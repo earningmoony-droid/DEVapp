@@ -5,135 +5,30 @@ import java.net.URI
 enum class TestSessionStatus(val displayLabel: String) {
     IDLE("Idle"),
     LOADING("Loading"),
-    VIEWING("Viewing"),
-    PAUSING_BETWEEN("Pausing"),
-    BLOCKED("Restricted"),
-    FAILED("Failed"),
-    COMPLETED("Completed"),
-    STOPPED("Stopped"),
-    ERROR("Error")
-}
-
-enum class ScrollSpeed(val label: String, val pxPerTick: Int) {
-    SLOW("Slow", 3),
-    MEDIUM("Medium", 7),
-    FAST("Fast", 14)
-}
-
-enum class AutoScrollDirection(val label: String) {
-    NONE("Stopped"),
-    DOWN("Scrolling Down"),
-    UP("Scrolling Up"),
-    RANDOM("Random Scroll")
-}
-
-enum class ScrollIndicatorState(val label: String) {
-    IDLE("Idle"),
-    SCROLLING_DOWN("Scrolling Down"),
-    SCROLLING_UP("Scrolling Up"),
-    RANDOM_DOWN("Random • Down"),
-    RANDOM_UP("Random • Up"),
-    PAUSED("Paused"),
-    STOPPED("Stopped"),
-    AT_TOP("Reached Top"),
-    AT_BOTTOM("Reached Bottom"),
-    NOT_SCROLLABLE("Page Not Scrollable"),
-    STUCK("Scroll Stuck"),
-    RESTRICTED("Cross-Origin Restricted")
-}
-
-enum class ClickInteractionMode(val label: String) {
-    CLICK("Click Mode"),
-    TAP("Tap Mode")
-}
-
-enum class VpnProvider(
-    val displayName: String,
-    val packageName: String?
-) {
-    ANDROID_SYSTEM("Android System VPN", null),
-    WIREGUARD("WireGuard", "com.wireguard.android"),
-    PROTON_VPN("Proton VPN", "ch.protonvpn.android"),
-    MULLVAD("Mullvad VPN", "net.mullvad.mullvadvpn"),
-    TAILSCALE("Tailscale", "com.tailscale.ipn"),
-    CLOUDFLARE_WARP("1.1.1.1 / WARP", "com.cloudflare.onedotonedotonedotone")
-}
-
-enum class VpnConnectionStatus(val label: String) {
-    DISCONNECTED("Disconnected"),
-    CONNECTED("VPN Active"),
-    VERIFYING("Verifying..."),
-    LOST("VPN Lost")
-}
-
-data class VpnVerificationInfo(
-    val isVerified: Boolean = false,
-    val publicIp: String? = null,
-    val country: String? = null,
-    val region: String? = null,
-    val networkOrg: String? = null,
-    val errorMessage: String? = null
-)
-
-data class ClickTargetItem(
-    val selector: String,
-    val label: String,
-    val tagType: String
-)
-
-const val DEMO_ENV_URL = "demo://webvisittester.local"
-
-enum class ClickTestStatus(val label: String) {
-    IDLE("Idle"),
-    RUNNING("Active"),
-    COMPLETED("Completed"),
-    STOPPED("Stopped"),
-    BLOCKED_AD("Ad Blocked"),
-    RESTRICTED("Restricted"),
-    NO_TARGET("No Target")
-}
-
-enum class RandomInteractionStatus(val label: String) {
-    IDLE("Idle"),
-    WAITING_LOAD("Waiting Load"),
-    TAPPING("Random Tapping"),
-    SCROLLING_DOWN("Scrolling Down"),
-    SCROLLING_UP("Scrolling Up"),
-    COMPLETED("Completed"),
-    FAILED("Load Failed"),
-    STOPPED("Stopped"),
-    RESTRICTED("Restricted")
-}
-
-enum class DiagnosticResultStatus(val label: String) {
-    IDLE("Idle"),
-    RUNNING("Running"),
-    PASSED("Passed"),
-    FAILED("Failed"),
+    LOADED("Loaded"),
     BLOCKED("Blocked"),
+    FAILED("Failed"),
+    NETWORK_ERROR("Network Error"),
     STOPPED("Stopped")
 }
 
+enum class ErrorDetectionSeverity {
+    NONE,
+    INFO,
+    WARNING,
+    ERROR
+}
+
 enum class WebCommandType {
-    BACK,
-    HOME,
     RELOAD,
     CLEAR_SESSION,
-    SCAN_CLICK_TARGETS,
-    EXECUTE_SINGLE_CLICK,
-    EXECUTE_RANDOM_TAP,
-    RANDOM_SCROLL_STEP,
-    DIAG_VERIFY_LISTENER,
-    DIAG_TEST_BUTTON,
-    DIAG_TEST_LINK
+    CHECK_CLICK_LISTENER
 }
 
 data class WebCommandEvent(
     val id: Long,
     val type: WebCommandType,
-    val targetUrl: String? = null,
-    val selector: String? = null,
-    val interactionMode: ClickInteractionMode = ClickInteractionMode.CLICK
+    val targetUrl: String? = null
 )
 
 sealed interface UrlValidationResult {
@@ -148,14 +43,14 @@ object UrlValidator {
     fun validate(rawInput: String): UrlValidationResult {
         val trimmed = rawInput.trim()
         if (trimmed.isEmpty()) {
-            return UrlValidationResult.Invalid("Enter a website URL to start testing.")
+            return UrlValidationResult.Invalid("Enter a Website URL to start testing.")
         }
         if (trimmed.any { it.isWhitespace() }) {
             return UrlValidationResult.Invalid("URL cannot contain spaces.")
         }
         val lower = trimmed.lowercase()
         if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
-            return UrlValidationResult.Invalid("URL must begin with http:// or https://")
+            return UrlValidationResult.Invalid("URL must start with http:// or https://")
         }
 
         val uri = try {

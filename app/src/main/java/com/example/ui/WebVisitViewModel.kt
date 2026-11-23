@@ -3,24 +3,12 @@ package com.example.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.model.AutoScrollDirection
-import com.example.model.ClickInteractionMode
-import com.example.model.ClickTargetItem
-import com.example.model.ClickTestStatus
-import com.example.model.DEMO_ENV_URL
-import com.example.model.DiagnosticResultStatus
-import com.example.model.RandomInteractionStatus
-import com.example.model.ScrollIndicatorState
-import com.example.model.ScrollSpeed
+import com.example.model.ErrorDetectionSeverity
 import com.example.model.TestSessionStatus
 import com.example.model.UrlValidationResult
 import com.example.model.UrlValidator
-import com.example.model.VpnConnectionStatus
-import com.example.model.VpnProvider
-import com.example.model.VpnVerificationInfo
 import com.example.model.WebCommandEvent
 import com.example.model.WebCommandType
-import com.example.network.VpnMonitorManager
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,188 +23,43 @@ import org.json.JSONObject
 data class WebVisitUiState(
     val urlInput: String = "",
     val urlError: String? = null,
-    val viewDurationSec: Int = 15,
-    val pauseDurationSec: Int = 3,
-    val totalRuns: Int = 3,
-    val scrollDirection: AutoScrollDirection = AutoScrollDirection.NONE,
-    val scrollSpeed: ScrollSpeed = ScrollSpeed.MEDIUM,
-    val scrollStatus: ScrollIndicatorState = ScrollIndicatorState.IDLE,
-    val isScrollPaused: Boolean = false,
-    val scrollPositionText: String = "0% • 0/0px",
-    val autoNextEnabled: Boolean = true,
 
-    // VPN Testing Module (temporary in-memory state only)
-    val selectedVpnProvider: VpnProvider = VpnProvider.ANDROID_SYSTEM,
-    val installedProviders: Set<VpnProvider> = setOf(VpnProvider.ANDROID_SYSTEM),
-    val vpnStatus: VpnConnectionStatus = VpnConnectionStatus.DISCONNECTED,
-    val vpnInterfaceName: String? = null,
-    val requireVpnForTest: Boolean = false,
-    val vpnVerification: VpnVerificationInfo? = null,
-    val vpnActionMessage: String? = null,
-    val isVerifyingVpn: Boolean = false,
-
-    // Clicks & Tap Automation (temporary in-memory state only, no history/logs)
-    val clickMode: ClickInteractionMode = ClickInteractionMode.CLICK,
-    val clickIntervalSec: Int = 2,
-    val clickSelector: String = "",
-    val clickTargetInput: String = "100",
-    val clickTarget: Int = 100,
-    val discoveredClickTargets: List<ClickTargetItem> = emptyList(),
-    val isScanningTargets: Boolean = false,
-    val isAutoClickRunning: Boolean = false,
-    val isManualClickListening: Boolean = false,
-    val clickCount: Int = 0,
-    val clickStatus: ClickTestStatus = ClickTestStatus.IDLE,
-    val clickStatusMessage: String? = null,
-    val isAuthorizedOwnSite: Boolean = false,
-
-    // Random Interaction Testing Mode (Own Test Page & Demo Environment only, zero ads)
-    val randomTapTargetInput: String = "20",
-    val randomTapTarget: Int = 20,
-    val randomTapDelayInput: String = "2",
-    val randomTapDelaySec: Int = 2,
-    val randomTapCount: Int = 0,
-    val isRandomInteractionRunning: Boolean = false,
-    val isRandomArmedOnLoad: Boolean = false,
-    val isDemoEnvironment: Boolean = false,
-    val randomStatus: RandomInteractionStatus = RandomInteractionStatus.IDLE,
-    val randomStatusMessage: String? = "Starts after verified page load. Performs safe random UI taps with scroll down/up cycles. Own Test Page & Demo Environment only; ads are blocked.",
-
-    // Impression & Click Tracking Diagnostic (temporary in-memory state only)
-    val isDiagRunning: Boolean = false,
-    val diagResultStatus: DiagnosticResultStatus = DiagnosticResultStatus.IDLE,
-    val diagPageLoadText: String = "Idle",
-    val diagTrackingText: String = "Idle",
-    val diagDetectionText: String = "Click Event Not Received",
-    val diagListenerText: String = "Not Checked",
-    val diagButtonText: String = "Pending",
-    val diagLinkText: String = "Pending",
-    val diagStatusMessage: String = "Load your Demo Test Page or Test Page URL, then tap Start Diagnostic to verify listener, button click event, and link navigation.",
-
-    // Temporary active session state only
-    val isRunning: Boolean = false,
+    // In-memory test session only (zero history, zero logs, zero fake counters)
     val status: TestSessionStatus = TestSessionStatus.IDLE,
     val activeUrl: String? = null,
     val previewLoadToken: Int = 0,
-    val visitCount: Int = 0,
-    val failedCount: Int = 0,
-    val currentRunNumber: Int = 0,
-    val activeTotalRuns: Int = 1,
-    val phaseRemainingSec: Int = 0,
-    val overallProgress: Float = 0f,
     val isPreviewLoading: Boolean = false,
     val previewBlockedReason: String? = null,
-    val lastLoadWasNetworkError: Boolean = false,
-    val canGoBack: Boolean = false,
+    val overallProgress: Float = 0f,
+
+    // Separate Impression Status & Click Tracking Status
+    val verifiedLoadCount: Int = 0,
+    val verifiedUiClicks: Int = 0,
+    val impressionStatusText: String = "Not Tested",
+    val clickTrackingStatusText: String = "Idle",
+    val pageLoadStatusText: String = "Idle",
+    val clickListenerStatusText: String = "Not Active",
+    val errorDetectionText: String = "No Click Tracking Error Detected",
+    val errorSeverity: ErrorDetectionSeverity = ErrorDetectionSeverity.NONE,
+    val statusMessage: String = "Enter a Website URL and tap Start Test to check Page Load, Impression Status, and Click Tracking.",
+    val isCheckingListener: Boolean = false,
+
     val webCommand: WebCommandEvent? = null,
     val isHtmlSheetVisible: Boolean = false
 )
 
 class WebVisitViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val vpnMonitor = VpnMonitorManager(application.applicationContext)
-
     private val _uiState = MutableStateFlow(WebVisitUiState())
     val uiState: StateFlow<WebVisitUiState> = _uiState.asStateFlow()
 
-    private var queueJob: Job? = null
-    private var autoClickJob: Job? = null
-    private var randomJob: Job? = null
-    private var diagJob: Job? = null
+    private var loadWatchdogJob: Job? = null
+    private var listenerCheckJob: Job? = null
     private var commandSeq: Long = 0L
-    private var wasVpnActive: Boolean = false
-    private var lastSingleTriggerAtMs: Long = 0L
-    private var countedVisitToken: Int = -1
+    private var countedLoadToken: Int = -1
     private var countedFailToken: Int = -1
-    private var randomLastSelector: String = ""
-    private var pendingRandomTapDeferred: CompletableDeferred<Triple<String, String?, String?>>? = null
-    private var pendingRandomScrollDeferred: CompletableDeferred<Pair<Boolean, String?>>? = null
-    private var pendingDiagDeferred: CompletableDeferred<String>? = null
-
-    init {
-        refreshInstalledProviders()
-
-        viewModelScope.launch {
-            vpnMonitor.transportState.collect { transport ->
-                val prevActive = wasVpnActive
-                wasVpnActive = transport.isVpnActive
-
-                val currentState = _uiState.value
-                val droppedDuringTest = prevActive && !transport.isVpnActive &&
-                    currentState.isRunning && currentState.requireVpnForTest
-
-                if (droppedDuringTest) {
-                    stopTestForVpnLoss()
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            vpnStatus = if (transport.isVpnActive) {
-                                VpnConnectionStatus.CONNECTED
-                            } else if (it.vpnStatus == VpnConnectionStatus.LOST) {
-                                VpnConnectionStatus.LOST
-                            } else {
-                                VpnConnectionStatus.DISCONNECTED
-                            },
-                            vpnInterfaceName = transport.interfaceName
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    fun refreshInstalledProviders() {
-        val installed = VpnProvider.entries.filter { vpnMonitor.isProviderInstalled(it) }.toSet()
-        _uiState.update { it.copy(installedProviders = installed) }
-    }
-
-    fun selectVpnProvider(provider: VpnProvider) {
-        _uiState.update {
-            it.copy(selectedVpnProvider = provider, vpnActionMessage = null)
-        }
-    }
-
-    fun setRequireVpnForTest(required: Boolean) {
-        if (_uiState.value.isRunning) return
-        _uiState.update { it.copy(requireVpnForTest = required, vpnActionMessage = null) }
-    }
-
-    fun openVpnConnectOrDisconnect() {
-        val provider = _uiState.value.selectedVpnProvider
-        vpnMonitor.openOfficialVpnControl(provider)
-            .onSuccess { msg ->
-                _uiState.update { it.copy(vpnActionMessage = msg) }
-            }
-            .onFailure { err ->
-                _uiState.update {
-                    it.copy(vpnActionMessage = err.localizedMessage ?: "Unable to open VPN settings.")
-                }
-            }
-    }
-
-    fun verifyVpnConnection() {
-        if (_uiState.value.isVerifyingVpn) return
-        _uiState.update {
-            it.copy(
-                isVerifyingVpn = true,
-                vpnStatus = VpnConnectionStatus.VERIFYING,
-                vpnActionMessage = null
-            )
-        }
-        viewModelScope.launch {
-            val info = vpnMonitor.verifyConnection()
-            val active = vpnMonitor.transportState.value.isVpnActive
-            _uiState.update {
-                it.copy(
-                    isVerifyingVpn = false,
-                    vpnStatus = if (active) VpnConnectionStatus.CONNECTED else VpnConnectionStatus.DISCONNECTED,
-                    vpnInterfaceName = vpnMonitor.transportState.value.interfaceName,
-                    vpnVerification = info,
-                    vpnActionMessage = info.errorMessage
-                )
-            }
-        }
-    }
+    private var lastTrustedClickAtMs: Long = 0L
+    private var pendingListenerDeferred: CompletableDeferred<String>? = null
 
     fun setHtmlSheetVisible(visible: Boolean) {
         _uiState.update { it.copy(isHtmlSheetVisible = visible) }
@@ -233,1404 +76,14 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun applyQuickProtocol(protocol: String) {
-        if (_uiState.value.isRunning) return
-        val current = _uiState.value.urlInput.trim()
-        val stripped = current.removePrefix("https://").removePrefix("http://")
+        if (_uiState.value.status == TestSessionStatus.LOADING) return
+        val stripped = _uiState.value.urlInput.trim().removePrefix("https://").removePrefix("http://")
         onUrlChanged("$protocol$stripped")
     }
 
-    fun updateViewDuration(seconds: Int) {
-        if (_uiState.value.isRunning) return
-        _uiState.update { it.copy(viewDurationSec = seconds.coerceIn(3, 300)) }
-    }
-
-    fun updatePauseDuration(seconds: Int) {
-        if (_uiState.value.isRunning) return
-        _uiState.update { it.copy(pauseDurationSec = seconds.coerceIn(0, 120)) }
-    }
-
-    fun updateTotalRuns(runs: Int) {
-        if (_uiState.value.isRunning) return
-        _uiState.update { it.copy(totalRuns = runs.coerceIn(1, 50)) }
-    }
-
-    fun startAutoScrollDown() {
-        _uiState.update {
-            if (it.activeUrl == null) {
-                return@update it.copy(
-                    scrollDirection = AutoScrollDirection.NONE,
-                    isScrollPaused = false,
-                    scrollStatus = ScrollIndicatorState.IDLE
-                )
-            }
-            it.copy(
-                scrollDirection = AutoScrollDirection.DOWN,
-                isScrollPaused = false,
-                scrollStatus = ScrollIndicatorState.SCROLLING_DOWN
-            )
-        }
-    }
-
-    fun startAutoScrollUp() {
-        _uiState.update {
-            if (it.activeUrl == null) {
-                return@update it.copy(
-                    scrollDirection = AutoScrollDirection.NONE,
-                    isScrollPaused = false,
-                    scrollStatus = ScrollIndicatorState.IDLE
-                )
-            }
-            it.copy(
-                scrollDirection = AutoScrollDirection.UP,
-                isScrollPaused = false,
-                scrollStatus = ScrollIndicatorState.SCROLLING_UP
-            )
-        }
-    }
-
-    fun startRandomScroll() {
-        _uiState.update {
-            if (it.activeUrl == null) {
-                return@update it.copy(
-                    scrollDirection = AutoScrollDirection.NONE,
-                    isScrollPaused = false,
-                    scrollStatus = ScrollIndicatorState.IDLE
-                )
-            }
-            it.copy(
-                scrollDirection = AutoScrollDirection.RANDOM,
-                isScrollPaused = false,
-                scrollStatus = ScrollIndicatorState.RANDOM_DOWN
-            )
-        }
-    }
-
-    fun togglePauseAutoScroll() {
-        _uiState.update { state ->
-            if (state.scrollDirection == AutoScrollDirection.NONE) return@update state
-            val nextPaused = !state.isScrollPaused
-            val nextStatus = if (nextPaused) {
-                ScrollIndicatorState.PAUSED
-            } else {
-                when (state.scrollDirection) {
-                    AutoScrollDirection.DOWN -> ScrollIndicatorState.SCROLLING_DOWN
-                    AutoScrollDirection.UP -> ScrollIndicatorState.SCROLLING_UP
-                    AutoScrollDirection.RANDOM -> ScrollIndicatorState.RANDOM_DOWN
-                    AutoScrollDirection.NONE -> ScrollIndicatorState.IDLE
-                }
-            }
-            state.copy(isScrollPaused = nextPaused, scrollStatus = nextStatus)
-        }
-    }
-
-    fun stopAutoScroll() {
-        _uiState.update {
-            it.copy(
-                scrollDirection = AutoScrollDirection.NONE,
-                isScrollPaused = false,
-                scrollStatus = ScrollIndicatorState.STOPPED
-            )
-        }
-    }
-
-    fun onScrollFeedback(status: ScrollIndicatorState, positionText: String?) {
-        val isTerminal = status == ScrollIndicatorState.AT_TOP ||
-            status == ScrollIndicatorState.AT_BOTTOM ||
-            status == ScrollIndicatorState.NOT_SCROLLABLE ||
-            status == ScrollIndicatorState.STUCK ||
-            status == ScrollIndicatorState.RESTRICTED
-
-        _uiState.update { state ->
-            val updatedPos = positionText ?: state.scrollPositionText
-            if (state.isScrollPaused && !isTerminal) {
-                return@update state.copy(scrollPositionText = updatedPos)
-            }
-            if (state.scrollDirection == AutoScrollDirection.NONE && !isTerminal) {
-                return@update state.copy(scrollPositionText = updatedPos)
-            }
-            state.copy(
-                scrollStatus = status,
-                scrollPositionText = updatedPos,
-                scrollDirection = if (isTerminal) AutoScrollDirection.NONE else state.scrollDirection,
-                isScrollPaused = if (isTerminal) false else state.isScrollPaused
-            )
-        }
-    }
-
-    fun setScrollSpeed(speed: ScrollSpeed) {
-        _uiState.update { it.copy(scrollSpeed = speed) }
-    }
-
-    fun setClickInteractionMode(mode: ClickInteractionMode) {
-        if (_uiState.value.isAutoClickRunning) return
-        _uiState.update { it.copy(clickMode = mode, clickStatusMessage = null) }
-    }
-
-    fun setAutoNextEnabled(enabled: Boolean) {
-        if (_uiState.value.isRunning) return
-        _uiState.update { it.copy(autoNextEnabled = enabled) }
-    }
-
-    // --- Clicks Automation Controls (Strictly for authorized own sites / test pages, zero ads) ---
-
-    fun setAuthorizedOwnSite(authorized: Boolean) {
-        if (!authorized) {
-            if (_uiState.value.isAutoClickRunning) {
-                stopAutoClick("Stopped: Authorization unchecked.")
-            }
-            if ((_uiState.value.isRandomInteractionRunning || _uiState.value.isRandomArmedOnLoad) &&
-                !_uiState.value.isDemoEnvironment
-            ) {
-                stopRandomInteraction("Stopped: Authorization unchecked.", RandomInteractionStatus.RESTRICTED)
-            }
-        }
-        _uiState.update {
-            it.copy(
-                isAuthorizedOwnSite = authorized,
-                clickStatusMessage = if (authorized) null else it.clickStatusMessage
-            )
-        }
-    }
-
-    fun onClickSelectorChanged(selector: String) {
-        _uiState.update {
-            it.copy(
-                clickSelector = selector,
-                clickStatusMessage = null
-            )
-        }
-    }
-
-    fun selectDiscoveredTarget(target: ClickTargetItem) {
-        _uiState.update {
-            it.copy(
-                clickSelector = target.selector,
-                clickStatusMessage = "Selected: ${target.label}"
-            )
-        }
-    }
-
-    fun updateClickInterval(seconds: Int) {
-        if (_uiState.value.isAutoClickRunning) return
-        _uiState.update { it.copy(clickIntervalSec = seconds.coerceIn(1, 60)) }
-    }
-
-    fun updateClickTargetInput(rawInput: String) {
-        val digitsOnly = rawInput.filter { it.isDigit() }.take(5)
-        val parsed = digitsOnly.toIntOrNull()?.coerceIn(1, 10000)
-        _uiState.update { state ->
-            val nextTarget = parsed ?: state.clickTarget
-            val reachedNow = state.isAutoClickRunning && parsed != null && state.clickCount >= nextTarget
-            if (reachedNow) {
-                autoClickJob?.cancel()
-                autoClickJob = null
-            }
-            state.copy(
-                clickTargetInput = digitsOnly,
-                clickTarget = nextTarget,
-                isAutoClickRunning = if (reachedNow) false else state.isAutoClickRunning,
-                isManualClickListening = if (reachedNow) false else state.isManualClickListening,
-                clickStatus = if (reachedNow) ClickTestStatus.COMPLETED else state.clickStatus,
-                clickStatusMessage = if (reachedNow) {
-                    "Target reached (${state.clickCount}/$nextTarget). Click Test stopped automatically."
-                } else {
-                    state.clickStatusMessage
-                }
-            )
-        }
-    }
-
-    fun selectClickTargetPreset(target: Int) {
-        val safeTarget = target.coerceIn(1, 10000)
-        _uiState.update { state ->
-            val reachedNow = state.isAutoClickRunning && state.clickCount >= safeTarget
-            if (reachedNow) {
-                autoClickJob?.cancel()
-                autoClickJob = null
-            }
-            state.copy(
-                clickTargetInput = safeTarget.toString(),
-                clickTarget = safeTarget,
-                isAutoClickRunning = if (reachedNow) false else state.isAutoClickRunning,
-                isManualClickListening = if (reachedNow) false else state.isManualClickListening,
-                clickStatus = if (reachedNow) ClickTestStatus.COMPLETED else state.clickStatus,
-                clickStatusMessage = if (reachedNow) {
-                    "Target reached (${state.clickCount}/$safeTarget). Click Test stopped automatically."
-                } else {
-                    "Click Target updated to $safeTarget (${state.clickCount}/$safeTarget)."
-                }
-            )
-        }
-    }
-
-    fun resetClickCounter() {
-        autoClickJob?.cancel()
-        autoClickJob = null
-        lastSingleTriggerAtMs = 0L
-        _uiState.update { state ->
-            val safeTarget = state.clickTargetInput.toIntOrNull()?.coerceIn(1, 10000) ?: state.clickTarget
-            state.copy(
-                clickTarget = safeTarget,
-                clickTargetInput = safeTarget.toString(),
-                isAutoClickRunning = false,
-                isManualClickListening = false,
-                clickCount = 0,
-                clickStatus = ClickTestStatus.IDLE,
-                clickStatusMessage = "Click counter reset (0/$safeTarget)."
-            )
-        }
-    }
-
-    fun scanClickTargets() {
-        val state = _uiState.value
-        if (state.activeUrl == null || state.previewBlockedReason != null || state.status == TestSessionStatus.PAUSING_BETWEEN) {
-            _uiState.update {
-                it.copy(
-                    clickStatus = ClickTestStatus.RESTRICTED,
-                    clickStatusMessage = "Load your website preview first before scanning buttons or links."
-                )
-            }
-            return
-        }
-        _uiState.update {
-            it.copy(
-                isScanningTargets = true,
-                clickStatusMessage = null,
-                webCommand = WebCommandEvent(++commandSeq, WebCommandType.SCAN_CLICK_TARGETS)
-            )
-        }
-    }
-
-    fun onClickTargetsScanned(targets: List<ClickTargetItem>, errorMsg: String?) {
-        _uiState.update { state ->
-            val currentStillValid = targets.any { it.selector == state.clickSelector }
-            state.copy(
-                isScanningTargets = false,
-                discoveredClickTargets = targets,
-                clickSelector = when {
-                    state.clickSelector.isNotBlank() && currentStillValid -> state.clickSelector
-                    state.clickSelector.isBlank() && targets.isNotEmpty() -> targets.first().selector
-                    else -> state.clickSelector
-                },
-                clickStatus = when {
-                    errorMsg != null -> ClickTestStatus.RESTRICTED
-                    targets.isEmpty() -> ClickTestStatus.NO_TARGET
-                    else -> if (state.isAutoClickRunning) ClickTestStatus.RUNNING else ClickTestStatus.IDLE
-                },
-                clickStatusMessage = errorMsg ?: if (targets.isEmpty()) {
-                    "No safe buttons or links found on this view."
-                } else {
-                    "Found ${targets.size} safe button/link target(s)."
-                }
-            )
-        }
-    }
-
-    private fun isProhibitedAdSelector(selector: String): Boolean {
-        val lower = selector.lowercase()
-        val blockedTokens = listOf(
-            "adsbygoogle", "doubleclick", "googlesyndication", "adservice",
-            "adsystem", "adserver", "adnxs", "taboola", "outbrain", "mgid",
-            "sponsored", "advertisement", "ad-slot", "ad_slot", "ad-banner",
-            "ad_banner", "google_ads", "data-ad"
-        )
-        return blockedTokens.any { lower.contains(it) }
-    }
-
-    fun triggerSingleClickTest() {
-        val now = System.currentTimeMillis()
-        if (now - lastSingleTriggerAtMs < 320L) return
-
-        val state = _uiState.value
-        if (!state.isAuthorizedOwnSite && !state.isDemoEnvironment) {
-            _uiState.update {
-                it.copy(
-                    clickStatus = ClickTestStatus.RESTRICTED,
-                    clickStatusMessage = "Confirm this is your own website or authorized test page first."
-                )
-            }
-            return
-        }
-        if (state.activeUrl == null || state.previewBlockedReason != null || state.status == TestSessionStatus.PAUSING_BETWEEN) {
-            _uiState.update {
-                it.copy(
-                    clickStatus = ClickTestStatus.RESTRICTED,
-                    clickStatusMessage = "Start a test session so the website preview is loaded."
-                )
-            }
-            return
-        }
-        val selector = state.clickSelector.trim()
-        if (selector.isEmpty()) {
-            _uiState.update {
-                it.copy(
-                    clickStatus = ClickTestStatus.NO_TARGET,
-                    clickStatusMessage = "Scan targets or enter a button/link selector."
-                )
-            }
-            return
-        }
-        if (isProhibitedAdSelector(selector)) {
-            _uiState.update {
-                it.copy(
-                    clickStatus = ClickTestStatus.BLOCKED_AD,
-                    clickStatusMessage = "Blocked: Ad elements and CTR manipulation are prohibited."
-                )
-            }
-            return
-        }
-
-        lastSingleTriggerAtMs = now
-        _uiState.update {
-            it.copy(
-                clickStatusMessage = null,
-                webCommand = WebCommandEvent(
-                    id = ++commandSeq,
-                    type = WebCommandType.EXECUTE_SINGLE_CLICK,
-                    selector = selector,
-                    interactionMode = state.clickMode
-                )
-            )
-        }
-    }
-
-    fun startAutoClick() {
-        val state = _uiState.value
-        if (state.isAutoClickRunning) return
-
-        val parsedTarget = state.clickTargetInput.trim().toIntOrNull()
-        if (parsedTarget == null || parsedTarget < 1) {
-            _uiState.update {
-                it.copy(
-                    clickStatus = ClickTestStatus.NO_TARGET,
-                    clickStatusMessage = "Enter a valid Click Target (1 to 10000)."
-                )
-            }
-            return
-        }
-        val safeTarget = parsedTarget.coerceIn(1, 10000)
-
-        if (!state.isAuthorizedOwnSite && !state.isDemoEnvironment) {
-            _uiState.update {
-                it.copy(
-                    clickTarget = safeTarget,
-                    clickTargetInput = safeTarget.toString(),
-                    clickStatus = ClickTestStatus.RESTRICTED,
-                    clickStatusMessage = "Confirm this is your own website or authorized test page first."
-                )
-            }
-            return
-        }
-        if (state.activeUrl == null || state.previewBlockedReason != null || state.status == TestSessionStatus.PAUSING_BETWEEN) {
-            _uiState.update {
-                it.copy(
-                    clickTarget = safeTarget,
-                    clickTargetInput = safeTarget.toString(),
-                    clickStatus = ClickTestStatus.RESTRICTED,
-                    clickStatusMessage = "Start a test session so the website preview is loaded."
-                )
-            }
-            return
-        }
-        if (state.clickCount >= safeTarget) {
-            _uiState.update {
-                it.copy(
-                    clickTarget = safeTarget,
-                    clickTargetInput = safeTarget.toString(),
-                    clickStatus = ClickTestStatus.COMPLETED,
-                    clickStatusMessage = "Target ${state.clickCount}/$safeTarget already reached. Reset Counter or raise Click Target."
-                )
-            }
-            return
-        }
-
-        val selector = state.clickSelector.trim()
-        if (selector.isNotEmpty() && isProhibitedAdSelector(selector)) {
-            _uiState.update {
-                it.copy(
-                    clickStatus = ClickTestStatus.BLOCKED_AD,
-                    clickStatusMessage = "Blocked: Ad elements and artificial clicks are strictly prohibited."
-                )
-            }
-            return
-        }
-
-        if (selector.isEmpty()) {
-            autoClickJob?.cancel()
-            autoClickJob = null
-            _uiState.update {
-                it.copy(
-                    clickTarget = safeTarget,
-                    clickTargetInput = safeTarget.toString(),
-                    isAutoClickRunning = true,
-                    isManualClickListening = true,
-                    clickStatus = ClickTestStatus.RUNNING,
-                    clickStatusMessage = "Click Test active (${state.clickCount}/$safeTarget): Tap elements in preview or enter a selector for auto clicking."
-                )
-            }
-            return
-        }
-
-        val intervalMs = state.clickIntervalSec.coerceIn(1, 60) * 1000L
-        val modeLabel = if (state.clickMode == ClickInteractionMode.TAP) "Tap Test" else "Click Test"
-        _uiState.update {
-            it.copy(
-                clickTarget = safeTarget,
-                clickTargetInput = safeTarget.toString(),
-                isAutoClickRunning = true,
-                isManualClickListening = false,
-                clickStatus = ClickTestStatus.RUNNING,
-                clickStatusMessage = "$modeLabel active (${state.clickCount}/$safeTarget) every ${state.clickIntervalSec}s"
-            )
-        }
-
-        autoClickJob?.cancel()
-        autoClickJob = viewModelScope.launch {
-            while (_uiState.value.isAutoClickRunning && !_uiState.value.isManualClickListening) {
-                val cur = _uiState.value
-                val activeLabel = if (cur.clickMode == ClickInteractionMode.TAP) "Tap Test" else "Click Test"
-                if (cur.clickCount >= cur.clickTarget) {
-                    _uiState.update {
-                        it.copy(
-                            isAutoClickRunning = false,
-                            isManualClickListening = false,
-                            clickStatus = ClickTestStatus.COMPLETED,
-                            clickStatusMessage = "Target reached (${cur.clickCount}/${cur.clickTarget}). $activeLabel stopped automatically."
-                        )
-                    }
-                    break
-                }
-                if ((!cur.isAuthorizedOwnSite && !cur.isDemoEnvironment) ||
-                    cur.activeUrl == null ||
-                    cur.previewBlockedReason != null
-                ) {
-                    stopAutoClick("$activeLabel stopped: Preview not active.")
-                    break
-                }
-                if (cur.status != TestSessionStatus.PAUSING_BETWEEN && !cur.isPreviewLoading) {
-                    _uiState.update {
-                        it.copy(
-                            webCommand = WebCommandEvent(
-                                id = ++commandSeq,
-                                type = WebCommandType.EXECUTE_SINGLE_CLICK,
-                                selector = cur.clickSelector.trim(),
-                                interactionMode = cur.clickMode
-                            )
-                        )
-                    }
-                }
-                delay(intervalMs)
-            }
-        }
-    }
-
-    fun stopAutoClick(reason: String? = null) {
-        autoClickJob?.cancel()
-        autoClickJob = null
-        _uiState.update {
-            val defaultMsg = if (it.clickMode == ClickInteractionMode.TAP) {
-                "Tap Test stopped (${it.clickCount}/${it.clickTarget})."
-            } else {
-                "Click Test stopped (${it.clickCount}/${it.clickTarget})."
-            }
-            it.copy(
-                isAutoClickRunning = false,
-                isManualClickListening = false,
-                clickStatus = ClickTestStatus.STOPPED,
-                clickStatusMessage = reason ?: defaultMsg
-            )
-        }
-    }
-
-    fun onDirectPreviewClick(targetLabel: String) {
-        val now = System.currentTimeMillis()
-        if (now - lastSingleTriggerAtMs < 280L) return
-
-        val state = _uiState.value
-        if (!state.isAuthorizedOwnSite && !state.isDemoEnvironment) {
-            _uiState.update {
-                it.copy(
-                    clickStatus = ClickTestStatus.RESTRICTED,
-                    clickStatusMessage = "Enable 'Authorized Own Site / Test Page' to count preview clicks."
-                )
-            }
-            return
-        }
-        if (state.activeUrl == null || state.previewBlockedReason != null) return
-
-        if (state.isAutoClickRunning && state.clickCount >= state.clickTarget) {
-            autoClickJob?.cancel()
-            autoClickJob = null
-            _uiState.update {
-                it.copy(
-                    isAutoClickRunning = false,
-                    isManualClickListening = false,
-                    clickStatus = ClickTestStatus.COMPLETED,
-                    clickStatusMessage = "Target reached (${state.clickCount}/${state.clickTarget}). Click Test stopped automatically."
-                )
-            }
-            return
-        }
-
-        lastSingleTriggerAtMs = now
-        val safeLabel = targetLabel.ifBlank { "element" }
-        _uiState.update {
-            val nextCount = it.clickCount + 1
-            val target = it.clickTarget
-            val reachedTarget = it.isAutoClickRunning && nextCount >= target
-            if (reachedTarget) {
-                autoClickJob?.cancel()
-                autoClickJob = null
-            }
-            val actionWord = if (it.clickMode == ClickInteractionMode.TAP) "tap" else "click"
-            it.copy(
-                clickCount = nextCount,
-                diagDetectionText = "Click Event Received",
-                diagTrackingText = "Active",
-                diagListenerText = "Active (0 Duplicates)",
-                isAutoClickRunning = if (reachedTarget) false else it.isAutoClickRunning,
-                isManualClickListening = if (reachedTarget) false else it.isManualClickListening,
-                clickStatus = when {
-                    reachedTarget -> ClickTestStatus.COMPLETED
-                    it.isAutoClickRunning -> ClickTestStatus.RUNNING
-                    else -> ClickTestStatus.IDLE
-                },
-                clickStatusMessage = if (reachedTarget) {
-                    "Target reached on \"$safeLabel\" ($nextCount/$target). Click Test stopped automatically."
-                } else {
-                    "Counted direct $actionWord on \"$safeLabel\" ($nextCount/$target)."
-                }
-            )
-        }
-    }
-
-    fun onSingleClickExecuted(resultCode: String, detail: String?) {
-        when (resultCode) {
-            "SKIPPED" -> Unit
-            "CLICKED" -> {
-                _uiState.update { state ->
-                    if (state.isAutoClickRunning && state.clickCount >= state.clickTarget) {
-                        autoClickJob?.cancel()
-                        autoClickJob = null
-                        return@update state.copy(
-                            isAutoClickRunning = false,
-                            isManualClickListening = false,
-                            clickStatus = ClickTestStatus.COMPLETED,
-                            clickStatusMessage = "Target reached (${state.clickCount}/${state.clickTarget}). Click Test stopped automatically."
-                        )
-                    }
-                    val nextCount = state.clickCount + 1
-                    val target = state.clickTarget
-                    val reachedTarget = state.isAutoClickRunning && nextCount >= target
-                    if (reachedTarget) {
-                        autoClickJob?.cancel()
-                        autoClickJob = null
-                    }
-                    state.copy(
-                        clickCount = nextCount,
-                        diagDetectionText = "Click Event Received",
-                        diagTrackingText = "Active",
-                        diagListenerText = "Active (0 Duplicates)",
-                        isAutoClickRunning = if (reachedTarget) false else state.isAutoClickRunning,
-                        isManualClickListening = if (reachedTarget) false else state.isManualClickListening,
-                        clickStatus = when {
-                            reachedTarget -> ClickTestStatus.COMPLETED
-                            state.isAutoClickRunning -> ClickTestStatus.RUNNING
-                            else -> ClickTestStatus.IDLE
-                        },
-                        clickStatusMessage = if (reachedTarget) {
-                            "Target reached ($nextCount/$target). Click Test stopped automatically."
-                        } else {
-                            "${detail ?: "Tested interaction"} ($nextCount/$target)."
-                        }
-                    )
-                }
-            }
-            "BLOCKED_AD" -> {
-                autoClickJob?.cancel()
-                autoClickJob = null
-                _uiState.update {
-                    it.copy(
-                        isAutoClickRunning = false,
-                        isManualClickListening = false,
-                        clickStatus = ClickTestStatus.BLOCKED_AD,
-                        clickStatusMessage = "Blocked: Clicking ads or sponsored elements is strictly prohibited."
-                    )
-                }
-            }
-            "NO_TARGET" -> {
-                autoClickJob?.cancel()
-                autoClickJob = null
-                _uiState.update {
-                    it.copy(
-                        isAutoClickRunning = false,
-                        isManualClickListening = false,
-                        clickStatus = ClickTestStatus.NO_TARGET,
-                        clickStatusMessage = "Selected button/link was not found on the current view."
-                    )
-                }
-            }
-            else -> {
-                autoClickJob?.cancel()
-                autoClickJob = null
-                _uiState.update {
-                    it.copy(
-                        isAutoClickRunning = false,
-                        isManualClickListening = false,
-                        clickStatus = ClickTestStatus.RESTRICTED,
-                        clickStatusMessage = detail ?: "Click blocked by page security restrictions."
-                    )
-                }
-            }
-        }
-    }
-
-    // --- Random Interaction Testing Mode (Own Test Page & Demo Environment Only, Zero Ads) ---
-
-    fun loadDemoTestEnvironment() {
-        val cur = _uiState.value
-        if (cur.isRunning || cur.isRandomInteractionRunning || cur.isDiagRunning) return
-
-        queueJob?.cancel()
-        queueJob = null
-        autoClickJob?.cancel()
-        autoClickJob = null
-        cancelRandomJobsAndDeferreds()
-        cancelDiagJobsAndDeferreds()
-        countedVisitToken = -1
-        countedFailToken = -1
-        randomLastSelector = ""
-
-        _uiState.update {
-            it.copy(
-                isRunning = false,
-                status = TestSessionStatus.VIEWING,
-                activeUrl = DEMO_ENV_URL,
-                previewLoadToken = it.previewLoadToken + 1,
-                visitCount = it.visitCount + 1,
-                isPreviewLoading = false,
-                previewBlockedReason = null,
-                lastLoadWasNetworkError = false,
-                canGoBack = false,
-                scrollDirection = AutoScrollDirection.NONE,
-                isScrollPaused = false,
-                scrollPositionText = "0% • 0/0px",
-                scrollStatus = ScrollIndicatorState.IDLE,
-                isAutoClickRunning = false,
-                isManualClickListening = false,
-                discoveredClickTargets = emptyList(),
-                isDemoEnvironment = true,
-                isRandomInteractionRunning = false,
-                isRandomArmedOnLoad = false,
-                randomStatus = RandomInteractionStatus.IDLE,
-                randomStatusMessage = "Demo Test Environment loaded (1 verified Impression). Tap 'Start Random Test' or 'Start Diagnostic'.",
-                isDiagRunning = false,
-                diagResultStatus = DiagnosticResultStatus.IDLE,
-                diagPageLoadText = "Loaded (Demo Page)",
-                diagTrackingText = "Ready",
-                diagDetectionText = "Click Event Not Received",
-                diagListenerText = "Not Checked",
-                diagButtonText = "Pending",
-                diagLinkText = "Pending",
-                diagStatusMessage = "Demo Test Page loaded (1 verified Impression). Tap Start Diagnostic to verify listener, test button, and link navigation."
-            )
-        }
-    }
-
-    fun updateRandomTapTargetInput(rawInput: String) {
-        val digitsOnly = rawInput.filter { it.isDigit() }.take(4)
-        val parsed = digitsOnly.toIntOrNull()?.coerceIn(1, 5000)
-        _uiState.update { state ->
-            val nextTarget = parsed ?: state.randomTapTarget
-            val reachedNow = state.isRandomInteractionRunning && parsed != null && state.randomTapCount >= nextTarget
-            if (reachedNow) {
-                cancelRandomJobsAndDeferreds()
-            }
-            state.copy(
-                randomTapTargetInput = digitsOnly,
-                randomTapTarget = nextTarget,
-                isRandomInteractionRunning = if (reachedNow) false else state.isRandomInteractionRunning,
-                isRandomArmedOnLoad = if (reachedNow) false else state.isRandomArmedOnLoad,
-                randomStatus = if (reachedNow) RandomInteractionStatus.COMPLETED else state.randomStatus,
-                randomStatusMessage = if (reachedNow) {
-                    "Random Interaction completed (${state.randomTapCount}/$nextTarget taps)."
-                } else {
-                    state.randomStatusMessage
-                }
-            )
-        }
-    }
-
-    fun updateRandomTapDelayInput(rawInput: String) {
-        if (_uiState.value.isRandomInteractionRunning || _uiState.value.isRandomArmedOnLoad) return
-        val digitsOnly = rawInput.filter { it.isDigit() }.take(2)
-        val parsed = digitsOnly.toIntOrNull()?.coerceIn(1, 30)
-        _uiState.update {
-            it.copy(
-                randomTapDelayInput = digitsOnly,
-                randomTapDelaySec = parsed ?: it.randomTapDelaySec
-            )
-        }
-    }
-
-    fun startRandomInteraction() {
-        val state = _uiState.value
-        if (state.isRandomInteractionRunning || state.isRandomArmedOnLoad) return
-
-        val safeTarget = state.randomTapTargetInput.trim().toIntOrNull()?.coerceIn(1, 5000) ?: 20
-        val safeDelay = state.randomTapDelayInput.trim().toIntOrNull()?.coerceIn(1, 30) ?: 2
-
-        if (state.randomTapCount >= safeTarget) {
-            _uiState.update {
-                it.copy(
-                    randomTapTarget = safeTarget,
-                    randomTapTargetInput = safeTarget.toString(),
-                    randomTapDelaySec = safeDelay,
-                    randomTapDelayInput = safeDelay.toString(),
-                    randomStatus = RandomInteractionStatus.COMPLETED,
-                    randomStatusMessage = "Tap Target (${state.randomTapCount}/$safeTarget) already reached. Press Reset or raise Tap Target."
-                )
-            }
-            return
-        }
-
-        if (!state.isDemoEnvironment && !state.isAuthorizedOwnSite) {
-            _uiState.update {
-                it.copy(
-                    randomTapTarget = safeTarget,
-                    randomTapTargetInput = safeTarget.toString(),
-                    randomTapDelaySec = safeDelay,
-                    randomTapDelayInput = safeDelay.toString(),
-                    randomStatus = RandomInteractionStatus.RESTRICTED,
-                    randomStatusMessage = "Random Interaction only works on your own Test Page ('Authorized Own Site') or Demo Environment ('Load Demo Test Environment')."
-                )
-            }
-            return
-        }
-
-        _uiState.update {
-            it.copy(
-                randomTapTarget = safeTarget,
-                randomTapTargetInput = safeTarget.toString(),
-                randomTapDelaySec = safeDelay,
-                randomTapDelayInput = safeDelay.toString()
-            )
-        }
-
-        val previewReady = (state.isDemoEnvironment && state.activeUrl == DEMO_ENV_URL) ||
-            (state.activeUrl != null && !state.isPreviewLoading && state.previewBlockedReason == null && state.status == TestSessionStatus.VIEWING)
-
-        if (previewReady) {
-            launchRandomInteractionLoop()
-            return
-        }
-
-        if (state.isRunning && state.isPreviewLoading && state.previewBlockedReason == null) {
-            _uiState.update {
-                it.copy(
-                    isRandomArmedOnLoad = true,
-                    randomStatus = RandomInteractionStatus.WAITING_LOAD,
-                    randomStatusMessage = "Waiting for page load to finish before starting Random Interaction..."
-                )
-            }
-            return
-        }
-
-        val check = UrlValidator.validate(state.urlInput)
-        if (check is UrlValidationResult.Invalid) {
-            _uiState.update {
-                it.copy(
-                    randomStatus = RandomInteractionStatus.FAILED,
-                    randomStatusMessage = "Load Demo Test Environment or enter a valid Test Page URL first."
-                )
-            }
-            return
-        }
-
-        _uiState.update {
-            it.copy(
-                isRandomArmedOnLoad = true,
-                randomStatus = RandomInteractionStatus.WAITING_LOAD,
-                randomStatusMessage = "Loading Test Page; Random Interaction will begin once page load completes..."
-            )
-        }
-        startTestInternal(preserveRandomArmed = true)
-    }
-
-    fun stopRandomInteraction(
-        reason: String? = null,
-        finalStatus: RandomInteractionStatus = RandomInteractionStatus.STOPPED
-    ) {
-        cancelRandomJobsAndDeferreds()
-        _uiState.update {
-            it.copy(
-                isRandomInteractionRunning = false,
-                isRandomArmedOnLoad = false,
-                randomStatus = finalStatus,
-                randomStatusMessage = reason ?: "Random Interaction stopped (${it.randomTapCount}/${it.randomTapTarget})."
-            )
-        }
-    }
-
-    fun resetRandomInteractionCounter() {
-        cancelRandomJobsAndDeferreds()
-        randomLastSelector = ""
-        _uiState.update {
-            val safeTarget = it.randomTapTargetInput.toIntOrNull()?.coerceIn(1, 5000) ?: it.randomTapTarget
-            it.copy(
-                randomTapTarget = safeTarget,
-                randomTapTargetInput = safeTarget.toString(),
-                randomTapCount = 0,
-                isRandomInteractionRunning = false,
-                isRandomArmedOnLoad = false,
-                randomStatus = RandomInteractionStatus.IDLE,
-                randomStatusMessage = "Counter reset (0/$safeTarget). Ready to start."
-            )
-        }
-    }
-
-    fun onRandomTapExecuted(status: String, label: String?, selector: String?) {
-        pendingRandomTapDeferred?.complete(Triple(status, label, selector))
-    }
-
-    fun onRandomScrollFinished(moved: Boolean, posText: String?) {
-        pendingRandomScrollDeferred?.complete(Pair(moved, posText))
-    }
-
-    private fun cancelRandomJobsAndDeferreds() {
-        randomJob?.cancel()
-        randomJob = null
-        pendingRandomTapDeferred?.cancel()
-        pendingRandomTapDeferred = null
-        pendingRandomScrollDeferred?.cancel()
-        pendingRandomScrollDeferred = null
-    }
-
-    private fun launchRandomInteractionLoop() {
-        cancelRandomJobsAndDeferreds()
-        randomLastSelector = ""
-        _uiState.update {
-            it.copy(
-                isRandomInteractionRunning = true,
-                isRandomArmedOnLoad = false,
-                scrollDirection = AutoScrollDirection.NONE,
-                isScrollPaused = false,
-                randomStatus = RandomInteractionStatus.TAPPING,
-                randomStatusMessage = "Starting Random Interaction (${it.randomTapCount}/${it.randomTapTarget})..."
-            )
-        }
-
-        randomJob = viewModelScope.launch {
-            var nextScrollDir = "down"
-            var tapsSinceScroll = 0
-
-            while (_uiState.value.isRandomInteractionRunning) {
-                val cur = _uiState.value
-                if (cur.previewBlockedReason != null ||
-                    cur.activeUrl == null ||
-                    cur.status == TestSessionStatus.FAILED ||
-                    cur.status == TestSessionStatus.ERROR ||
-                    cur.status == TestSessionStatus.BLOCKED
-                ) {
-                    stopRandomInteraction("Stopped: Page load failed.", RandomInteractionStatus.FAILED)
-                    break
-                }
-                if (!cur.isDemoEnvironment && !cur.isAuthorizedOwnSite) {
-                    stopRandomInteraction(
-                        "Stopped: Authorized Test Page or Demo Environment required.",
-                        RandomInteractionStatus.RESTRICTED
-                    )
-                    break
-                }
-                if (cur.randomTapCount >= cur.randomTapTarget) {
-                    stopRandomInteraction(
-                        "Random Interaction completed (${cur.randomTapCount}/${cur.randomTapTarget} taps).",
-                        RandomInteractionStatus.COMPLETED
-                    )
-                    break
-                }
-
-                if (tapsSinceScroll >= 2) {
-                    val scrollStatus = if (nextScrollDir == "down") {
-                        RandomInteractionStatus.SCROLLING_DOWN
-                    } else {
-                        RandomInteractionStatus.SCROLLING_UP
-                    }
-                    _uiState.update {
-                        it.copy(
-                            randomStatus = scrollStatus,
-                            scrollStatus = if (nextScrollDir == "down") ScrollIndicatorState.RANDOM_DOWN else ScrollIndicatorState.RANDOM_UP,
-                            randomStatusMessage = "Scrolling $nextScrollDir before re-scanning UI elements (${cur.randomTapCount}/${cur.randomTapTarget})..."
-                        )
-                    }
-                    val scrollDeferred = CompletableDeferred<Pair<Boolean, String?>>()
-                    pendingRandomScrollDeferred = scrollDeferred
-                    _uiState.update {
-                        it.copy(
-                            webCommand = WebCommandEvent(
-                                id = ++commandSeq,
-                                type = WebCommandType.RANDOM_SCROLL_STEP,
-                                selector = nextScrollDir
-                            )
-                        )
-                    }
-                    val scrollRes = withTimeoutOrNull(3500L) { scrollDeferred.await() }
-                    pendingRandomScrollDeferred = null
-                    if (!_uiState.value.isRandomInteractionRunning) break
-                    if (scrollRes?.second != null) {
-                        _uiState.update { it.copy(scrollPositionText = scrollRes.second!!) }
-                    }
-                    nextScrollDir = if (nextScrollDir == "down") "up" else "down"
-                    tapsSinceScroll = 0
-                    delay(350L)
-                    continue
-                }
-
-                val tapDeferred = CompletableDeferred<Triple<String, String?, String?>>()
-                pendingRandomTapDeferred = tapDeferred
-                _uiState.update {
-                    it.copy(
-                        webCommand = WebCommandEvent(
-                            id = ++commandSeq,
-                            type = WebCommandType.EXECUTE_RANDOM_TAP,
-                            selector = randomLastSelector
-                        )
-                    )
-                }
-                val tapRes = withTimeoutOrNull(3000L) { tapDeferred.await() }
-                pendingRandomTapDeferred = null
-                if (!_uiState.value.isRandomInteractionRunning) break
-
-                if (tapRes == null) {
-                    stopRandomInteraction("Stopped: Page preview unavailable.", RandomInteractionStatus.FAILED)
-                    break
-                }
-
-                val (resCode, resLabel, resSelector) = tapRes
-                when (resCode) {
-                    "TAPPED" -> {
-                        if (!resSelector.isNullOrBlank()) {
-                            randomLastSelector = resSelector
-                        }
-                        tapsSinceScroll += 1
-                        val elLabel = resLabel?.takeIf { it.isNotBlank() } ?: "UI element"
-                        var reachedGoal = false
-                        var delaySecNow = 2
-                        _uiState.update { s ->
-                            val nextCount = s.randomTapCount + 1
-                            val target = s.randomTapTarget.coerceAtLeast(1)
-                            delaySecNow = s.randomTapDelaySec.coerceIn(1, 30)
-                            if (nextCount >= target) {
-                                reachedGoal = true
-                                s.copy(
-                                    randomTapCount = nextCount,
-                                    isRandomInteractionRunning = false,
-                                    isRandomArmedOnLoad = false,
-                                    randomStatus = RandomInteractionStatus.COMPLETED,
-                                    randomStatusMessage = "Target reached ($nextCount/$target) after tapping \"$elLabel\"."
-                                )
-                            } else {
-                                s.copy(
-                                    randomTapCount = nextCount,
-                                    randomStatus = RandomInteractionStatus.TAPPING,
-                                    randomStatusMessage = "Tapped \"$elLabel\" ($nextCount/$target) • Next in ${delaySecNow}s"
-                                )
-                            }
-                        }
-                        if (reachedGoal) break
-                        delay(delaySecNow * 1000L)
-                    }
-                    "BLOCKED_AD" -> {
-                        stopRandomInteraction(
-                            "Blocked: Ad elements and ad clicks are strictly prohibited.",
-                            RandomInteractionStatus.RESTRICTED
-                        )
-                        break
-                    }
-                    "NO_TARGET" -> {
-                        stopRandomInteraction(
-                            "No safe non-ad UI elements found to tap on this test page.",
-                            RandomInteractionStatus.RESTRICTED
-                        )
-                        break
-                    }
-                    else -> {
-                        stopRandomInteraction(
-                            resLabel ?: "Random Interaction blocked on this page.",
-                            RandomInteractionStatus.RESTRICTED
-                        )
-                        break
-                    }
-                }
-            }
-        }
-    }
-
-    // --- Impression & Click Tracking Diagnostic Engine ---
-
-    fun onDiagCommandResult(jsonResult: String) {
-        pendingDiagDeferred?.complete(jsonResult)
-    }
-
-    private fun cancelDiagJobsAndDeferreds() {
-        diagJob?.cancel()
-        diagJob = null
-        pendingDiagDeferred?.cancel()
-        pendingDiagDeferred = null
-    }
-
-    private suspend fun dispatchDiagCommand(type: WebCommandType): JSONObject? {
-        val deferred = CompletableDeferred<String>()
-        pendingDiagDeferred = deferred
-        _uiState.update {
-            it.copy(
-                webCommand = WebCommandEvent(
-                    id = ++commandSeq,
-                    type = type,
-                    interactionMode = it.clickMode
-                )
-            )
-        }
-        val raw = withTimeoutOrNull(3500L) { deferred.await() }
-        pendingDiagDeferred = null
-        return raw?.let { runCatching { JSONObject(it) }.getOrNull() }
-    }
-
-    private fun validateDiagnosticPrecheck(requireAuthForExternal: Boolean): Boolean {
-        val s = _uiState.value
-        if (s.previewBlockedReason != null ||
-            s.status == TestSessionStatus.FAILED ||
-            s.status == TestSessionStatus.ERROR ||
-            s.status == TestSessionStatus.BLOCKED
-        ) {
-            _uiState.update {
-                it.copy(
-                    isDiagRunning = false,
-                    diagResultStatus = DiagnosticResultStatus.FAILED,
-                    diagPageLoadText = if (s.lastLoadWasNetworkError) "Network Error" else "Load Failed",
-                    diagTrackingText = "Unavailable",
-                    diagDetectionText = "Click Event Not Received",
-                    diagStatusMessage = "Page failed to load (${s.previewBlockedReason ?: "Error"}). Resolve page load failure first."
-                )
-            }
-            return false
-        }
-        if (s.activeUrl == null || s.status == TestSessionStatus.PAUSING_BETWEEN) {
-            _uiState.update {
-                it.copy(
-                    isDiagRunning = false,
-                    diagResultStatus = DiagnosticResultStatus.FAILED,
-                    diagPageLoadText = "Not Loaded",
-                    diagTrackingText = "Idle",
-                    diagDetectionText = "Click Event Not Received",
-                    diagStatusMessage = "Preview is not loaded. Load the Demo Test Environment or start a URL test first."
-                )
-            }
-            return false
-        }
-        if (requireAuthForExternal && !s.isDemoEnvironment && !s.isAuthorizedOwnSite) {
-            _uiState.update {
-                it.copy(
-                    isDiagRunning = false,
-                    diagResultStatus = DiagnosticResultStatus.BLOCKED,
-                    diagTrackingText = "Blocked (Unconfirmed)",
-                    diagDetectionText = "Click Event Not Received",
-                    diagStatusMessage = "Authorization required: Enable 'Authorized Own Site / Test Page' or load the Demo Test Environment."
-                )
-            }
-            return false
-        }
-        _uiState.update {
-            it.copy(
-                diagPageLoadText = if (s.isDemoEnvironment) "Loaded (Demo Page)" else "Loaded (WebView DOM)"
-            )
-        }
-        return true
-    }
-
-    fun startDiagnostic() {
-        val state = _uiState.value
-        if (state.isDiagRunning) return
-        if (!validateDiagnosticPrecheck(requireAuthForExternal = true)) return
-
-        cancelDiagJobsAndDeferreds()
-        _uiState.update {
-            it.copy(
-                isDiagRunning = true,
-                diagResultStatus = DiagnosticResultStatus.RUNNING,
-                diagButtonText = "Testing...",
-                diagLinkText = "Waiting...",
-                diagStatusMessage = "Checking page load & verifying click event listener..."
-            )
-        }
-
-        diagJob = viewModelScope.launch {
-            val listenerObj = dispatchDiagCommand(WebCommandType.DIAG_VERIFY_LISTENER)
-            if (!_uiState.value.isDiagRunning) return@launch
-            val listenerOk = listenerObj?.optBoolean("ok", false) == true
-            val listenerStatus = listenerObj?.optString("listenerText")
-                ?.takeIf { it.isNotBlank() } ?: if (listenerOk) "Active (0 Duplicates)" else "Not Responding"
-            val listenerResultType = listenerObj?.optString("status").orEmpty()
-
-            if (!listenerOk) {
-                val blocked = listenerResultType == "BLOCKED"
-                _uiState.update {
-                    it.copy(
-                        isDiagRunning = false,
-                        diagResultStatus = if (blocked) DiagnosticResultStatus.BLOCKED else DiagnosticResultStatus.FAILED,
-                        diagListenerText = listenerStatus,
-                        diagTrackingText = if (blocked) "Restricted" else "Listener Failed",
-                        diagDetectionText = "Click Event Not Received",
-                        diagStatusMessage = listenerObj?.optString("reason")
-                            ?.takeIf { r -> r.isNotBlank() }
-                            ?: "Diagnostic Failed: Click Event Listener did not respond."
-                    )
-                }
-                return@launch
-            }
-
-            _uiState.update {
-                it.copy(
-                    diagListenerText = listenerStatus,
-                    diagTrackingText = "Listening"
-                )
-            }
-
-            delay(300L)
-            if (!_uiState.value.isDiagRunning) return@launch
-
-            val btnObj = dispatchDiagCommand(WebCommandType.DIAG_TEST_BUTTON)
-            if (!_uiState.value.isDiagRunning) return@launch
-            val btnOk = btnObj?.optBoolean("ok", false) == true
-            val btnLabel = btnObj?.optString("label")?.takeIf { it.isNotBlank() } ?: "Test Button"
-            val btnClicked = btnObj?.optBoolean("clicked", false) == true
-
-            if (btnClicked) {
-                incrementDiagnosticVerifiedClick()
-            }
-
-            if (!btnOk) {
-                val blocked = btnObj?.optString("status") == "BLOCKED"
-                _uiState.update {
-                    it.copy(
-                        isDiagRunning = false,
-                        diagResultStatus = if (blocked) DiagnosticResultStatus.BLOCKED else DiagnosticResultStatus.FAILED,
-                        diagButtonText = btnObj?.optString("cellText")?.takeIf { t -> t.isNotBlank() } ?: "Not Received",
-                        diagDetectionText = if (btnClicked) "Click Event Received" else "Click Event Not Received",
-                        diagStatusMessage = "Diagnostic Failed: ${btnObj?.optString("reason") ?: "Test button click event not received."}"
-                    )
-                }
-                return@launch
-            }
-
-            _uiState.update {
-                it.copy(
-                    diagButtonText = "Verified ($btnLabel)",
-                    diagDetectionText = "Click Event Received",
-                    diagTrackingText = "Active",
-                    diagStatusMessage = "Test Button verified (\"$btnLabel\"). Testing Link navigation..."
-                )
-            }
-
-            delay(400L)
-            if (!_uiState.value.isDiagRunning) return@launch
-
-            val linkObj = dispatchDiagCommand(WebCommandType.DIAG_TEST_LINK)
-            if (!_uiState.value.isDiagRunning) return@launch
-            val linkOk = linkObj?.optBoolean("ok", false) == true
-            val linkClicked = linkObj?.optBoolean("clicked", false) == true
-            val linkCell = linkObj?.optString("cellText")?.takeIf { it.isNotBlank() }
-                ?: if (linkOk) "Verified" else "Failed"
-
-            if (linkClicked) {
-                incrementDiagnosticVerifiedClick()
-            }
-
-            if (!linkOk) {
-                val blocked = linkObj?.optString("status") == "BLOCKED"
-                _uiState.update {
-                    it.copy(
-                        isDiagRunning = false,
-                        diagResultStatus = if (blocked) DiagnosticResultStatus.BLOCKED else DiagnosticResultStatus.FAILED,
-                        diagLinkText = linkCell,
-                        diagDetectionText = if (linkClicked) "Click Event Received" else "Click Event Not Received",
-                        diagStatusMessage = "Diagnostic Failed: ${linkObj?.optString("reason") ?: "Test link navigation check failed."}"
-                    )
-                }
-                return@launch
-            }
-
-            _uiState.update {
-                it.copy(
-                    isDiagRunning = false,
-                    diagResultStatus = DiagnosticResultStatus.PASSED,
-                    diagLinkText = linkCell,
-                    diagDetectionText = "Click Event Received",
-                    diagTrackingText = "Active",
-                    diagStatusMessage = "Diagnostic Passed: Impression=${it.visitCount}, Click=${it.clickCount}. Listener active (0 duplicates), Test Button & Test Link navigation verified."
-                )
-            }
-        }
-    }
-
-    fun stopDiagnostic(reason: String? = null) {
-        cancelDiagJobsAndDeferreds()
-        _uiState.update {
-            it.copy(
-                isDiagRunning = false,
-                diagResultStatus = DiagnosticResultStatus.STOPPED,
-                diagStatusMessage = reason ?: "Click Tracking Diagnostic stopped."
-            )
-        }
-    }
-
-    fun verifyDiagListenerOnly() {
-        if (_uiState.value.isDiagRunning) return
-        if (!validateDiagnosticPrecheck(requireAuthForExternal = false)) return
-        cancelDiagJobsAndDeferreds()
-        _uiState.update {
-            it.copy(
-                isDiagRunning = true,
-                diagResultStatus = DiagnosticResultStatus.RUNNING,
-                diagStatusMessage = "Verifying DOM click event listener..."
-            )
-        }
-        diagJob = viewModelScope.launch {
-            val res = dispatchDiagCommand(WebCommandType.DIAG_VERIFY_LISTENER)
-            val ok = res?.optBoolean("ok", false) == true
-            val blocked = res?.optString("status") == "BLOCKED"
-            _uiState.update {
-                it.copy(
-                    isDiagRunning = false,
-                    diagResultStatus = when {
-                        blocked -> DiagnosticResultStatus.BLOCKED
-                        ok -> DiagnosticResultStatus.PASSED
-                        else -> DiagnosticResultStatus.FAILED
-                    },
-                    diagListenerText = res?.optString("listenerText")?.takeIf { t -> t.isNotBlank() }
-                        ?: if (ok) "Active (0 Duplicates)" else "Not Responding",
-                    diagTrackingText = if (ok) "Listening" else "Listener Failed",
-                    diagStatusMessage = if (ok) {
-                        "Click Event Listener verified active (0 duplicate listeners)."
-                    } else {
-                        res?.optString("reason") ?: "Click Event Listener verification failed."
-                    }
-                )
-            }
-        }
-    }
-
-    fun runDiagButtonTestOnly() {
-        if (_uiState.value.isDiagRunning) return
-        if (!validateDiagnosticPrecheck(requireAuthForExternal = true)) return
-        cancelDiagJobsAndDeferreds()
-        _uiState.update {
-            it.copy(
-                isDiagRunning = true,
-                diagResultStatus = DiagnosticResultStatus.RUNNING,
-                diagButtonText = "Testing...",
-                diagStatusMessage = "Testing button click event receipt..."
-            )
-        }
-        diagJob = viewModelScope.launch {
-            dispatchDiagCommand(WebCommandType.DIAG_VERIFY_LISTENER)
-            val res = dispatchDiagCommand(WebCommandType.DIAG_TEST_BUTTON)
-            val ok = res?.optBoolean("ok", false) == true
-            val blocked = res?.optString("status") == "BLOCKED"
-            val clicked = res?.optBoolean("clicked", false) == true
-            val label = res?.optString("label")?.takeIf { it.isNotBlank() } ?: "Test Button"
-            if (clicked) incrementDiagnosticVerifiedClick()
-            _uiState.update {
-                it.copy(
-                    isDiagRunning = false,
-                    diagResultStatus = when {
-                        blocked -> DiagnosticResultStatus.BLOCKED
-                        ok -> DiagnosticResultStatus.PASSED
-                        else -> DiagnosticResultStatus.FAILED
-                    },
-                    diagListenerText = "Active (0 Duplicates)",
-                    diagTrackingText = if (ok) "Active" else it.diagTrackingText,
-                    diagDetectionText = if (clicked) "Click Event Received" else "Click Event Not Received",
-                    diagButtonText = if (ok) "Verified ($label)" else (res?.optString("cellText") ?: "Not Received"),
-                    diagStatusMessage = if (ok) {
-                        "Click Event Received from Test Button (\"$label\")."
-                    } else {
-                        "Click Event Not Received: ${res?.optString("reason") ?: "Test button did not emit click."}"
-                    }
-                )
-            }
-        }
-    }
-
-    fun runDiagLinkTestOnly() {
-        if (_uiState.value.isDiagRunning) return
-        if (!validateDiagnosticPrecheck(requireAuthForExternal = true)) return
-        cancelDiagJobsAndDeferreds()
-        _uiState.update {
-            it.copy(
-                isDiagRunning = true,
-                diagResultStatus = DiagnosticResultStatus.RUNNING,
-                diagLinkText = "Testing...",
-                diagStatusMessage = "Testing link click & navigation..."
-            )
-        }
-        diagJob = viewModelScope.launch {
-            dispatchDiagCommand(WebCommandType.DIAG_VERIFY_LISTENER)
-            val res = dispatchDiagCommand(WebCommandType.DIAG_TEST_LINK)
-            val ok = res?.optBoolean("ok", false) == true
-            val blocked = res?.optString("status") == "BLOCKED"
-            val clicked = res?.optBoolean("clicked", false) == true
-            val label = res?.optString("label")?.takeIf { it.isNotBlank() } ?: "Test Link"
-            if (clicked) incrementDiagnosticVerifiedClick()
-            _uiState.update {
-                it.copy(
-                    isDiagRunning = false,
-                    diagResultStatus = when {
-                        blocked -> DiagnosticResultStatus.BLOCKED
-                        ok -> DiagnosticResultStatus.PASSED
-                        else -> DiagnosticResultStatus.FAILED
-                    },
-                    diagListenerText = "Active (0 Duplicates)",
-                    diagTrackingText = if (ok) "Active" else it.diagTrackingText,
-                    diagDetectionText = if (clicked) "Click Event Received" else "Click Event Not Received",
-                    diagLinkText = res?.optString("cellText")?.takeIf { t -> t.isNotBlank() }
-                        ?: if (ok) "Verified ($label)" else "Failed",
-                    diagStatusMessage = if (ok) {
-                        "Test Link click & navigation verified (\"$label\")."
-                    } else {
-                        "Test Link check failed: ${res?.optString("reason") ?: "Link did not navigate."}"
-                    }
-                )
-            }
-        }
-    }
-
-    private fun incrementDiagnosticVerifiedClick() {
-        _uiState.update { state ->
-            val nextCount = state.clickCount + 1
-            val reachedTarget = state.isAutoClickRunning && nextCount >= state.clickTarget
-            if (reachedTarget) {
-                autoClickJob?.cancel()
-                autoClickJob = null
-            }
-            state.copy(
-                clickCount = nextCount,
-                diagDetectionText = "Click Event Received",
-                diagTrackingText = "Active",
-                isAutoClickRunning = if (reachedTarget) false else state.isAutoClickRunning,
-                isManualClickListening = if (reachedTarget) false else state.isManualClickListening,
-                clickStatus = if (reachedTarget) ClickTestStatus.COMPLETED else state.clickStatus
-            )
-        }
-    }
-
     fun startTest() {
-        startTestInternal(preserveRandomArmed = false)
-    }
-
-    private fun startTestInternal(preserveRandomArmed: Boolean) {
         val state = _uiState.value
-        if (state.isRunning) return
+        if (state.status == TestSessionStatus.LOADING) return
 
         val validation = UrlValidator.validate(state.urlInput)
         if (validation is UrlValidationResult.Invalid) {
@@ -1638,450 +91,122 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
             return
         }
 
-        vpnMonitor.refreshState()
-        val vpnActive = vpnMonitor.transportState.value.isVpnActive
-        if (state.requireVpnForTest && !vpnActive) {
-            _uiState.update {
-                it.copy(
-                    vpnStatus = VpnConnectionStatus.DISCONNECTED,
-                    vpnActionMessage = "VPN required: Connect a VPN provider before starting the test.",
-                    isRandomArmedOnLoad = false
-                )
-            }
-            return
-        }
-
         val normalizedUrl = (validation as UrlValidationResult.Valid).normalizedUrl
-        val runs = if (state.autoNextEnabled) state.totalRuns else 1
-        val viewSec = state.viewDurationSec
-        val pauseSec = state.pauseDurationSec
-
-        cancelRandomJobsAndDeferreds()
-        cancelDiagJobsAndDeferreds()
-        countedVisitToken = -1
+        cancelJobsAndDeferreds()
+        countedLoadToken = -1
         countedFailToken = -1
-        randomLastSelector = ""
+        lastTrustedClickAtMs = 0L
 
+        val nextToken = state.previewLoadToken + 1
         _uiState.update {
             it.copy(
                 urlInput = normalizedUrl,
                 urlError = null,
-                vpnActionMessage = null,
-                isDemoEnvironment = false,
-                isRandomInteractionRunning = false,
-                isRandomArmedOnLoad = preserveRandomArmed,
-                isDiagRunning = false,
-                diagResultStatus = DiagnosticResultStatus.IDLE,
-                diagPageLoadText = "Loading",
-                diagTrackingText = "Waiting for Load",
-                diagDetectionText = "Click Event Not Received",
-                diagListenerText = "Not Checked",
-                diagButtonText = "Pending",
-                diagLinkText = "Pending",
-                diagStatusMessage = "Waiting for website load to finish before running Impression & Click Diagnostic.",
-                isRunning = true,
                 status = TestSessionStatus.LOADING,
                 activeUrl = normalizedUrl,
-                visitCount = 0,
-                failedCount = 0,
-                clickCount = 0,
-                currentRunNumber = 1,
-                activeTotalRuns = runs,
-                phaseRemainingSec = viewSec,
-                overallProgress = 0f,
+                previewLoadToken = nextToken,
                 isPreviewLoading = true,
                 previewBlockedReason = null,
-                lastLoadWasNetworkError = false,
-                canGoBack = false,
-                scrollStatus = when (it.scrollDirection) {
-                    AutoScrollDirection.DOWN -> ScrollIndicatorState.SCROLLING_DOWN
-                    AutoScrollDirection.UP -> ScrollIndicatorState.SCROLLING_UP
-                    AutoScrollDirection.RANDOM -> ScrollIndicatorState.RANDOM_DOWN
-                    AutoScrollDirection.NONE -> ScrollIndicatorState.IDLE
-                }
+                overallProgress = 0.35f,
+                verifiedLoadCount = 0,
+                verifiedUiClicks = 0,
+                impressionStatusText = "Checking Load...",
+                clickTrackingStatusText = "Waiting for Load",
+                pageLoadStatusText = "Loading...",
+                clickListenerStatusText = "Pending",
+                errorDetectionText = "No Click Tracking Error Detected",
+                errorSeverity = ErrorDetectionSeverity.NONE,
+                statusMessage = "Loading Website URL to verify Impression and Click Tracking...",
+                isCheckingListener = false
             )
         }
 
-        queueJob?.cancel()
-        queueJob = viewModelScope.launch {
-            runQueue(normalizedUrl, runs, viewSec, pauseSec)
-        }
-    }
-
-    private suspend fun runQueue(
-        targetUrl: String,
-        runs: Int,
-        viewDurationSec: Int,
-        pauseDurationSec: Int
-    ) {
-        for (runIdx in 1..runs) {
-            if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
-                stopTestForVpnLoss()
-                return
-            }
-
-            _uiState.update {
-                it.copy(
-                    status = TestSessionStatus.LOADING,
-                    activeUrl = targetUrl,
-                    previewLoadToken = it.previewLoadToken + 1,
-                    currentRunNumber = runIdx,
-                    activeTotalRuns = runs,
-                    phaseRemainingSec = viewDurationSec,
-                    isPreviewLoading = true,
-                    previewBlockedReason = null,
-                    lastLoadWasNetworkError = false
-                )
-            }
-
-            var loadGraceMs = 0
-            while (_uiState.value.isPreviewLoading &&
-                _uiState.value.previewBlockedReason == null &&
-                loadGraceMs < 8000
+        loadWatchdogJob = viewModelScope.launch {
+            delay(8500L)
+            val cur = _uiState.value
+            if (cur.previewLoadToken == nextToken &&
+                cur.status == TestSessionStatus.LOADING &&
+                cur.isPreviewLoading &&
+                cur.previewBlockedReason == null
             ) {
-                if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
-                    stopTestForVpnLoss()
-                    return
-                }
-                delay(150)
-                loadGraceMs += 150
-            }
-
-            val currentAfterWait = _uiState.value
-            val timedOut = currentAfterWait.isPreviewLoading && currentAfterWait.previewBlockedReason == null
-            if (timedOut) {
-                onPreviewBlockedOrError("Page load timed out before completing.", isNetworkError = false)
-            }
-
-            val stateAfterLoad = _uiState.value
-            if (stateAfterLoad.previewBlockedReason != null) {
-                val hardError = stateAfterLoad.lastLoadWasNetworkError
-                val canAdvance = !hardError && runIdx < runs && stateAfterLoad.autoNextEnabled
-                if (canAdvance) {
-                    _uiState.update {
-                        it.copy(
-                            status = TestSessionStatus.FAILED,
-                            isPreviewLoading = false,
-                            scrollDirection = AutoScrollDirection.NONE,
-                            isScrollPaused = false,
-                            scrollStatus = ScrollIndicatorState.RESTRICTED
-                        )
-                    }
-                    delay(1200)
-                    if (pauseDurationSec > 0) {
-                        _uiState.update {
-                            it.copy(
-                                status = TestSessionStatus.PAUSING_BETWEEN,
-                                activeUrl = null,
-                                phaseRemainingSec = pauseDurationSec,
-                                canGoBack = false
-                            )
-                        }
-                        for (pauseLeft in pauseDurationSec downTo 1) {
-                            if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
-                                stopTestForVpnLoss()
-                                return
-                            }
-                            _uiState.update { it.copy(phaseRemainingSec = pauseLeft) }
-                            delay(1000)
-                        }
-                    }
-                    continue
-                } else {
-                    autoClickJob?.cancel()
-                    autoClickJob = null
-                    _uiState.update {
-                        it.copy(
-                            isRunning = false,
-                            status = if (hardError) TestSessionStatus.ERROR else TestSessionStatus.FAILED,
-                            isPreviewLoading = false,
-                            isAutoClickRunning = false,
-                            isManualClickListening = false,
-                            scrollDirection = AutoScrollDirection.NONE,
-                            isScrollPaused = false,
-                            scrollStatus = ScrollIndicatorState.RESTRICTED
-                        )
-                    }
-                    return
-                }
-            }
-
-            _uiState.update {
-                it.copy(
-                    status = TestSessionStatus.VIEWING,
-                    isPreviewLoading = false
+                onPreviewBlockedOrError(
+                    reason = "Network Error: Connection timed out before website finished loading.",
+                    isNetworkError = true
                 )
             }
-
-            for (secLeft in viewDurationSec downTo 1) {
-                if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
-                    stopTestForVpnLoss()
-                    return
-                }
-                _uiState.update {
-                    val fractionDoneInRun =
-                        (viewDurationSec - secLeft).toFloat() / viewDurationSec.toFloat()
-                    val overall = ((runIdx - 1) + fractionDoneInRun) / runs.toFloat()
-                    it.copy(
-                        phaseRemainingSec = secLeft,
-                        overallProgress = overall.coerceIn(0f, 1f)
-                    )
-                }
-                delay(1000)
-
-                if (_uiState.value.previewBlockedReason != null) {
-                    val hardError = _uiState.value.lastLoadWasNetworkError
-                    autoClickJob?.cancel()
-                    autoClickJob = null
-                    _uiState.update {
-                        it.copy(
-                            isRunning = false,
-                            status = if (hardError) TestSessionStatus.ERROR else TestSessionStatus.FAILED,
-                            isAutoClickRunning = false,
-                            isManualClickListening = false,
-                            scrollDirection = AutoScrollDirection.NONE,
-                            isScrollPaused = false,
-                            scrollStatus = ScrollIndicatorState.RESTRICTED
-                        )
-                    }
-                    return
-                }
-            }
-
-            while (_uiState.value.isRandomInteractionRunning || _uiState.value.isRandomArmedOnLoad) {
-                if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
-                    stopTestForVpnLoss()
-                    return
-                }
-                if (_uiState.value.previewBlockedReason != null) {
-                    val hardError = _uiState.value.lastLoadWasNetworkError
-                    autoClickJob?.cancel()
-                    autoClickJob = null
-                    cancelRandomJobsAndDeferreds()
-                    _uiState.update {
-                        it.copy(
-                            isRunning = false,
-                            status = if (hardError) TestSessionStatus.ERROR else TestSessionStatus.FAILED,
-                            isAutoClickRunning = false,
-                            isManualClickListening = false,
-                            isRandomInteractionRunning = false,
-                            isRandomArmedOnLoad = false,
-                            randomStatus = RandomInteractionStatus.FAILED,
-                            randomStatusMessage = "Stopped: Page load failure occurred.",
-                            scrollDirection = AutoScrollDirection.NONE,
-                            isScrollPaused = false,
-                            scrollStatus = ScrollIndicatorState.RESTRICTED
-                        )
-                    }
-                    return
-                }
-                delay(300)
-            }
-
-            _uiState.update {
-                it.copy(overallProgress = runIdx.toFloat() / runs.toFloat())
-            }
-
-            val hasNextRun = runIdx < runs && _uiState.value.autoNextEnabled
-            if (hasNextRun && pauseDurationSec > 0) {
-                _uiState.update {
-                    it.copy(
-                        status = TestSessionStatus.PAUSING_BETWEEN,
-                        activeUrl = null,
-                        phaseRemainingSec = pauseDurationSec,
-                        canGoBack = false
-                    )
-                }
-                for (pauseLeft in pauseDurationSec downTo 1) {
-                    if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
-                        stopTestForVpnLoss()
-                        return
-                    }
-                    _uiState.update { it.copy(phaseRemainingSec = pauseLeft) }
-                    delay(1000)
-                }
-            }
-        }
-
-        autoClickJob?.cancel()
-        autoClickJob = null
-        cancelRandomJobsAndDeferreds()
-        cancelDiagJobsAndDeferreds()
-
-        _uiState.update {
-            val allFailed = it.visitCount == 0 && it.failedCount > 0
-            it.copy(
-                isRunning = false,
-                status = if (allFailed) TestSessionStatus.FAILED else TestSessionStatus.COMPLETED,
-                activeUrl = null,
-                phaseRemainingSec = 0,
-                overallProgress = if (allFailed) it.overallProgress else 1f,
-                canGoBack = false,
-                scrollDirection = AutoScrollDirection.NONE,
-                isScrollPaused = false,
-                scrollPositionText = "0% • 0/0px",
-                scrollStatus = ScrollIndicatorState.IDLE,
-                isAutoClickRunning = false,
-                isManualClickListening = false,
-                isRandomInteractionRunning = false,
-                isRandomArmedOnLoad = false,
-                isDemoEnvironment = false,
-                isDiagRunning = false,
-                diagPageLoadText = if (allFailed) "Load Failed" else "Completed",
-                diagTrackingText = "Idle",
-                discoveredClickTargets = emptyList(),
-                clickStatus = if (it.clickCount >= it.clickTarget && it.clickCount > 0) ClickTestStatus.COMPLETED else ClickTestStatus.IDLE,
-                webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
-            )
-        }
-    }
-
-    private fun stopTestForVpnLoss() {
-        queueJob?.cancel()
-        queueJob = null
-        autoClickJob?.cancel()
-        autoClickJob = null
-        cancelRandomJobsAndDeferreds()
-        cancelDiagJobsAndDeferreds()
-        countedVisitToken = -1
-        countedFailToken = -1
-
-        _uiState.update {
-            it.copy(
-                isRunning = false,
-                status = TestSessionStatus.STOPPED,
-                activeUrl = null,
-                visitCount = 0,
-                failedCount = 0,
-                currentRunNumber = 0,
-                phaseRemainingSec = 0,
-                overallProgress = 0f,
-                isPreviewLoading = false,
-                previewBlockedReason = null,
-                lastLoadWasNetworkError = false,
-                canGoBack = false,
-                scrollDirection = AutoScrollDirection.NONE,
-                isScrollPaused = false,
-                scrollPositionText = "0% • 0/0px",
-                scrollStatus = ScrollIndicatorState.STOPPED,
-                isAutoClickRunning = false,
-                isManualClickListening = false,
-                isRandomInteractionRunning = false,
-                isRandomArmedOnLoad = false,
-                isDemoEnvironment = false,
-                isDiagRunning = false,
-                diagResultStatus = DiagnosticResultStatus.STOPPED,
-                diagPageLoadText = "Stopped",
-                diagTrackingText = "Stopped",
-                diagDetectionText = "Click Event Not Received",
-                diagListenerText = "Not Checked",
-                diagButtonText = "Pending",
-                diagLinkText = "Pending",
-                diagStatusMessage = "Stopped: VPN connectivity was lost.",
-                randomStatus = RandomInteractionStatus.STOPPED,
-                randomStatusMessage = "Stopped: VPN connectivity was lost.",
-                clickCount = 0,
-                discoveredClickTargets = emptyList(),
-                clickStatus = ClickTestStatus.IDLE,
-                clickStatusMessage = null,
-                vpnStatus = VpnConnectionStatus.LOST,
-                vpnInterfaceName = null,
-                vpnActionMessage = "Test stopped: VPN connectivity was lost.",
-                webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
-            )
         }
     }
 
     fun stopTest() {
-        queueJob?.cancel()
-        queueJob = null
-        autoClickJob?.cancel()
-        autoClickJob = null
-        cancelRandomJobsAndDeferreds()
-        cancelDiagJobsAndDeferreds()
-        countedVisitToken = -1
+        cancelJobsAndDeferreds()
+        countedLoadToken = -1
         countedFailToken = -1
+        lastTrustedClickAtMs = 0L
 
         _uiState.update {
             it.copy(
-                isRunning = false,
                 status = TestSessionStatus.STOPPED,
                 activeUrl = null,
-                visitCount = 0,
-                failedCount = 0,
-                currentRunNumber = 0,
-                phaseRemainingSec = 0,
-                overallProgress = 0f,
                 isPreviewLoading = false,
                 previewBlockedReason = null,
-                lastLoadWasNetworkError = false,
-                canGoBack = false,
-                scrollDirection = AutoScrollDirection.NONE,
-                isScrollPaused = false,
-                scrollPositionText = "0% • 0/0px",
-                scrollStatus = ScrollIndicatorState.STOPPED,
-                isAutoClickRunning = false,
-                isManualClickListening = false,
-                isRandomInteractionRunning = false,
-                isRandomArmedOnLoad = false,
-                isDemoEnvironment = false,
-                isDiagRunning = false,
-                diagResultStatus = DiagnosticResultStatus.STOPPED,
-                diagPageLoadText = "Stopped",
-                diagTrackingText = "Stopped",
-                diagDetectionText = "Click Event Not Received",
-                diagListenerText = "Not Checked",
-                diagButtonText = "Pending",
-                diagLinkText = "Pending",
-                diagStatusMessage = "Load your Demo Test Page or Test Page URL, then tap Start Diagnostic to verify listener, button click event, and link navigation.",
-                randomTapCount = 0,
-                randomStatus = RandomInteractionStatus.STOPPED,
-                randomStatusMessage = "Session stopped & cleared.",
-                clickCount = 0,
-                discoveredClickTargets = emptyList(),
-                clickStatus = ClickTestStatus.IDLE,
-                clickStatusMessage = null,
+                overallProgress = 0f,
+                verifiedLoadCount = 0,
+                verifiedUiClicks = 0,
+                impressionStatusText = "Stopped",
+                clickTrackingStatusText = "Stopped",
+                pageLoadStatusText = "Stopped",
+                clickListenerStatusText = "Stopped",
+                errorDetectionText = "No Click Tracking Error Detected",
+                errorSeverity = ErrorDetectionSeverity.NONE,
+                statusMessage = "Test stopped and temporary state cleared (no history or logs saved).",
+                isCheckingListener = false,
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
-            )
-        }
-    }
-
-    fun triggerBack() {
-        _uiState.update {
-            it.copy(webCommand = WebCommandEvent(++commandSeq, WebCommandType.BACK))
-        }
-    }
-
-    fun triggerHome() {
-        val state = _uiState.value
-        val target = if (state.isDemoEnvironment) {
-            DEMO_ENV_URL
-        } else {
-            state.activeUrl ?: when (val res = UrlValidator.validate(state.urlInput)) {
-                is UrlValidationResult.Valid -> res.normalizedUrl
-                is UrlValidationResult.Invalid -> null
-            } ?: return
-        }
-
-        _uiState.update {
-            it.copy(
-                activeUrl = target,
-                previewBlockedReason = null,
-                lastLoadWasNetworkError = false,
-                webCommand = WebCommandEvent(++commandSeq, WebCommandType.HOME, target)
             )
         }
     }
 
     fun triggerReload() {
         val state = _uiState.value
-        if (state.activeUrl == null) return
+        val currentUrl = state.activeUrl ?: return
+        if (state.status == TestSessionStatus.LOADING) return
+
+        cancelJobsAndDeferreds()
+        countedLoadToken = -1
+        countedFailToken = -1
+        lastTrustedClickAtMs = 0L
+
+        val nextToken = state.previewLoadToken + 1
         _uiState.update {
             it.copy(
+                status = TestSessionStatus.LOADING,
+                previewLoadToken = nextToken,
                 previewBlockedReason = null,
-                lastLoadWasNetworkError = false,
-                webCommand = WebCommandEvent(++commandSeq, WebCommandType.RELOAD, it.activeUrl)
+                isPreviewLoading = true,
+                overallProgress = 0.35f,
+                impressionStatusText = "Checking Load...",
+                clickTrackingStatusText = "Waiting for Load",
+                pageLoadStatusText = "Loading...",
+                clickListenerStatusText = "Pending",
+                errorDetectionText = "No Click Tracking Error Detected",
+                errorSeverity = ErrorDetectionSeverity.NONE,
+                statusMessage = "Reloading $currentUrl...",
+                webCommand = WebCommandEvent(++commandSeq, WebCommandType.RELOAD, currentUrl)
             )
+        }
+
+        loadWatchdogJob = viewModelScope.launch {
+            delay(8500L)
+            val cur = _uiState.value
+            if (cur.previewLoadToken == nextToken &&
+                cur.status == TestSessionStatus.LOADING &&
+                cur.isPreviewLoading &&
+                cur.previewBlockedReason == null
+            ) {
+                onPreviewBlockedOrError(
+                    reason = "Network Error: Website reload timed out.",
+                    isNetworkError = true
+                )
+            }
         }
     }
 
@@ -2091,108 +216,215 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun updateCanGoBack(canGoBack: Boolean) {
-        _uiState.update { it.copy(canGoBack = canGoBack) }
-    }
-
     fun onPreviewPageStarted() {
         _uiState.update {
             it.copy(
                 isPreviewLoading = true,
-                diagPageLoadText = "Loading",
-                diagTrackingText = "Waiting for Load"
+                pageLoadStatusText = "Loading...",
+                clickTrackingStatusText = "Waiting for Load"
             )
         }
     }
 
-    fun onPreviewPageFinished(canGoBack: Boolean) {
-        var shouldLaunchRandom = false
+    fun onPreviewPageFinished(listenerBound: Boolean = true) {
+        loadWatchdogJob?.cancel()
+        loadWatchdogJob = null
         _uiState.update { state ->
-            val token = state.previewLoadToken
-            val shouldCountVisit = state.isRunning &&
-                state.status == TestSessionStatus.LOADING &&
-                state.previewBlockedReason == null &&
-                state.activeUrl != null &&
-                countedVisitToken != token &&
-                countedFailToken != token
-
-            if (shouldCountVisit) {
-                countedVisitToken = token
+            if (state.previewBlockedReason != null || state.activeUrl == null) {
+                return@update state.copy(isPreviewLoading = false)
             }
-
-            if (state.isRandomArmedOnLoad && !state.isRandomInteractionRunning && state.previewBlockedReason == null) {
-                shouldLaunchRandom = true
+            val token = state.previewLoadToken
+            val isFirstLoadForToken = countedLoadToken != token && countedFailToken != token
+            if (isFirstLoadForToken) {
+                countedLoadToken = token
             }
 
             state.copy(
                 isPreviewLoading = false,
-                canGoBack = canGoBack,
-                visitCount = if (shouldCountVisit) state.visitCount + 1 else state.visitCount,
-                diagPageLoadText = if (state.previewBlockedReason == null) {
-                    if (state.isDemoEnvironment) "Loaded (Demo Page)" else "Loaded (WebView DOM)"
+                overallProgress = 1f,
+                status = if (state.status == TestSessionStatus.LOADING) TestSessionStatus.LOADED else state.status,
+                verifiedLoadCount = if (isFirstLoadForToken) state.verifiedLoadCount + 1 else state.verifiedLoadCount,
+                impressionStatusText = "Impression Verified",
+                pageLoadStatusText = "Loaded (WebView DOM)",
+                clickListenerStatusText = if (listenerBound) "Active (0 Duplicates)" else "Error: Listener Failed",
+                clickTrackingStatusText = if (listenerBound) "Listener Active" else "Click Tracking Error",
+                errorDetectionText = if (listenerBound) {
+                    "No Click Tracking Error Detected"
                 } else {
-                    state.diagPageLoadText
+                    "Click Tracking Error: Unable to bind DOM click listener."
                 },
-                diagTrackingText = if (state.previewBlockedReason == null) "Listening" else state.diagTrackingText,
-                status = if (state.isRunning && state.status == TestSessionStatus.LOADING && state.previewBlockedReason == null) {
-                    TestSessionStatus.VIEWING
+                errorSeverity = if (listenerBound) ErrorDetectionSeverity.NONE else ErrorDetectionSeverity.ERROR,
+                statusMessage = if (listenerBound) {
+                    "Page loaded and Impression verified. Tap inside your website preview to verify real UI click tracking."
                 } else {
-                    state.status
+                    "Page loaded, but DOM click listener could not attach."
                 }
             )
-        }
-        if (shouldLaunchRandom) {
-            launchRandomInteractionLoop()
         }
     }
 
     fun onPreviewBlockedOrError(reason: String, isNetworkError: Boolean = false) {
-        val hadRandom = _uiState.value.isRandomInteractionRunning || _uiState.value.isRandomArmedOnLoad
-        if (hadRandom) {
-            cancelRandomJobsAndDeferreds()
-        }
-        val hadDiag = _uiState.value.isDiagRunning
-        if (hadDiag) {
-            cancelDiagJobsAndDeferreds()
-        }
+        cancelJobsAndDeferreds()
         _uiState.update { state ->
             val token = state.previewLoadToken
-            val shouldCountFail = state.isRunning &&
-                countedFailToken != token &&
-                countedVisitToken != token
-
-            if (shouldCountFail) {
+            if (countedFailToken != token && countedLoadToken != token) {
                 countedFailToken = token
             }
-
+            val nextStatus = if (isNetworkError) TestSessionStatus.NETWORK_ERROR else TestSessionStatus.FAILED
             state.copy(
+                status = nextStatus,
                 isPreviewLoading = false,
+                overallProgress = 0f,
                 previewBlockedReason = reason,
-                lastLoadWasNetworkError = isNetworkError,
-                failedCount = if (shouldCountFail) state.failedCount + 1 else state.failedCount,
-                scrollDirection = AutoScrollDirection.NONE,
-                isScrollPaused = false,
-                scrollStatus = ScrollIndicatorState.RESTRICTED,
-                isRandomInteractionRunning = if (hadRandom) false else state.isRandomInteractionRunning,
-                isRandomArmedOnLoad = if (hadRandom) false else state.isRandomArmedOnLoad,
-                randomStatus = if (hadRandom) RandomInteractionStatus.FAILED else state.randomStatus,
-                randomStatusMessage = if (hadRandom) "Stopped: Page load failed ($reason)" else state.randomStatusMessage,
-                isDiagRunning = false,
-                diagPageLoadText = if (isNetworkError) "Network Error" else "Load Failed",
-                diagTrackingText = "Unavailable",
-                diagDetectionText = "Click Event Not Received",
-                diagResultStatus = if (hadDiag) DiagnosticResultStatus.FAILED else state.diagResultStatus,
-                diagStatusMessage = if (hadDiag) "Diagnostic Failed: $reason" else state.diagStatusMessage
+                impressionStatusText = if (isNetworkError) "Not Verified (Network Error)" else "Not Verified (Load Failed)",
+                pageLoadStatusText = if (isNetworkError) "Network Error" else "Load Failed",
+                clickTrackingStatusText = "Unavailable",
+                clickListenerStatusText = "Unavailable",
+                errorDetectionText = reason,
+                errorSeverity = ErrorDetectionSeverity.ERROR,
+                statusMessage = reason
             )
         }
     }
 
+    fun onDirectPreviewClick(targetLabel: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastTrustedClickAtMs < 250L) {
+            onInvalidTrafficOrNotice("Invalid Traffic Filtered: Rapid duplicate click burst (<250ms) ignored.")
+            return
+        }
+        val state = _uiState.value
+        if (state.activeUrl == null || state.previewBlockedReason != null) return
+
+        lastTrustedClickAtMs = now
+        val safeLabel = targetLabel.ifBlank { "element" }
+        _uiState.update {
+            it.copy(
+                verifiedUiClicks = it.verifiedUiClicks + 1,
+                clickTrackingStatusText = "Click Event Received",
+                clickListenerStatusText = "Active (0 Duplicates)",
+                errorDetectionText = "No Click Tracking Error Detected",
+                errorSeverity = ErrorDetectionSeverity.NONE,
+                statusMessage = "Real user click received on \"$safeLabel\". Impression and Click Tracking verified separately."
+            )
+        }
+    }
+
+    fun onAdElementObserved() {
+        _uiState.update {
+            it.copy(
+                clickTrackingStatusText = "Ad Network Protected",
+                errorDetectionText = "Ad Network Protection Active: Ad click was not altered or intercepted.",
+                errorSeverity = ErrorDetectionSeverity.INFO,
+                statusMessage = "Ad interaction handled naturally by the site/ad network. Only non-ad UI interactions are counted here."
+            )
+        }
+    }
+
+    fun onInvalidTrafficOrNotice(reason: String) {
+        val msg = reason.ifBlank { "Invalid Traffic Filtered: Synthetic or duplicate click ignored." }
+        _uiState.update {
+            it.copy(
+                clickTrackingStatusText = "Invalid Traffic Filtered",
+                errorDetectionText = msg,
+                errorSeverity = ErrorDetectionSeverity.WARNING,
+                statusMessage = msg
+            )
+        }
+    }
+
+    fun checkClickTrackingHealth() {
+        val s = _uiState.value
+        if (s.isCheckingListener) return
+        if (s.activeUrl == null || s.status == TestSessionStatus.IDLE || s.status == TestSessionStatus.STOPPED) {
+            _uiState.update {
+                it.copy(
+                    errorDetectionText = "Enter a Website URL and tap Start Test before checking Click Tracking.",
+                    errorSeverity = ErrorDetectionSeverity.ERROR,
+                    statusMessage = "No active website loaded."
+                )
+            }
+            return
+        }
+        if (s.previewBlockedReason != null ||
+            s.status == TestSessionStatus.FAILED ||
+            s.status == TestSessionStatus.NETWORK_ERROR
+        ) {
+            _uiState.update {
+                it.copy(
+                    errorDetectionText = s.previewBlockedReason ?: "Fix Page Load or Network Error first.",
+                    errorSeverity = ErrorDetectionSeverity.ERROR,
+                    statusMessage = s.previewBlockedReason ?: "Website failed to load."
+                )
+            }
+            return
+        }
+
+        listenerCheckJob?.cancel()
+        pendingListenerDeferred?.cancel()
+        val deferred = CompletableDeferred<String>()
+        pendingListenerDeferred = deferred
+
+        _uiState.update {
+            it.copy(
+                isCheckingListener = true,
+                statusMessage = "Verifying DOM Click Event Listener and checking for blocking overlays...",
+                webCommand = WebCommandEvent(id = ++commandSeq, type = WebCommandType.CHECK_CLICK_LISTENER)
+            )
+        }
+
+        listenerCheckJob = viewModelScope.launch {
+            val raw = withTimeoutOrNull(3500L) { deferred.await() }
+            pendingListenerDeferred = null
+            val obj = raw?.let { runCatching { JSONObject(it) }.getOrNull() }
+            val ok = obj?.optBoolean("ok", false) == true
+            val blocked = obj?.optString("status") == "BLOCKED"
+            val listenerText = obj?.optString("listenerText")?.takeIf { it.isNotBlank() }
+                ?: if (ok) "Active (0 Duplicates)" else "Error: Not Responding"
+            val reason = obj?.optString("reason")?.takeIf { it.isNotBlank() }
+                ?: "Click Tracking Error: DOM click event pipeline did not respond."
+
+            _uiState.update { cur ->
+                cur.copy(
+                    isCheckingListener = false,
+                    status = if (blocked) TestSessionStatus.BLOCKED else cur.status,
+                    clickListenerStatusText = listenerText,
+                    clickTrackingStatusText = when {
+                        blocked -> "Blocked (Cross-Origin)"
+                        ok -> if (cur.verifiedUiClicks > 0) "Click Event Received" else "Listener Active"
+                        else -> "Click Tracking Error"
+                    },
+                    errorDetectionText = if (ok) "No Click Tracking Error Detected" else reason,
+                    errorSeverity = when {
+                        blocked -> ErrorDetectionSeverity.WARNING
+                        ok -> ErrorDetectionSeverity.NONE
+                        else -> ErrorDetectionSeverity.ERROR
+                    },
+                    statusMessage = if (ok) {
+                        "Click Event Listener verified active (0 duplicates, CSS pointer-events clear)."
+                    } else {
+                        reason
+                    }
+                )
+            }
+        }
+    }
+
+    fun onListenerHealthResult(jsonResult: String) {
+        pendingListenerDeferred?.complete(jsonResult)
+    }
+
+    private fun cancelJobsAndDeferreds() {
+        loadWatchdogJob?.cancel()
+        loadWatchdogJob = null
+        listenerCheckJob?.cancel()
+        listenerCheckJob = null
+        pendingListenerDeferred?.cancel()
+        pendingListenerDeferred = null
+    }
+
     override fun onCleared() {
         super.onCleared()
-        queueJob?.cancel()
-        autoClickJob?.cancel()
-        cancelRandomJobsAndDeferreds()
-        cancelDiagJobsAndDeferreds()
-        vpnMonitor.release()
+        cancelJobsAndDeferreds()
     }
 }

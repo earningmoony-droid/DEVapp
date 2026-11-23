@@ -19,7 +19,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -44,8 +43,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowDownward
-import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Code
@@ -53,16 +50,9 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Link
-import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Public
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Stop
-import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.VerifiedUser
-import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,18 +60,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -92,26 +81,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
-import com.example.model.AutoScrollDirection
-import com.example.model.ClickInteractionMode
-import com.example.model.ClickTargetItem
-import com.example.model.ClickTestStatus
-import com.example.model.DiagnosticResultStatus
-import com.example.model.RandomInteractionStatus
-import com.example.model.ScrollIndicatorState
-import com.example.model.ScrollSpeed
+import com.example.model.ErrorDetectionSeverity
 import com.example.model.TestSessionStatus
-import com.example.model.VpnConnectionStatus
-import com.example.model.VpnProvider
 import com.example.ui.WebVisitUiState
 import com.example.ui.WebVisitViewModel
-import com.example.ui.components.DurationStepperRow
 import com.example.ui.components.GlassActionButton
 import com.example.ui.components.GradientPrimaryButton
 import com.example.ui.components.LiquidGlassBackground
@@ -126,6 +102,7 @@ import com.example.ui.theme.GlassStrokeSubtle
 import com.example.ui.theme.GlassStrokeViolet
 import com.example.ui.theme.GlassSurfaceElevated
 import com.example.ui.theme.IndigoAccent
+import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LuminousPurple
 import com.example.ui.theme.MidnightDeep
 import com.example.ui.theme.MidnightNavy
@@ -140,18 +117,6 @@ fun WebVisitTesterApp(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    // Refresh installed VPN providers when returning from system VPN Settings or provider app
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshInstalledProviders()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
 
     val openWebsiteInBrowser: (String) -> Unit = { targetUrl ->
         val trimmed = targetUrl.trim()
@@ -176,10 +141,8 @@ fun WebVisitTesterApp(
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .navigationBarsPadding()
         ) {
-            MinimalHeaderBar(
+            HeaderBar(
                 status = uiState.status,
-                phaseRemainingSec = uiState.phaseRemainingSec,
-                isRunning = uiState.isRunning,
                 onShowHtmlClick = { viewModel.setHtmlSheetVisible(true) },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
             )
@@ -210,65 +173,17 @@ fun WebVisitTesterApp(
                                 modifier = Modifier.weight(0.95f),
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                MinimalControlPanel(
+                                UrlTestControlsCard(
                                     uiState = uiState,
                                     onUrlChanged = viewModel::onUrlChanged,
                                     onApplyProtocol = viewModel::applyQuickProtocol,
                                     onStartTest = viewModel::startTest,
-                                    onStopTest = viewModel::stopTest,
-                                    onViewDurationChanged = viewModel::updateViewDuration,
-                                    onPauseDurationChanged = viewModel::updatePauseDuration,
-                                    onScrollDown = viewModel::startAutoScrollDown,
-                                    onScrollUp = viewModel::startAutoScrollUp,
-                                    onRandomScroll = viewModel::startRandomScroll,
-                                    onTogglePauseScroll = viewModel::togglePauseAutoScroll,
-                                    onStopScroll = viewModel::stopAutoScroll,
-                                    onScrollSpeedChanged = viewModel::setScrollSpeed,
-                                    onAutoNextChanged = viewModel::setAutoNextEnabled,
-                                    onTotalRunsChanged = viewModel::updateTotalRuns
+                                    onStopTest = viewModel::stopTest
                                 )
 
-                                ClicksAutomationPanel(
+                                ImpressionClickTrackingCard(
                                     uiState = uiState,
-                                    onAuthorizedChanged = viewModel::setAuthorizedOwnSite,
-                                    onClickModeChanged = viewModel::setClickInteractionMode,
-                                    onClickTargetInputChanged = viewModel::updateClickTargetInput,
-                                    onClickTargetPresetSelected = viewModel::selectClickTargetPreset,
-                                    onSelectorChanged = viewModel::onClickSelectorChanged,
-                                    onSelectTarget = viewModel::selectDiscoveredTarget,
-                                    onScanTargets = viewModel::scanClickTargets,
-                                    onClickIntervalChanged = viewModel::updateClickInterval,
-                                    onSingleClickTest = viewModel::triggerSingleClickTest,
-                                    onStartAutoClick = viewModel::startAutoClick,
-                                    onStopAutoClick = { viewModel.stopAutoClick() },
-                                    onResetClickCounter = viewModel::resetClickCounter
-                                )
-
-                                RandomInteractionPanel(
-                                    uiState = uiState,
-                                    onTargetInputChanged = viewModel::updateRandomTapTargetInput,
-                                    onDelayInputChanged = viewModel::updateRandomTapDelayInput,
-                                    onLoadDemoEnvironment = viewModel::loadDemoTestEnvironment,
-                                    onStartRandomTest = viewModel::startRandomInteraction,
-                                    onStopRandomTest = { viewModel.stopRandomInteraction() },
-                                    onResetRandomCounter = viewModel::resetRandomInteractionCounter
-                                )
-
-                                DiagnosticPanel(
-                                    uiState = uiState,
-                                    onStartDiagnostic = viewModel::startDiagnostic,
-                                    onStopDiagnostic = { viewModel.stopDiagnostic() },
-                                    onVerifyListener = viewModel::verifyDiagListenerOnly,
-                                    onTestButton = viewModel::runDiagButtonTestOnly,
-                                    onTestLink = viewModel::runDiagLinkTestOnly
-                                )
-
-                                VpnTestingPanel(
-                                    uiState = uiState,
-                                    onSelectProvider = viewModel::selectVpnProvider,
-                                    onConnectDisconnect = viewModel::openVpnConnectOrDisconnect,
-                                    onVerifyConnection = viewModel::verifyVpnConnection,
-                                    onRequireVpnChanged = viewModel::setRequireVpnForTest
+                                    onCheckTracking = viewModel::checkClickTrackingHealth
                                 )
                             }
 
@@ -279,91 +194,32 @@ fun WebVisitTesterApp(
                                 status = uiState.status,
                                 isPreviewLoading = uiState.isPreviewLoading,
                                 blockedReason = uiState.previewBlockedReason,
-                                phaseRemainingSec = uiState.phaseRemainingSec,
-                                scrollDirection = uiState.scrollDirection,
-                                isScrollPaused = uiState.isScrollPaused,
-                                scrollSpeed = uiState.scrollSpeed,
-                                canGoBack = uiState.canGoBack,
                                 pendingCommand = uiState.webCommand,
                                 onConsumeCommand = viewModel::consumeWebCommand,
-                                onBackClick = viewModel::triggerBack,
-                                onHomeClick = viewModel::triggerHome,
                                 onReloadClick = viewModel::triggerReload,
                                 onPageStarted = viewModel::onPreviewPageStarted,
                                 onPageFinished = viewModel::onPreviewPageFinished,
-                                onCanGoBackChanged = viewModel::updateCanGoBack,
-                                onScrollFeedback = viewModel::onScrollFeedback,
                                 onBlockedOrError = viewModel::onPreviewBlockedOrError,
                                 onOpenExternal = openWebsiteInBrowser,
-                                onTargetsScanned = viewModel::onClickTargetsScanned,
-                                onClickExecuted = viewModel::onSingleClickExecuted,
                                 onDirectPreviewClick = viewModel::onDirectPreviewClick,
-                                onRandomTapExecuted = viewModel::onRandomTapExecuted,
-                                onRandomScrollFinished = viewModel::onRandomScrollFinished,
-                                onDiagCommandResult = viewModel::onDiagCommandResult,
+                                onAdElementObserved = viewModel::onAdElementObserved,
+                                onInvalidTrafficNotice = viewModel::onInvalidTrafficOrNotice,
+                                onListenerHealthResult = viewModel::onListenerHealthResult,
                                 modifier = Modifier.weight(1.05f)
                             )
                         }
                     } else {
-                        MinimalControlPanel(
+                        UrlTestControlsCard(
                             uiState = uiState,
                             onUrlChanged = viewModel::onUrlChanged,
                             onApplyProtocol = viewModel::applyQuickProtocol,
                             onStartTest = viewModel::startTest,
-                            onStopTest = viewModel::stopTest,
-                            onViewDurationChanged = viewModel::updateViewDuration,
-                            onPauseDurationChanged = viewModel::updatePauseDuration,
-                            onScrollDown = viewModel::startAutoScrollDown,
-                            onScrollUp = viewModel::startAutoScrollUp,
-                            onRandomScroll = viewModel::startRandomScroll,
-                            onTogglePauseScroll = viewModel::togglePauseAutoScroll,
-                            onStopScroll = viewModel::stopAutoScroll,
-                            onScrollSpeedChanged = viewModel::setScrollSpeed,
-                            onAutoNextChanged = viewModel::setAutoNextEnabled,
-                            onTotalRunsChanged = viewModel::updateTotalRuns
+                            onStopTest = viewModel::stopTest
                         )
 
-                        ClicksAutomationPanel(
+                        ImpressionClickTrackingCard(
                             uiState = uiState,
-                            onAuthorizedChanged = viewModel::setAuthorizedOwnSite,
-                            onClickModeChanged = viewModel::setClickInteractionMode,
-                            onClickTargetInputChanged = viewModel::updateClickTargetInput,
-                            onClickTargetPresetSelected = viewModel::selectClickTargetPreset,
-                            onSelectorChanged = viewModel::onClickSelectorChanged,
-                            onSelectTarget = viewModel::selectDiscoveredTarget,
-                            onScanTargets = viewModel::scanClickTargets,
-                            onClickIntervalChanged = viewModel::updateClickInterval,
-                            onSingleClickTest = viewModel::triggerSingleClickTest,
-                            onStartAutoClick = viewModel::startAutoClick,
-                            onStopAutoClick = { viewModel.stopAutoClick() },
-                            onResetClickCounter = viewModel::resetClickCounter
-                        )
-
-                        RandomInteractionPanel(
-                            uiState = uiState,
-                            onTargetInputChanged = viewModel::updateRandomTapTargetInput,
-                            onDelayInputChanged = viewModel::updateRandomTapDelayInput,
-                            onLoadDemoEnvironment = viewModel::loadDemoTestEnvironment,
-                            onStartRandomTest = viewModel::startRandomInteraction,
-                            onStopRandomTest = { viewModel.stopRandomInteraction() },
-                            onResetRandomCounter = viewModel::resetRandomInteractionCounter
-                        )
-
-                        DiagnosticPanel(
-                            uiState = uiState,
-                            onStartDiagnostic = viewModel::startDiagnostic,
-                            onStopDiagnostic = { viewModel.stopDiagnostic() },
-                            onVerifyListener = viewModel::verifyDiagListenerOnly,
-                            onTestButton = viewModel::runDiagButtonTestOnly,
-                            onTestLink = viewModel::runDiagLinkTestOnly
-                        )
-
-                        VpnTestingPanel(
-                            uiState = uiState,
-                            onSelectProvider = viewModel::selectVpnProvider,
-                            onConnectDisconnect = viewModel::openVpnConnectOrDisconnect,
-                            onVerifyConnection = viewModel::verifyVpnConnection,
-                            onRequireVpnChanged = viewModel::setRequireVpnForTest
+                            onCheckTracking = viewModel::checkClickTrackingHealth
                         )
 
                         WebPreviewCard(
@@ -373,28 +229,17 @@ fun WebVisitTesterApp(
                             status = uiState.status,
                             isPreviewLoading = uiState.isPreviewLoading,
                             blockedReason = uiState.previewBlockedReason,
-                            phaseRemainingSec = uiState.phaseRemainingSec,
-                            scrollDirection = uiState.scrollDirection,
-                            isScrollPaused = uiState.isScrollPaused,
-                            scrollSpeed = uiState.scrollSpeed,
-                            canGoBack = uiState.canGoBack,
                             pendingCommand = uiState.webCommand,
                             onConsumeCommand = viewModel::consumeWebCommand,
-                            onBackClick = viewModel::triggerBack,
-                            onHomeClick = viewModel::triggerHome,
                             onReloadClick = viewModel::triggerReload,
                             onPageStarted = viewModel::onPreviewPageStarted,
                             onPageFinished = viewModel::onPreviewPageFinished,
-                            onCanGoBackChanged = viewModel::updateCanGoBack,
-                            onScrollFeedback = viewModel::onScrollFeedback,
                             onBlockedOrError = viewModel::onPreviewBlockedOrError,
                             onOpenExternal = openWebsiteInBrowser,
-                            onTargetsScanned = viewModel::onClickTargetsScanned,
-                            onClickExecuted = viewModel::onSingleClickExecuted,
                             onDirectPreviewClick = viewModel::onDirectPreviewClick,
-                            onRandomTapExecuted = viewModel::onRandomTapExecuted,
-                            onRandomScrollFinished = viewModel::onRandomScrollFinished,
-                            onDiagCommandResult = viewModel::onDiagCommandResult
+                            onAdElementObserved = viewModel::onAdElementObserved,
+                            onInvalidTrafficNotice = viewModel::onInvalidTrafficOrNotice,
+                            onListenerHealthResult = viewModel::onListenerHealthResult
                         )
                     }
                 }
@@ -410,18 +255,16 @@ fun WebVisitTesterApp(
 }
 
 @Composable
-private fun MinimalHeaderBar(
+private fun HeaderBar(
     status: TestSessionStatus,
-    phaseRemainingSec: Int,
-    isRunning: Boolean,
     onShowHtmlClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val statusColor by animateColorAsState(
         targetValue = when (status) {
-            TestSessionStatus.VIEWING, TestSessionStatus.COMPLETED -> EmeraldSuccess
-            TestSessionStatus.PAUSING_BETWEEN, TestSessionStatus.STOPPED -> AmberWarning
-            TestSessionStatus.BLOCKED, TestSessionStatus.FAILED, TestSessionStatus.ERROR -> CoralDanger
+            TestSessionStatus.LOADED -> EmeraldSuccess
+            TestSessionStatus.BLOCKED, TestSessionStatus.STOPPED -> AmberWarning
+            TestSessionStatus.FAILED, TestSessionStatus.NETWORK_ERROR -> CoralDanger
             else -> ElectricCyan
         },
         label = "live_status_color"
@@ -446,13 +289,22 @@ private fun MinimalHeaderBar(
                     .border(1.dp, GlassStrokeBright, RoundedCornerShape(12.dp))
             )
 
-            Text(
-                text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = TextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Column {
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.app_subtitle),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = ElectricCyan,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         Row(
@@ -464,11 +316,13 @@ private fun MinimalHeaderBar(
                 shape = RoundedCornerShape(999.dp),
                 color = GlassSurfaceElevated.copy(alpha = 0.65f),
                 border = BorderStroke(1.dp, GlassStrokeSubtle),
-                modifier = Modifier.testTag("export_html_button")
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag("export_html_button")
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Code,
@@ -493,7 +347,7 @@ private fun MinimalHeaderBar(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp)
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp)
                 ) {
                     Box(
                         modifier = Modifier
@@ -502,13 +356,8 @@ private fun MinimalHeaderBar(
                             .background(statusColor)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    val liveLabel = if (isRunning) {
-                        "${status.displayLabel} • ${formatTimer(phaseRemainingSec)}"
-                    } else {
-                        status.displayLabel
-                    }
                     Text(
-                        text = liveLabel,
+                        text = status.displayLabel,
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                         color = TextPrimary,
                         maxLines = 1
@@ -520,25 +369,17 @@ private fun MinimalHeaderBar(
 }
 
 @Composable
-private fun MinimalControlPanel(
+private fun UrlTestControlsCard(
     uiState: WebVisitUiState,
     onUrlChanged: (String) -> Unit,
     onApplyProtocol: (String) -> Unit,
     onStartTest: () -> Unit,
     onStopTest: () -> Unit,
-    onViewDurationChanged: (Int) -> Unit,
-    onPauseDurationChanged: (Int) -> Unit,
-    onScrollDown: () -> Unit,
-    onScrollUp: () -> Unit,
-    onRandomScroll: () -> Unit,
-    onTogglePauseScroll: () -> Unit,
-    onStopScroll: () -> Unit,
-    onScrollSpeedChanged: (ScrollSpeed) -> Unit,
-    onAutoNextChanged: (Boolean) -> Unit,
-    onTotalRunsChanged: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
+    val isLoading = uiState.status == TestSessionStatus.LOADING
+    val hasActiveSession = uiState.status != TestSessionStatus.IDLE && uiState.status != TestSessionStatus.STOPPED
     val animatedProgress by animateFloatAsState(
         targetValue = uiState.overallProgress,
         animationSpec = spring(),
@@ -549,9 +390,15 @@ private fun MinimalControlPanel(
         OutlinedTextField(
             value = uiState.urlInput,
             onValueChange = onUrlChanged,
-            enabled = !uiState.isRunning,
+            enabled = !isLoading,
             singleLine = true,
             isError = uiState.urlError != null,
+            label = {
+                Text(
+                    text = stringResource(R.string.url_label),
+                    color = TextSecondary
+                )
+            },
             placeholder = {
                 Text(
                     text = stringResource(R.string.url_placeholder),
@@ -566,7 +413,7 @@ private fun MinimalControlPanel(
                 )
             },
             trailingIcon = {
-                if (uiState.urlInput.isNotEmpty() && !uiState.isRunning) {
+                if (uiState.urlInput.isNotEmpty() && !isLoading) {
                     IconButton(
                         onClick = { onUrlChanged("") },
                         modifier = Modifier.testTag("clear_url_button")
@@ -613,15 +460,17 @@ private fun MinimalControlPanel(
             ProtocolChip(
                 label = "https://",
                 selected = isHttps,
-                enabled = !uiState.isRunning,
+                enabled = !isLoading,
                 onClick = { onApplyProtocol("https://") },
+                testTag = "protocol_https_chip",
                 modifier = Modifier.weight(1f)
             )
             ProtocolChip(
                 label = "http://",
                 selected = !isHttps,
-                enabled = !uiState.isRunning,
+                enabled = !isLoading,
                 onClick = { onApplyProtocol("http://") },
+                testTag = "protocol_http_chip",
                 modifier = Modifier.weight(1f)
             )
         }
@@ -663,7 +512,7 @@ private fun MinimalControlPanel(
                     focusManager.clearFocus()
                     onStartTest()
                 },
-                enabled = !uiState.isRunning,
+                enabled = !isLoading,
                 testTag = "start_test_button",
                 modifier = Modifier.weight(1f)
             )
@@ -672,7 +521,7 @@ private fun MinimalControlPanel(
                 text = stringResource(R.string.btn_stop),
                 icon = Icons.Rounded.Stop,
                 onClick = onStopTest,
-                enabled = uiState.isRunning,
+                enabled = hasActiveSession,
                 accentColor = CoralDanger,
                 testTag = "stop_test_button",
                 modifier = Modifier.weight(1f)
@@ -686,15 +535,11 @@ private fun MinimalControlPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val statusSummary = if (uiState.isRunning) {
-                "${uiState.status.displayLabel} • Run ${uiState.currentRunNumber}/${uiState.activeTotalRuns}"
-            } else {
-                "${stringResource(R.string.label_live_status)}: ${uiState.status.displayLabel}"
-            }
             Text(
-                text = statusSummary,
+                text = "${stringResource(R.string.label_live_status)}: ${uiState.status.displayLabel}",
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary
+                color = TextSecondary,
+                modifier = Modifier.testTag("live_test_status_text")
             )
             Text(
                 text = "${(animatedProgress * 100).toInt()}%",
@@ -725,6 +570,34 @@ private fun MinimalControlPanel(
                     )
             )
         }
+    }
+}
+
+@Composable
+private fun ImpressionClickTrackingCard(
+    uiState: WebVisitUiState,
+    onCheckTracking: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LiquidGlassPanel(modifier = modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.VerifiedUser,
+                contentDescription = null,
+                tint = ElectricCyan,
+                modifier = Modifier.size(19.dp)
+            )
+            Text(
+                text = stringResource(R.string.label_tracking_section),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -732,1460 +605,187 @@ private fun MinimalControlPanel(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            LiveCounterPill(
-                label = "Visits",
-                value = uiState.visitCount.toString(),
-                accentColor = ElectricCyan,
-                testTag = "visit_count_text",
+            TrackingMetricCell(
+                title = "Impression Status",
+                statusLabel = uiState.impressionStatusText,
+                subText = "Verified Loads: ${uiState.verifiedLoadCount}",
+                accent = when {
+                    uiState.impressionStatusText.contains("Verified", ignoreCase = true) &&
+                        !uiState.impressionStatusText.contains("Not", ignoreCase = true) -> EmeraldSuccess
+                    uiState.impressionStatusText.contains("Not Verified", ignoreCase = true) -> CoralDanger
+                    uiState.impressionStatusText == "Stopped" -> AmberWarning
+                    else -> ElectricCyan
+                },
+                testTag = "impression_status_cell",
                 modifier = Modifier.weight(1f)
             )
-            LiveCounterPill(
-                label = "Failed",
-                value = uiState.failedCount.toString(),
-                accentColor = CoralDanger,
-                testTag = "failed_count_text",
-                modifier = Modifier.weight(1f)
-            )
-            LiveCounterPill(
-                label = if (uiState.clickMode == ClickInteractionMode.TAP) "Taps" else "Clicks",
-                value = "${uiState.clickCount}/${uiState.clickTarget}",
-                accentColor = LuminousPurple,
-                testTag = "live_click_count_text",
+            TrackingMetricCell(
+                title = "Click Tracking Status",
+                statusLabel = uiState.clickTrackingStatusText,
+                subText = "UI Clicks: ${uiState.verifiedUiClicks}",
+                accent = when {
+                    uiState.clickTrackingStatusText == "Click Event Received" -> EmeraldSuccess
+                    uiState.clickTrackingStatusText == "Listener Active" ||
+                        uiState.clickTrackingStatusText == "Ad Network Protected" -> ElectricCyan
+                    uiState.clickTrackingStatusText.contains("Blocked", ignoreCase = true) ||
+                        uiState.clickTrackingStatusText.contains("Invalid", ignoreCase = true) ||
+                        uiState.clickTrackingStatusText == "Stopped" -> AmberWarning
+                    uiState.clickTrackingStatusText.contains("Error", ignoreCase = true) ||
+                        uiState.clickTrackingStatusText == "Unavailable" -> CoralDanger
+                    else -> LuminousPurple
+                },
+                testTag = "click_tracking_status_cell",
                 modifier = Modifier.weight(1f)
             )
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        DurationStepperRow(
-            label = stringResource(R.string.label_view_duration),
-            valueText = "${uiState.viewDurationSec}s",
-            presets = listOf("10s" to 10, "15s" to 15, "30s" to 30, "60s" to 60),
-            currentValue = uiState.viewDurationSec,
-            enabled = !uiState.isRunning,
-            onDecrement = { onViewDurationChanged(uiState.viewDurationSec - 5) },
-            onIncrement = { onViewDurationChanged(uiState.viewDurationSec + 5) },
-            onPresetSelected = onViewDurationChanged,
-            testTagPrefix = "view_duration"
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        DurationStepperRow(
-            label = stringResource(R.string.label_pause_interval),
-            valueText = "${uiState.pauseDurationSec}s",
-            presets = listOf("0s" to 0, "3s" to 3, "5s" to 5, "10s" to 10),
-            currentValue = uiState.pauseDurationSec,
-            enabled = !uiState.isRunning,
-            onDecrement = { onPauseDurationChanged(uiState.pauseDurationSec - 1) },
-            onIncrement = { onPauseDurationChanged(uiState.pauseDurationSec + 1) },
-            onPresetSelected = onPauseDurationChanged,
-            testTagPrefix = "pause_duration"
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Auto Scroll Down / Up / Random / Pause / Stop + Position & Status Indicator
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = stringResource(R.string.label_auto_scroll),
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                color = TextPrimary
+            StatusDetailCell(
+                title = "Page Load Status",
+                value = uiState.pageLoadStatusText,
+                accent = when {
+                    uiState.pageLoadStatusText.startsWith("Loaded") -> EmeraldSuccess
+                    uiState.pageLoadStatusText.contains("Failed") || uiState.pageLoadStatusText.contains("Error") -> CoralDanger
+                    uiState.pageLoadStatusText == "Stopped" -> AmberWarning
+                    else -> TextPrimary
+                },
+                testTag = "page_load_status_cell",
+                modifier = Modifier.weight(1f)
             )
-
-            val scrollColor = when (uiState.scrollStatus) {
-                ScrollIndicatorState.SCROLLING_DOWN -> ElectricCyan
-                ScrollIndicatorState.SCROLLING_UP -> LuminousPurple
-                ScrollIndicatorState.RANDOM_DOWN, ScrollIndicatorState.RANDOM_UP -> EmeraldSuccess
-                ScrollIndicatorState.RESTRICTED, ScrollIndicatorState.NOT_SCROLLABLE, ScrollIndicatorState.STUCK -> CoralDanger
-                ScrollIndicatorState.PAUSED, ScrollIndicatorState.AT_TOP, ScrollIndicatorState.AT_BOTTOM, ScrollIndicatorState.STOPPED -> AmberWarning
-                ScrollIndicatorState.IDLE -> TextMuted
-            }
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = scrollColor.copy(alpha = 0.14f),
-                border = BorderStroke(1.dp, scrollColor.copy(alpha = 0.4f)),
-                modifier = Modifier.testTag("scroll_status_badge")
-            ) {
-                Text(
-                    text = uiState.scrollStatus.label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = scrollColor,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                )
-            }
+            StatusDetailCell(
+                title = "Click Event Listener",
+                value = uiState.clickListenerStatusText,
+                accent = when {
+                    uiState.clickListenerStatusText.startsWith("Active") -> EmeraldSuccess
+                    uiState.clickListenerStatusText.contains("Blocked") || uiState.clickListenerStatusText == "Stopped" -> AmberWarning
+                    uiState.clickListenerStatusText.contains("Error") || uiState.clickListenerStatusText == "Unavailable" -> CoralDanger
+                    else -> TextPrimary
+                },
+                testTag = "click_listener_status_cell",
+                modifier = Modifier.weight(1f)
+            )
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
+        val errorColor = when (uiState.errorSeverity) {
+            ErrorDetectionSeverity.ERROR -> CoralDanger
+            ErrorDetectionSeverity.WARNING -> AmberWarning
+            ErrorDetectionSeverity.INFO -> ElectricCyan
+            ErrorDetectionSeverity.NONE -> EmeraldSuccess
+        }
+        val errorBorderColor = when (uiState.errorSeverity) {
+            ErrorDetectionSeverity.ERROR -> CoralDanger.copy(alpha = 0.45f)
+            ErrorDetectionSeverity.WARNING -> AmberWarning.copy(alpha = 0.45f)
+            ErrorDetectionSeverity.INFO -> ElectricCyan.copy(alpha = 0.4f)
+            ErrorDetectionSeverity.NONE -> GlassStrokeSubtle
+        }
+
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(MidnightDeep.copy(alpha = 0.56f))
-                .border(1.dp, GlassStrokeSubtle, RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .background(MidnightDeep.copy(alpha = 0.62f))
+                .border(1.dp, errorBorderColor, RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 9.dp)
+                .testTag("error_detection_box"),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
-                text = "Scroll Position",
+                text = "CLICK TRACKING ERROR DETECTION",
                 style = MaterialTheme.typography.labelSmall,
                 color = TextMuted
             )
             Text(
-                text = uiState.scrollPositionText,
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = ElectricCyan,
-                modifier = Modifier.testTag("scroll_position_text")
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            GlassActionButton(
-                text = stringResource(R.string.btn_scroll_down),
-                icon = Icons.Rounded.ArrowDownward,
-                onClick = onScrollDown,
-                enabled = uiState.scrollDirection != AutoScrollDirection.DOWN || uiState.isScrollPaused,
-                accentColor = ElectricCyan,
-                testTag = "scroll_down_button",
-                modifier = Modifier.weight(1f)
-            )
-            GlassActionButton(
-                text = stringResource(R.string.btn_scroll_up),
-                icon = Icons.Rounded.ArrowUpward,
-                onClick = onScrollUp,
-                enabled = uiState.scrollDirection != AutoScrollDirection.UP || uiState.isScrollPaused,
-                accentColor = LuminousPurple,
-                testTag = "scroll_up_button",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            GlassActionButton(
-                text = stringResource(R.string.btn_scroll_random),
-                icon = Icons.Rounded.Shuffle,
-                onClick = onRandomScroll,
-                enabled = uiState.scrollDirection != AutoScrollDirection.RANDOM || uiState.isScrollPaused,
-                accentColor = EmeraldSuccess,
-                testTag = "scroll_random_button",
-                modifier = Modifier.weight(1f)
-            )
-            GlassActionButton(
-                text = if (uiState.isScrollPaused) stringResource(R.string.btn_resume_scroll) else stringResource(R.string.btn_pause_scroll),
-                icon = if (uiState.isScrollPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                onClick = onTogglePauseScroll,
-                enabled = uiState.scrollDirection != AutoScrollDirection.NONE,
-                accentColor = AmberWarning,
-                testTag = "pause_scroll_button",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        GlassActionButton(
-            text = stringResource(R.string.btn_stop_scroll),
-            icon = Icons.Rounded.Stop,
-            onClick = onStopScroll,
-            enabled = uiState.scrollDirection != AutoScrollDirection.NONE,
-            accentColor = CoralDanger,
-            testTag = "stop_scroll_button",
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ScrollSpeed.entries.forEach { speed ->
-                val selected = uiState.scrollSpeed == speed
-                val shape = RoundedCornerShape(10.dp)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(shape)
-                        .background(
-                            if (selected) ElectricCyan.copy(alpha = 0.22f)
-                            else MidnightDeep.copy(alpha = 0.45f)
-                        )
-                        .border(
-                            1.dp,
-                            if (selected) ElectricCyan.copy(alpha = 0.65f) else GlassStrokeSubtle,
-                            shape
-                        )
-                        .clickable { onScrollSpeedChanged(speed) }
-                        .padding(vertical = 8.dp)
-                        .testTag("scroll_speed_${speed.name.lowercase()}"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = speed.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (selected) ElectricCyan else TextMuted
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(
-                    text = stringResource(R.string.label_auto_next),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                    color = TextPrimary
-                )
-                Text(
-                    text = if (uiState.autoNextEnabled) "Automatically continues next run" else "Stops after 1 viewing run",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
-            }
-
-            Switch(
-                checked = uiState.autoNextEnabled,
-                onCheckedChange = onAutoNextChanged,
-                enabled = !uiState.isRunning,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = MidnightDeep,
-                    checkedTrackColor = LuminousPurple,
-                    uncheckedThumbColor = TextMuted,
-                    uncheckedTrackColor = MidnightDeep.copy(alpha = 0.6f)
-                ),
-                modifier = Modifier.testTag("auto_next_switch")
-            )
-        }
-
-        AnimatedVisibility(visible = uiState.autoNextEnabled) {
-            Column {
-                Spacer(modifier = Modifier.height(10.dp))
-                DurationStepperRow(
-                    label = stringResource(R.string.label_total_runs),
-                    valueText = "${uiState.totalRuns}x",
-                    presets = listOf("2x" to 2, "3x" to 3, "5x" to 5, "10x" to 10),
-                    currentValue = uiState.totalRuns,
-                    enabled = !uiState.isRunning,
-                    onDecrement = { onTotalRunsChanged(uiState.totalRuns - 1) },
-                    onIncrement = { onTotalRunsChanged(uiState.totalRuns + 1) },
-                    onPresetSelected = onTotalRunsChanged,
-                    testTagPrefix = "total_runs"
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun VpnTestingPanel(
-    uiState: WebVisitUiState,
-    onSelectProvider: (VpnProvider) -> Unit,
-    onConnectDisconnect: () -> Unit,
-    onVerifyConnection: () -> Unit,
-    onRequireVpnChanged: (Boolean) -> Unit
-) {
-    val vpnColor = when (uiState.vpnStatus) {
-        VpnConnectionStatus.CONNECTED -> EmeraldSuccess
-        VpnConnectionStatus.VERIFYING -> ElectricCyan
-        VpnConnectionStatus.LOST -> CoralDanger
-        VpnConnectionStatus.DISCONNECTED -> AmberWarning
-    }
-
-    LiquidGlassPanel(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.VpnKey,
-                    contentDescription = null,
-                    tint = ElectricCyan,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = stringResource(R.string.label_vpn_module),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = vpnColor.copy(alpha = 0.14f),
-                border = BorderStroke(1.dp, vpnColor.copy(alpha = 0.45f)),
-                modifier = Modifier.testTag("vpn_status_badge")
-            ) {
-                val ifaceSuffix = uiState.vpnInterfaceName?.let { " • $it" } ?: ""
-                Text(
-                    text = "${uiState.vpnStatus.label}$ifaceSuffix",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = vpnColor,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-            text = "Supported VPN Providers (Country/server chosen inside provider app)",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextMuted
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            VpnProvider.entries.forEach { provider ->
-                val selected = uiState.selectedVpnProvider == provider
-                val installed = provider in uiState.installedProviders
-                val shape = RoundedCornerShape(12.dp)
-                Box(
-                    modifier = Modifier
-                        .clip(shape)
-                        .background(
-                            if (selected) ElectricCyan.copy(alpha = 0.2f)
-                            else MidnightDeep.copy(alpha = 0.5f)
-                        )
-                        .border(
-                            1.dp,
-                            if (selected) ElectricCyan.copy(alpha = 0.6f) else GlassStrokeSubtle,
-                            shape
-                        )
-                        .clickable { onSelectProvider(provider) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .testTag("vpn_provider_${provider.name.lowercase()}"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (installed && provider != VpnProvider.ANDROID_SYSTEM) {
-                            "${provider.displayName} ✓"
-                        } else {
-                            provider.displayName
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (selected) ElectricCyan else TextSecondary,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val isConnected = uiState.vpnStatus == VpnConnectionStatus.CONNECTED
-            GlassActionButton(
-                text = if (isConnected) stringResource(R.string.btn_vpn_disconnect) else stringResource(R.string.btn_vpn_connect),
-                icon = Icons.Rounded.Public,
-                onClick = onConnectDisconnect,
-                accentColor = if (isConnected) AmberWarning else ElectricCyan,
-                testTag = "vpn_connect_button",
-                modifier = Modifier.weight(1.1f)
-            )
-            GlassActionButton(
-                text = if (uiState.isVerifyingVpn) "Checking..." else stringResource(R.string.btn_vpn_verify),
-                icon = Icons.Rounded.VerifiedUser,
-                onClick = onVerifyConnection,
-                enabled = !uiState.isVerifyingVpn,
-                accentColor = EmeraldSuccess,
-                testTag = "vpn_verify_button",
-                modifier = Modifier.weight(0.9f)
-            )
-        }
-
-        uiState.vpnVerification?.let { info ->
-            Spacer(modifier = Modifier.height(10.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MidnightDeep.copy(alpha = 0.6f))
-                    .border(1.dp, GlassStrokeSubtle, RoundedCornerShape(12.dp))
-                    .padding(10.dp)
-            ) {
-                if (info.isVerified) {
-                    val location = listOfNotNull(info.country, info.region).joinToString(", ").ifBlank { "Unknown" }
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(
-                            text = "Exit IP: ${info.publicIp ?: "Unknown"} • Region: $location",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = EmeraldSuccess
-                        )
-                        info.networkOrg?.let { org ->
-                            Text(
-                                text = "Network: $org",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextMuted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                } else {
-                    Text(
-                        text = info.errorMessage ?: "Verification unavailable",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = CoralDanger
-                    )
-                }
-            }
-        }
-
-        uiState.vpnActionMessage?.let { msg ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = msg,
-                style = MaterialTheme.typography.labelSmall,
-                color = AmberWarning
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Require Active VPN",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                    color = TextPrimary
-                )
-                Text(
-                    text = "Verify VPN before loading & stop test if VPN disconnects",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Switch(
-                checked = uiState.requireVpnForTest,
-                onCheckedChange = onRequireVpnChanged,
-                enabled = !uiState.isRunning,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = MidnightDeep,
-                    checkedTrackColor = EmeraldSuccess,
-                    uncheckedThumbColor = TextMuted,
-                    uncheckedTrackColor = MidnightDeep.copy(alpha = 0.6f)
-                ),
-                modifier = Modifier.testTag("require_vpn_switch")
-            )
-        }
-    }
-}
-
-@Composable
-private fun ClicksAutomationPanel(
-    uiState: WebVisitUiState,
-    onAuthorizedChanged: (Boolean) -> Unit,
-    onClickModeChanged: (ClickInteractionMode) -> Unit,
-    onClickTargetInputChanged: (String) -> Unit,
-    onClickTargetPresetSelected: (Int) -> Unit,
-    onSelectorChanged: (String) -> Unit,
-    onSelectTarget: (ClickTargetItem) -> Unit,
-    onScanTargets: () -> Unit,
-    onClickIntervalChanged: (Int) -> Unit,
-    onSingleClickTest: () -> Unit,
-    onStartAutoClick: () -> Unit,
-    onStopAutoClick: () -> Unit,
-    onResetClickCounter: () -> Unit
-) {
-    val clickBadgeColor = when (uiState.clickStatus) {
-        ClickTestStatus.RUNNING, ClickTestStatus.COMPLETED -> EmeraldSuccess
-        ClickTestStatus.BLOCKED_AD, ClickTestStatus.RESTRICTED -> CoralDanger
-        ClickTestStatus.STOPPED, ClickTestStatus.NO_TARGET -> AmberWarning
-        ClickTestStatus.IDLE -> ElectricCyan
-    }
-    val isTapMode = uiState.clickMode == ClickInteractionMode.TAP
-    val safeTarget = uiState.clickTarget.coerceAtLeast(1)
-    val clickRatioFraction = (uiState.clickCount.toFloat() / safeTarget.toFloat()).coerceIn(0f, 1f)
-    val animatedClickProgress by animateFloatAsState(
-        targetValue = clickRatioFraction,
-        animationSpec = spring(),
-        label = "click_target_progress"
-    )
-    val focusManager = LocalFocusManager.current
-
-    LiquidGlassPanel(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.TouchApp,
-                    contentDescription = null,
-                    tint = LuminousPurple,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = stringResource(R.string.label_click_module),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = clickBadgeColor.copy(alpha = 0.14f),
-                border = BorderStroke(1.dp, clickBadgeColor.copy(alpha = 0.45f)),
-                modifier = Modifier.testTag("click_counter_badge")
-            ) {
-                val countLabel = if (isTapMode) "Taps" else "Clicks"
-                Text(
-                    text = "$countLabel: ${uiState.clickCount}/$safeTarget • ${uiState.clickStatus.label}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = clickBadgeColor,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Target Click Counter Panel (Separate Current Click, Click Target, Progress Bar, Input & Presets)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(MidnightDeep.copy(alpha = 0.58f))
-                .border(1.dp, GlassStrokeViolet, RoundedCornerShape(16.dp))
-                .padding(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Target Click Counter",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = TextSecondary
-                )
-                Text(
-                    text = "${uiState.clickCount}/$safeTarget (${(animatedClickProgress * 100).toInt()}%)",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = LuminousPurple,
-                    modifier = Modifier.testTag("click_target_ratio_text")
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                LiveCounterPill(
-                    label = "Current Click",
-                    value = uiState.clickCount.toString(),
-                    accentColor = LuminousPurple,
-                    testTag = "current_click_stat",
-                    modifier = Modifier.weight(1f)
-                )
-                LiveCounterPill(
-                    label = "Click Target",
-                    value = safeTarget.toString(),
-                    accentColor = ElectricCyan,
-                    testTag = "target_click_stat",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(MidnightDeep.copy(alpha = 0.85f))
-                    .border(1.dp, GlassStrokeSubtle, RoundedCornerShape(999.dp))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(animatedClickProgress)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(LuminousPurple, ElectricCyan, EmeraldSuccess)
-                            )
-                        )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            OutlinedTextField(
-                value = uiState.clickTargetInput,
-                onValueChange = onClickTargetInputChanged,
-                singleLine = true,
-                label = { Text("Click Target (e.g. 50, 100, 500, 1000)", color = TextMuted) },
-                placeholder = { Text("100", color = TextMuted) },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { focusManager.clearFocus() }
-                ),
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = ElectricCyan,
-                    unfocusedBorderColor = GlassStrokeSubtle,
-                    focusedContainerColor = MidnightNavy.copy(alpha = 0.65f),
-                    unfocusedContainerColor = MidnightNavy.copy(alpha = 0.50f),
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("click_target_input")
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                listOf(50, 100, 500, 1000).forEach { preset ->
-                    val selected = safeTarget == preset
-                    val shape = RoundedCornerShape(10.dp)
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(shape)
-                            .background(
-                                if (selected) ElectricCyan.copy(alpha = 0.22f)
-                                else MidnightNavy.copy(alpha = 0.55f)
-                            )
-                            .border(
-                                1.dp,
-                                if (selected) ElectricCyan.copy(alpha = 0.65f) else GlassStrokeSubtle,
-                                shape
-                            )
-                            .clickable { onClickTargetPresetSelected(preset) }
-                            .padding(vertical = 8.dp)
-                            .testTag("click_target_preset_$preset"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = preset.toString(),
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = if (selected) ElectricCyan else TextSecondary
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Authorized Own Site / Test Page",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                    color = TextPrimary
-                )
-                Text(
-                    text = "Ads & sponsored clicks are strictly blocked",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Switch(
-                checked = uiState.isAuthorizedOwnSite,
-                onCheckedChange = onAuthorizedChanged,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = MidnightDeep,
-                    checkedTrackColor = ElectricCyan,
-                    uncheckedThumbColor = TextMuted,
-                    uncheckedTrackColor = MidnightDeep.copy(alpha = 0.6f)
-                ),
-                modifier = Modifier.testTag("authorized_site_switch")
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ClickInteractionMode.entries.forEach { mode ->
-                val selected = uiState.clickMode == mode
-                val shape = RoundedCornerShape(10.dp)
-                val accent = if (mode == ClickInteractionMode.TAP) LuminousPurple else ElectricCyan
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(shape)
-                        .background(
-                            if (selected) accent.copy(alpha = 0.22f)
-                            else MidnightDeep.copy(alpha = 0.45f)
-                        )
-                        .border(
-                            1.dp,
-                            if (selected) accent.copy(alpha = 0.65f) else GlassStrokeSubtle,
-                            shape
-                        )
-                        .clickable(enabled = !uiState.isAutoClickRunning) { onClickModeChanged(mode) }
-                        .padding(vertical = 8.dp)
-                        .testTag("interaction_mode_${mode.name.lowercase()}"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = mode.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (selected) TextPrimary else TextMuted
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = uiState.clickSelector,
-            onValueChange = onSelectorChanged,
-            enabled = !uiState.isAutoClickRunning,
-            singleLine = true,
-            placeholder = {
-                Text(
-                    text = "CSS selector (e.g. #submit-btn, .cta)",
-                    color = TextMuted
-                )
-            },
-            shape = RoundedCornerShape(14.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = LuminousPurple,
-                unfocusedBorderColor = GlassStrokeViolet,
-                focusedContainerColor = MidnightDeep.copy(alpha = 0.65f),
-                unfocusedContainerColor = MidnightDeep.copy(alpha = 0.50f),
-                disabledContainerColor = MidnightDeep.copy(alpha = 0.35f),
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary,
-                disabledTextColor = TextSecondary
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("click_selector_input")
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            GlassActionButton(
-                text = if (uiState.isScanningTargets) "Scanning..." else stringResource(R.string.btn_scan_targets),
-                icon = Icons.Rounded.Search,
-                onClick = onScanTargets,
-                enabled = !uiState.isScanningTargets && !uiState.isAutoClickRunning,
-                accentColor = ElectricCyan,
-                testTag = "scan_targets_button",
-                modifier = Modifier.weight(1f)
-            )
-            GlassActionButton(
-                text = if (isTapMode) stringResource(R.string.btn_single_tap) else stringResource(R.string.btn_single_click),
-                icon = Icons.Rounded.TouchApp,
-                onClick = onSingleClickTest,
-                enabled = !uiState.isAutoClickRunning,
-                accentColor = LuminousPurple,
-                testTag = "single_click_test_button",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        if (uiState.discoveredClickTargets.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                uiState.discoveredClickTargets.forEachIndexed { idx, item ->
-                    val selected = uiState.clickSelector == item.selector
-                    val shape = RoundedCornerShape(10.dp)
-                    Box(
-                        modifier = Modifier
-                            .clip(shape)
-                            .background(
-                                if (selected) LuminousPurple.copy(alpha = 0.24f)
-                                else MidnightDeep.copy(alpha = 0.52f)
-                            )
-                            .border(
-                                1.dp,
-                                if (selected) LuminousPurple.copy(alpha = 0.65f) else GlassStrokeSubtle,
-                                shape
-                            )
-                            .clickable(enabled = !uiState.isAutoClickRunning) { onSelectTarget(item) }
-                            .padding(horizontal = 10.dp, vertical = 7.dp)
-                            .testTag("click_target_chip_$idx"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "${item.tagType}: ${item.label}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (selected) TextPrimary else TextSecondary,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        DurationStepperRow(
-            label = stringResource(R.string.label_click_interval),
-            valueText = "${uiState.clickIntervalSec}s",
-            presets = listOf("1s" to 1, "2s" to 2, "5s" to 5, "10s" to 10),
-            currentValue = uiState.clickIntervalSec,
-            enabled = !uiState.isAutoClickRunning,
-            onDecrement = { onClickIntervalChanged(uiState.clickIntervalSec - 1) },
-            onIncrement = { onClickIntervalChanged(uiState.clickIntervalSec + 1) },
-            onPresetSelected = onClickIntervalChanged,
-            testTagPrefix = "click_interval"
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            GlassActionButton(
-                text = if (isTapMode) stringResource(R.string.btn_start_tap) else stringResource(R.string.btn_start_click),
-                icon = Icons.Rounded.PlayArrow,
-                onClick = onStartAutoClick,
-                enabled = !uiState.isAutoClickRunning,
-                accentColor = EmeraldSuccess,
-                testTag = "start_click_button",
-                modifier = Modifier.weight(1f)
-            )
-            GlassActionButton(
-                text = if (isTapMode) stringResource(R.string.btn_stop_tap) else stringResource(R.string.btn_stop_click),
-                icon = Icons.Rounded.Stop,
-                onClick = onStopAutoClick,
-                enabled = uiState.isAutoClickRunning,
-                accentColor = CoralDanger,
-                testTag = "stop_click_button",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        GlassActionButton(
-            text = stringResource(R.string.btn_reset_click_counter),
-            icon = Icons.Rounded.Refresh,
-            onClick = onResetClickCounter,
-            enabled = uiState.clickCount > 0 || uiState.clickStatus != ClickTestStatus.IDLE,
-            accentColor = TextSecondary,
-            testTag = "reset_click_counter_button",
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        uiState.clickStatusMessage?.let { msg ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = msg,
-                style = MaterialTheme.typography.labelSmall,
-                color = when (uiState.clickStatus) {
-                    ClickTestStatus.BLOCKED_AD, ClickTestStatus.RESTRICTED -> CoralDanger
-                    ClickTestStatus.RUNNING, ClickTestStatus.COMPLETED -> EmeraldSuccess
-                    ClickTestStatus.STOPPED, ClickTestStatus.NO_TARGET -> AmberWarning
-                    ClickTestStatus.IDLE -> ElectricCyan
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun RandomInteractionPanel(
-    uiState: WebVisitUiState,
-    onTargetInputChanged: (String) -> Unit,
-    onDelayInputChanged: (String) -> Unit,
-    onLoadDemoEnvironment: () -> Unit,
-    onStartRandomTest: () -> Unit,
-    onStopRandomTest: () -> Unit,
-    onResetRandomCounter: () -> Unit
-) {
-    val badgeColor = when (uiState.randomStatus) {
-        RandomInteractionStatus.TAPPING,
-        RandomInteractionStatus.COMPLETED -> EmeraldSuccess
-        RandomInteractionStatus.WAITING_LOAD,
-        RandomInteractionStatus.SCROLLING_DOWN -> ElectricCyan
-        RandomInteractionStatus.SCROLLING_UP -> LuminousPurple
-        RandomInteractionStatus.STOPPED -> AmberWarning
-        RandomInteractionStatus.FAILED,
-        RandomInteractionStatus.RESTRICTED -> CoralDanger
-        RandomInteractionStatus.IDLE -> EmeraldSuccess
-    }
-    val safeTarget = uiState.randomTapTarget.coerceAtLeast(1)
-    val progressFraction = (uiState.randomTapCount.toFloat() / safeTarget.toFloat()).coerceIn(0f, 1f)
-    val animatedProgress by animateFloatAsState(
-        targetValue = progressFraction,
-        animationSpec = spring(),
-        label = "random_tap_progress"
-    )
-    val isBusy = uiState.isRandomInteractionRunning || uiState.isRandomArmedOnLoad
-    val focusManager = LocalFocusManager.current
-
-    LiquidGlassPanel(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Shuffle,
-                    contentDescription = null,
-                    tint = EmeraldSuccess,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = stringResource(R.string.label_random_module),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = badgeColor.copy(alpha = 0.14f),
-                border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.45f)),
-                modifier = Modifier.testTag("random_status_badge")
-            ) {
-                Text(
-                    text = uiState.randomStatus.label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = badgeColor,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(MidnightDeep.copy(alpha = 0.58f))
-                .border(1.dp, GlassStrokeViolet, RoundedCornerShape(16.dp))
-                .padding(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Random Tap Progress",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = TextSecondary
-                )
-                Text(
-                    text = "${uiState.randomTapCount}/$safeTarget (${(animatedProgress * 100).toInt()}%)",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = EmeraldSuccess,
-                    modifier = Modifier.testTag("random_ratio_text")
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                LiveCounterPill(
-                    label = "Live Tap Counter",
-                    value = uiState.randomTapCount.toString(),
-                    accentColor = EmeraldSuccess,
-                    testTag = "random_tap_count_stat",
-                    modifier = Modifier.weight(1f)
-                )
-                LiveCounterPill(
-                    label = "Tap Target",
-                    value = safeTarget.toString(),
-                    accentColor = ElectricCyan,
-                    testTag = "random_tap_target_stat",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(MidnightDeep.copy(alpha = 0.85f))
-                    .border(1.dp, GlassStrokeSubtle, RoundedCornerShape(999.dp))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(animatedProgress)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(EmeraldSuccess, ElectricCyan, LuminousPurple)
-                            )
-                        )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = uiState.randomTapTargetInput,
-                onValueChange = onTargetInputChanged,
-                singleLine = true,
-                label = { Text("Tap Target", color = TextMuted) },
-                placeholder = { Text("20", color = TextMuted) },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = ElectricCyan,
-                    unfocusedBorderColor = GlassStrokeSubtle,
-                    focusedContainerColor = MidnightDeep.copy(alpha = 0.65f),
-                    unfocusedContainerColor = MidnightDeep.copy(alpha = 0.50f),
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("random_target_input")
-            )
-
-            OutlinedTextField(
-                value = uiState.randomTapDelayInput,
-                onValueChange = onDelayInputChanged,
-                enabled = !isBusy,
-                singleLine = true,
-                label = { Text("Tap Delay (s)", color = TextMuted) },
-                placeholder = { Text("2", color = TextMuted) },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = LuminousPurple,
-                    unfocusedBorderColor = GlassStrokeSubtle,
-                    focusedContainerColor = MidnightDeep.copy(alpha = 0.65f),
-                    unfocusedContainerColor = MidnightDeep.copy(alpha = 0.50f),
-                    disabledContainerColor = MidnightDeep.copy(alpha = 0.35f),
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    disabledTextColor = TextSecondary
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("random_delay_input")
+                text = uiState.errorDetectionText,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = errorColor
             )
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
         GlassActionButton(
-            text = stringResource(R.string.btn_load_demo),
-            icon = Icons.Rounded.Public,
-            onClick = onLoadDemoEnvironment,
-            enabled = !uiState.isRunning && !isBusy,
+            text = stringResource(R.string.btn_check_tracking),
+            icon = Icons.Rounded.VerifiedUser,
+            onClick = onCheckTracking,
+            enabled = uiState.activeUrl != null &&
+                uiState.status != TestSessionStatus.LOADING &&
+                uiState.status != TestSessionStatus.FAILED &&
+                uiState.status != TestSessionStatus.NETWORK_ERROR &&
+                !uiState.isCheckingListener,
             accentColor = ElectricCyan,
-            testTag = "load_demo_button",
+            testTag = "check_tracking_button",
             modifier = Modifier.fillMaxWidth()
         )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            GlassActionButton(
-                text = stringResource(R.string.btn_start_random),
-                icon = Icons.Rounded.PlayArrow,
-                onClick = {
-                    focusManager.clearFocus()
-                    onStartRandomTest()
-                },
-                enabled = !isBusy,
-                accentColor = EmeraldSuccess,
-                testTag = "start_random_button",
-                modifier = Modifier.weight(1f)
-            )
-            GlassActionButton(
-                text = stringResource(R.string.btn_stop_random),
-                icon = Icons.Rounded.Stop,
-                onClick = onStopRandomTest,
-                enabled = isBusy,
-                accentColor = CoralDanger,
-                testTag = "stop_random_button",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        GlassActionButton(
-            text = stringResource(R.string.btn_reset_random),
-            icon = Icons.Rounded.Refresh,
-            onClick = onResetRandomCounter,
-            enabled = uiState.randomTapCount > 0 || uiState.randomStatus != RandomInteractionStatus.IDLE,
-            accentColor = TextSecondary,
-            testTag = "reset_random_button",
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        uiState.randomStatusMessage?.let { msg ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = msg,
-                style = MaterialTheme.typography.labelSmall,
-                color = when (uiState.randomStatus) {
-                    RandomInteractionStatus.FAILED, RandomInteractionStatus.RESTRICTED -> CoralDanger
-                    RandomInteractionStatus.TAPPING, RandomInteractionStatus.COMPLETED, RandomInteractionStatus.WAITING_LOAD -> EmeraldSuccess
-                    RandomInteractionStatus.SCROLLING_DOWN, RandomInteractionStatus.SCROLLING_UP -> ElectricCyan
-                    RandomInteractionStatus.STOPPED -> AmberWarning
-                    RandomInteractionStatus.IDLE -> TextSecondary
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun DiagnosticPanel(
-    uiState: WebVisitUiState,
-    onStartDiagnostic: () -> Unit,
-    onStopDiagnostic: () -> Unit,
-    onVerifyListener: () -> Unit,
-    onTestButton: () -> Unit,
-    onTestLink: () -> Unit
-) {
-    val resultColor = when (uiState.diagResultStatus) {
-        DiagnosticResultStatus.PASSED -> EmeraldSuccess
-        DiagnosticResultStatus.RUNNING, DiagnosticResultStatus.IDLE -> ElectricCyan
-        DiagnosticResultStatus.BLOCKED, DiagnosticResultStatus.STOPPED -> AmberWarning
-        DiagnosticResultStatus.FAILED -> CoralDanger
-    }
-
-    LiquidGlassPanel(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.VerifiedUser,
-                    contentDescription = null,
-                    tint = ElectricCyan,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = stringResource(R.string.label_diag_module),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = resultColor.copy(alpha = 0.14f),
-                border = BorderStroke(1.dp, resultColor.copy(alpha = 0.45f)),
-                modifier = Modifier.testTag("diag_result_badge")
-            ) {
-                Text(
-                    text = "Result: ${uiState.diagResultStatus.label}",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = resultColor,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            LiveCounterPill(
-                label = "Impression Test",
-                value = "${uiState.visitCount} ${if (uiState.visitCount == 1) "Load" else "Loads"}",
-                accentColor = ElectricCyan,
-                testTag = "diag_impression_stat",
-                modifier = Modifier.weight(1f)
-            )
-            LiveCounterPill(
-                label = "Click Test",
-                value = "${uiState.clickCount} ${if (uiState.clickCount == 1) "Event" else "Events"}",
-                accentColor = LuminousPurple,
-                testTag = "diag_click_stat",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(ElectricCyan.copy(alpha = 0.08f))
-                .border(1.dp, ElectricCyan.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 8.dp)
-        ) {
-            Text(
-                text = "Impression vs Click: Impression Count tracks completed page loads; Click Count tracks real button/link click events received by the DOM listener. Page loads never create fake clicks, and ads are strictly excluded.",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DiagnosticStatusCell(
-                    title = "Page Load Status",
-                    value = uiState.diagPageLoadText,
-                    accent = TextPrimary,
-                    testTag = "diag_page_load_cell",
-                    modifier = Modifier.weight(1f)
-                )
-                DiagnosticStatusCell(
-                    title = "Click Tracking Status",
-                    value = uiState.diagTrackingText,
-                    accent = TextPrimary,
-                    testTag = "diag_tracking_cell",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val detectionAccent = if (uiState.diagDetectionText == "Click Event Received") {
-                    EmeraldSuccess
-                } else {
-                    AmberWarning
-                }
-                DiagnosticStatusCell(
-                    title = "Click Event Detection",
-                    value = uiState.diagDetectionText,
-                    accent = detectionAccent,
-                    testTag = "diag_detection_cell",
-                    modifier = Modifier.weight(1f)
-                )
-                DiagnosticStatusCell(
-                    title = "Click Event Listener",
-                    value = uiState.diagListenerText,
-                    accent = if (uiState.diagListenerText.startsWith("Active")) EmeraldSuccess else TextPrimary,
-                    testTag = "diag_listener_cell",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val btnAccent = when {
-                    uiState.diagButtonText.startsWith("Verified") -> EmeraldSuccess
-                    uiState.diagButtonText.contains("Not") || uiState.diagButtonText.contains("Blocked") -> CoralDanger
-                    else -> TextPrimary
-                }
-                val linkAccent = when {
-                    uiState.diagLinkText.startsWith("Verified") -> EmeraldSuccess
-                    uiState.diagLinkText.contains("Not") || uiState.diagLinkText.contains("Blocked") || uiState.diagLinkText.contains("Only") -> CoralDanger
-                    else -> TextPrimary
-                }
-                DiagnosticStatusCell(
-                    title = "Test Button Check",
-                    value = uiState.diagButtonText,
-                    accent = btnAccent,
-                    testTag = "diag_button_cell",
-                    modifier = Modifier.weight(1f)
-                )
-                DiagnosticStatusCell(
-                    title = "Test Link Navigation",
-                    value = uiState.diagLinkText,
-                    accent = linkAccent,
-                    testTag = "diag_link_cell",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            GlassActionButton(
-                text = stringResource(R.string.btn_start_diag),
-                icon = Icons.Rounded.PlayArrow,
-                onClick = onStartDiagnostic,
-                enabled = !uiState.isDiagRunning,
-                accentColor = EmeraldSuccess,
-                testTag = "start_diag_button",
-                modifier = Modifier.weight(1f)
-            )
-            GlassActionButton(
-                text = stringResource(R.string.btn_stop_diag),
-                icon = Icons.Rounded.Stop,
-                onClick = onStopDiagnostic,
-                enabled = uiState.isDiagRunning,
-                accentColor = CoralDanger,
-                testTag = "stop_diag_button",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            listOf(
-                Triple(stringResource(R.string.btn_diag_listener), "diag_check_listener_btn", onVerifyListener),
-                Triple(stringResource(R.string.btn_diag_button), "diag_test_button_btn", onTestButton),
-                Triple(stringResource(R.string.btn_diag_link), "diag_test_link_btn", onTestLink)
-            ).forEach { (label, tag, action) ->
-                val shape = RoundedCornerShape(10.dp)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                        .clip(shape)
-                        .background(MidnightDeep.copy(alpha = 0.6f))
-                        .border(1.dp, GlassStrokeSubtle, shape)
-                        .clickable(enabled = !uiState.isDiagRunning, onClick = action)
-                        .padding(horizontal = 6.dp, vertical = 10.dp)
-                        .testTag(tag),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = if (!uiState.isDiagRunning) TextPrimary else TextMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = uiState.diagStatusMessage,
+            text = uiState.statusMessage,
             style = MaterialTheme.typography.labelSmall,
-            color = when (uiState.diagResultStatus) {
-                DiagnosticResultStatus.PASSED -> EmeraldSuccess
-                DiagnosticResultStatus.FAILED -> CoralDanger
-                DiagnosticResultStatus.BLOCKED, DiagnosticResultStatus.STOPPED -> AmberWarning
-                DiagnosticResultStatus.RUNNING, DiagnosticResultStatus.IDLE -> TextSecondary
-            },
-            modifier = Modifier.testTag("diag_status_msg")
+            color = errorColor.takeIf { uiState.errorSeverity != ErrorDetectionSeverity.NONE } ?: TextSecondary,
+            modifier = Modifier.testTag("tracking_status_message")
         )
     }
 }
 
 @Composable
-private fun DiagnosticStatusCell(
+private fun TrackingMetricCell(
+    title: String,
+    statusLabel: String,
+    subText: String,
+    accent: Color,
+    testTag: String,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(MidnightDeep.copy(alpha = 0.62f))
+            .border(1.dp, GlassStrokeSubtle, shape)
+            .padding(horizontal = 11.dp, vertical = 10.dp)
+            .testTag(testTag),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = title.uppercase(Locale.US),
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = statusLabel,
+            style = MaterialTheme.typography.titleSmall.copy(
+                fontFamily = JetBrainsMonoFontFamily,
+                fontWeight = FontWeight.Bold
+            ),
+            color = accent,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = subText,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun StatusDetailCell(
     title: String,
     value: String,
-    accent: androidx.compose.ui.graphics.Color,
+    accent: Color,
     testTag: String,
     modifier: Modifier = Modifier
 ) {
@@ -2222,11 +822,13 @@ private fun ProtocolChip(
     selected: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
+    testTag: String,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(10.dp)
     Box(
         modifier = modifier
+            .heightIn(min = 48.dp)
             .clip(shape)
             .background(
                 if (selected) ElectricCyan.copy(alpha = 0.18f)
@@ -2238,12 +840,13 @@ private fun ProtocolChip(
                 shape = shape
             )
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 10.dp)
+            .testTag(testTag),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = if (selected) ElectricCyan else TextMuted
         )
     }
@@ -2300,7 +903,7 @@ private fun SingleFileHtmlDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Save or copy the standalone single-file HTML/CSS/JS version of WebVisit Tester (${htmlSource.length} bytes) with Auto Scroll, Clicks & Tap Automation, and VPN Testing.",
+                    text = "Save or copy the standalone single-file HTML/CSS/JS version of WebVisit Tester — Impression & Click Tracking Test (${htmlSource.length} bytes).",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )
@@ -2355,44 +958,4 @@ private fun SingleFileHtmlDialog(
             }
         }
     )
-}
-
-@Composable
-private fun LiveCounterPill(
-    label: String,
-    value: String,
-    accentColor: androidx.compose.ui.graphics.Color,
-    testTag: String,
-    modifier: Modifier = Modifier
-) {
-    val shape = RoundedCornerShape(14.dp)
-    Column(
-        modifier = modifier
-            .clip(shape)
-            .background(MidnightDeep.copy(alpha = 0.6f))
-            .border(1.dp, GlassStrokeSubtle, shape)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-            .testTag(testTag),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        Text(
-            text = label.uppercase(Locale.US),
-            style = MaterialTheme.typography.labelSmall,
-            color = TextMuted,
-            maxLines = 1
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = accentColor,
-            maxLines = 1
-        )
-    }
-}
-
-private fun formatTimer(totalSec: Int): String {
-    val safe = totalSec.coerceAtLeast(0)
-    val mins = safe / 60
-    val secs = safe % 60
-    return String.format(Locale.US, "%02d:%02d", mins, secs)
 }

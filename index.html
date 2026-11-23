@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#06091A" />
-  <title>WebVisit Tester</title>
+  <title>WebVisit Tester — Impression &amp; Click Tracking Test</title>
   <style>
     :root {
       --bg-deep: #06091a;
@@ -45,7 +45,7 @@
       touch-action: manipulation;
     }
 
-    button, a, input, label, .slider {
+    button, a, input {
       touch-action: manipulation;
     }
 
@@ -77,9 +77,9 @@
     .app-shell {
       position: relative;
       z-index: 1;
-      max-width: 1060px;
+      max-width: 1040px;
       margin: 0 auto;
-      padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+      padding: calc(14px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -107,6 +107,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      min-width: 0;
     }
 
     .brand-icon {
@@ -117,12 +118,23 @@
       border: 1px solid rgba(255, 255, 255, 0.24);
       display: grid;
       place-items: center;
+      flex-shrink: 0;
     }
 
     .brand-title {
-      font-size: 1.08rem;
+      font-size: 1.04rem;
       font-weight: 700;
       letter-spacing: -0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand-sub {
+      font-size: 0.72rem;
+      color: var(--cyan);
+      font-weight: 600;
+      letter-spacing: 0.01em;
     }
 
     .status-pill {
@@ -138,6 +150,7 @@
       color: var(--text-primary);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .status-dot {
@@ -161,6 +174,22 @@
       }
     }
 
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .field-label {
+      display: block;
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
     .field-group {
       display: flex;
       flex-direction: column;
@@ -171,10 +200,11 @@
     .url-row {
       display: flex;
       align-items: center;
+      gap: 4px;
       background: rgba(6, 9, 26, 0.65);
       border: 1px solid var(--glass-border-violet);
       border-radius: var(--radius-md);
-      padding: 2px 10px;
+      padding: 2px 6px 2px 12px;
     }
 
     .url-row:focus-within {
@@ -190,10 +220,27 @@
       color: var(--text-primary);
       font-size: 0.92rem;
       padding: 11px 4px;
-      min-height: 44px;
+      min-height: 46px;
     }
 
     .url-input::placeholder { color: var(--text-muted); }
+
+    .clear-url-btn {
+      min-width: 44px;
+      height: 44px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 1rem;
+      cursor: pointer;
+      border-radius: 10px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .clear-url-btn.visible { display: inline-flex; }
+    .clear-url-btn:hover { color: var(--text-primary); }
 
     .chip-row {
       display: flex;
@@ -202,12 +249,12 @@
 
     .chip-btn {
       flex: 1;
-      min-height: 40px;
-      border-radius: 10px;
+      min-height: 44px;
+      border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       background: rgba(6, 9, 26, 0.48);
       color: var(--text-secondary);
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
       user-select: none;
@@ -217,12 +264,6 @@
       background: rgba(56, 189, 248, 0.18);
       border-color: rgba(56, 189, 248, 0.55);
       color: var(--cyan);
-    }
-
-    .chip-btn.active-purple {
-      background: rgba(168, 85, 247, 0.22);
-      border-color: rgba(168, 85, 247, 0.62);
-      color: #f3e8ff;
     }
 
     .chip-btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -240,13 +281,6 @@
       margin-bottom: 14px;
     }
 
-    .scroll-controls-row {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
     .btn {
       min-height: 48px;
       border-radius: var(--radius-md);
@@ -259,7 +293,7 @@
       align-items: center;
       justify-content: center;
       gap: 6px;
-      padding: 0 10px;
+      padding: 0 12px;
       text-decoration: none;
       user-select: none;
       transition: transform 0.15s ease, opacity 0.18s ease;
@@ -279,86 +313,14 @@
       color: #fecdd3;
     }
 
-    .btn-scroll-down {
-      background: rgba(56, 189, 248, 0.16);
+    .btn-check {
+      width: 100%;
+      background: rgba(56, 189, 248, 0.14);
       border-color: rgba(56, 189, 248, 0.45);
       color: #e0f2fe;
-      min-height: 46px;
-      font-size: 0.78rem;
-    }
-
-    .btn-scroll-down.active {
-      background: rgba(56, 189, 248, 0.32);
-      border-color: var(--cyan);
-    }
-
-    .btn-scroll-up {
-      background: rgba(168, 85, 247, 0.16);
-      border-color: rgba(168, 85, 247, 0.45);
-      color: #f3e8ff;
-      min-height: 46px;
-      font-size: 0.78rem;
-    }
-
-    .btn-scroll-up.active {
-      background: rgba(168, 85, 247, 0.34);
-      border-color: var(--purple);
-    }
-
-    .btn-scroll-random {
-      background: rgba(52, 211, 153, 0.16);
-      border-color: rgba(52, 211, 153, 0.45);
-      color: #d1fae5;
-      min-height: 46px;
-      font-size: 0.78rem;
-    }
-
-    .btn-scroll-random.active {
-      background: rgba(52, 211, 153, 0.32);
-      border-color: var(--emerald);
-    }
-
-    .btn-scroll-pause {
-      background: rgba(251, 191, 36, 0.16);
-      border-color: rgba(251, 191, 36, 0.45);
-      color: #fef3c7;
-      min-height: 46px;
-      font-size: 0.78rem;
-    }
-
-    .btn-scroll-pause.active {
-      background: rgba(251, 191, 36, 0.32);
-      border-color: var(--amber);
-    }
-
-    .btn-scroll-stop {
-      width: 100%;
-      background: rgba(251, 113, 133, 0.16);
-      border-color: rgba(251, 113, 133, 0.45);
-      color: #fecdd3;
-      min-height: 44px;
-      font-size: 0.78rem;
+      min-height: 48px;
+      font-size: 0.84rem;
       margin-bottom: 10px;
-    }
-
-    .scroll-pos-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      background: rgba(6, 9, 26, 0.56);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 7px 10px;
-      margin-bottom: 10px;
-      font-size: 0.74rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      color: var(--text-secondary);
-    }
-
-    .scroll-pos-value {
-      color: var(--cyan);
-      font-weight: 700;
     }
 
     .progress-meta {
@@ -376,7 +338,6 @@
       border-radius: 999px;
       background: rgba(6, 9, 26, 0.75);
       overflow: hidden;
-      margin-bottom: 14px;
     }
 
     .progress-fill {
@@ -384,166 +345,94 @@
       width: 0%;
       border-radius: 999px;
       background: linear-gradient(90deg, var(--cyan), var(--indigo), var(--purple));
-      transition: width 0.3s ease;
+      transition: width 0.25s ease;
     }
 
-    .counters-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 14px;
-    }
-
-    .counter-pill {
-      background: rgba(6, 9, 26, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: var(--radius-md);
-      padding: 8px 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 2px;
-    }
-
-    .counter-lbl {
-      font-size: 0.69rem;
-      color: var(--text-muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .counter-num {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 1.05rem;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-
-    .timer-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 14px;
-    }
-
-    .num-box {
-      background: rgba(6, 9, 26, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: var(--radius-md);
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-
-    .num-box label {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .num-input {
-      width: 100%;
-      background: transparent;
-      border: none;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-      color: var(--cyan);
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 1rem;
-      font-weight: 700;
-      padding: 4px 0;
-      outline: none;
-    }
-
-    .scroll-section {
-      padding: 12px 0;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .scroll-header {
+    .panel-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .panel-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.96rem;
+      font-weight: 700;
+    }
+
+    .status-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 8px;
       margin-bottom: 10px;
     }
 
-    .scroll-badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      padding: 4px 9px;
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      background: rgba(6, 9, 26, 0.55);
-      color: var(--text-secondary);
-      white-space: nowrap;
-    }
-
-    .toggle-row {
+    .metric-cell {
+      background: rgba(6, 9, 26, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 10px 11px;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 10px 0 2px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      flex-direction: column;
+      gap: 3px;
     }
 
-    .toggle-label {
-      font-size: 0.85rem;
-      font-weight: 600;
+    .metric-cell-full {
+      background: rgba(6, 9, 26, 0.66);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 10px;
     }
 
-    .toggle-sub {
-      font-size: 0.73rem;
+    .cell-title {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
       color: var(--text-muted);
+      font-weight: 700;
     }
 
-    .switch {
-      position: relative;
-      width: 48px;
-      height: 28px;
-      flex-shrink: 0;
+    .cell-val {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      word-break: break-word;
     }
 
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
+    .cell-sub {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      line-height: 1.35;
     }
 
-    .slider {
-      position: absolute;
-      inset: 0;
-      background: rgba(6, 9, 26, 0.75);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 999px;
-      cursor: pointer;
-      transition: 0.2s;
+    .counter-num {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.96rem;
+      font-weight: 700;
+      line-height: 1.25;
     }
 
-    .slider::before {
-      content: "";
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      left: 3px;
-      top: 3px;
-      border-radius: 50%;
-      background: var(--text-muted);
-      transition: 0.2s;
+    .status-banner {
+      background: rgba(6, 9, 26, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
     }
 
-    .switch input:checked + .slider {
-      background: rgba(168, 85, 247, 0.28);
-      border-color: var(--purple);
-    }
-
-    .switch input:checked + .slider::before {
-      transform: translateX(20px);
-      background: var(--purple);
-    }
+    .info-ok { color: var(--emerald); font-weight: 600; }
+    .info-warn { color: var(--amber); font-weight: 600; }
+    .info-err { color: var(--coral); font-weight: 600; }
 
     .preview-toolbar {
       display: flex;
@@ -553,21 +442,16 @@
       margin-bottom: 12px;
     }
 
-    .nav-actions {
-      display: flex;
-      gap: 6px;
-    }
-
     .icon-btn {
-      min-width: 44px;
-      height: 44px;
+      min-width: 48px;
+      min-height: 48px;
       border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.14);
       background: rgba(6, 9, 26, 0.55);
       color: var(--text-primary);
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       font-weight: 600;
-      padding: 0 10px;
+      padding: 0 14px;
       cursor: pointer;
       user-select: none;
     }
@@ -575,13 +459,13 @@
     .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .btn-ghost {
-      min-height: 44px;
-      padding: 0 12px;
+      min-height: 48px;
+      padding: 0 14px;
       border-radius: 12px;
       background: rgba(56, 189, 248, 0.14);
       border: 1px solid rgba(56, 189, 248, 0.42);
       color: var(--text-primary);
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       font-weight: 600;
       text-decoration: none;
       display: inline-flex;
@@ -589,10 +473,15 @@
       user-select: none;
     }
 
+    .btn-ghost.disabled {
+      opacity: 0.42;
+      pointer-events: none;
+    }
+
     .preview-stage {
       position: relative;
       width: 100%;
-      height: 360px;
+      height: 440px;
       border-radius: var(--radius-md);
       overflow: hidden;
       background: rgba(6, 9, 26, 0.85);
@@ -623,363 +512,6 @@
 
     .preview-overlay h3 { font-size: 1.02rem; font-weight: 700; }
     .preview-overlay p { font-size: 0.84rem; color: var(--text-secondary); max-width: 340px; }
-
-    .left-col {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .vpn-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .vpn-title {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.95rem;
-      font-weight: 700;
-    }
-
-    .vpn-badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(251, 191, 36, 0.45);
-      background: rgba(251, 191, 36, 0.14);
-      color: var(--amber);
-      white-space: nowrap;
-    }
-
-    .provider-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-      margin: 8px 0 12px;
-    }
-
-    .provider-chip {
-      min-height: 40px;
-      padding: 0 11px;
-      border-radius: 11px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(6, 9, 26, 0.52);
-      color: var(--text-secondary);
-      font-size: 0.76rem;
-      font-weight: 600;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .provider-chip.active {
-      background: rgba(56, 189, 248, 0.2);
-      border-color: rgba(56, 189, 248, 0.6);
-      color: var(--cyan);
-    }
-
-    .vpn-actions-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .btn-vpn-connect {
-      background: rgba(56, 189, 248, 0.16);
-      border-color: rgba(56, 189, 248, 0.45);
-      color: #e0f2fe;
-      min-height: 44px;
-      font-size: 0.78rem;
-    }
-
-    .btn-vpn-disconnect {
-      background: rgba(251, 191, 36, 0.14);
-      border-color: rgba(251, 191, 36, 0.42);
-      color: #fef3c7;
-      min-height: 44px;
-      font-size: 0.78rem;
-    }
-
-    .btn-vpn-verify {
-      background: rgba(52, 211, 153, 0.16);
-      border-color: rgba(52, 211, 153, 0.45);
-      color: #d1fae5;
-      min-height: 44px;
-      font-size: 0.78rem;
-    }
-
-    .vpn-info-box {
-      background: rgba(6, 9, 26, 0.62);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 0.76rem;
-      color: var(--text-secondary);
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      margin-bottom: 10px;
-    }
-
-    .vpn-info-ok {
-      color: var(--emerald);
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-weight: 600;
-    }
-
-    .vpn-info-warn {
-      color: var(--amber);
-    }
-
-    .vpn-info-err {
-      color: var(--coral);
-    }
-
-    .click-badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(56, 189, 248, 0.45);
-      background: rgba(56, 189, 248, 0.14);
-      color: var(--cyan);
-      white-space: nowrap;
-    }
-
-    .click-actions-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .btn-click-scan {
-      background: rgba(56, 189, 248, 0.16);
-      border-color: rgba(56, 189, 248, 0.45);
-      color: #e0f2fe;
-      min-height: 46px;
-      font-size: 0.78rem;
-    }
-
-    .btn-click-once {
-      background: rgba(168, 85, 247, 0.16);
-      border-color: rgba(168, 85, 247, 0.45);
-      color: #f3e8ff;
-      min-height: 46px;
-      font-size: 0.78rem;
-    }
-
-    .btn-click-start {
-      background: rgba(52, 211, 153, 0.16);
-      border-color: rgba(52, 211, 153, 0.45);
-      color: #d1fae5;
-      min-height: 46px;
-      font-size: 0.8rem;
-    }
-
-    .btn-click-stop {
-      background: rgba(251, 113, 133, 0.16);
-      border-color: rgba(251, 113, 133, 0.45);
-      color: #fecdd3;
-      min-height: 46px;
-      font-size: 0.78rem;
-    }
-
-    .btn-click-reset {
-      width: 100%;
-      background: rgba(148, 163, 184, 0.12);
-      border-color: rgba(255, 255, 255, 0.18);
-      color: var(--text-secondary);
-      min-height: 44px;
-      font-size: 0.78rem;
-      margin-bottom: 10px;
-    }
-
-    .target-chips-row {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-      margin-bottom: 10px;
-    }
-
-    .target-chip {
-      flex-shrink: 0;
-      min-height: 38px;
-      padding: 0 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(6, 9, 26, 0.55);
-      color: var(--text-secondary);
-      font-size: 0.74rem;
-      font-weight: 600;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .target-chip.active {
-      background: rgba(168, 85, 247, 0.24);
-      border-color: rgba(168, 85, 247, 0.65);
-      color: var(--text-primary);
-    }
-
-    .click-interval-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      background: rgba(6, 9, 26, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: var(--radius-md);
-      padding: 8px 12px;
-      margin-bottom: 10px;
-    }
-
-    .click-target-box {
-      background: rgba(6, 9, 26, 0.58);
-      border: 1px solid var(--glass-border-violet);
-      border-radius: var(--radius-md);
-      padding: 12px;
-      margin-bottom: 10px;
-    }
-
-    .click-target-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .click-target-stat {
-      background: rgba(13, 21, 56, 0.72);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 8px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .click-progress-track {
-      width: 100%;
-      height: 8px;
-      border-radius: 999px;
-      background: rgba(6, 9, 26, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      overflow: hidden;
-      margin-bottom: 10px;
-    }
-
-    .click-progress-fill {
-      height: 100%;
-      width: 0%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, var(--purple), var(--cyan), var(--emerald));
-      transition: width 0.22s ease;
-    }
-
-    .target-preset-row {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 6px;
-      margin-top: 8px;
-    }
-
-    .random-inputs-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .btn-demo-page {
-      width: 100%;
-      background: rgba(56, 189, 248, 0.14);
-      border-color: rgba(56, 189, 248, 0.45);
-      color: #e0f2fe;
-      min-height: 44px;
-      font-size: 0.78rem;
-      margin-bottom: 8px;
-    }
-
-    .random-badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(52, 211, 153, 0.45);
-      background: rgba(52, 211, 153, 0.14);
-      color: var(--emerald);
-      white-space: nowrap;
-    }
-
-    .diag-grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .diag-cell {
-      background: rgba(6, 9, 26, 0.62);
-      border: 1px solid rgba(255, 255, 255, 0.11);
-      border-radius: 12px;
-      padding: 8px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .diag-cell-title {
-      font-size: 0.68rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--text-muted);
-      font-weight: 700;
-    }
-
-    .diag-cell-val {
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: var(--text-primary);
-      word-break: break-word;
-    }
-
-    .diag-note-box {
-      background: rgba(56, 189, 248, 0.08);
-      border: 1px solid rgba(56, 189, 248, 0.25);
-      border-radius: 12px;
-      padding: 9px 11px;
-      margin-bottom: 10px;
-      font-size: 0.74rem;
-      line-height: 1.4;
-      color: var(--text-secondary);
-    }
-
-    .diag-checks-row {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 6px;
-      margin-bottom: 10px;
-    }
-
-    .btn-diag-sub {
-      background: rgba(15, 23, 56, 0.72);
-      border-color: rgba(255, 255, 255, 0.16);
-      color: var(--text-primary);
-      min-height: 44px;
-      font-size: 0.74rem;
-      padding: 0 8px;
-    }
   </style>
 </head>
 <body>
@@ -991,14 +523,15 @@
       <div class="brand">
         <div class="brand-icon" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="2" y1="12" x2="22" y2="12"></line>
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
           </svg>
         </div>
-        <div class="brand-title">WebVisit Tester</div>
+        <div>
+          <div class="brand-title">WebVisit Tester</div>
+          <div class="brand-sub">Impression &amp; Click Tracking Test</div>
+        </div>
       </div>
-      <div class="status-pill">
+      <div class="status-pill" aria-label="Live Test Status">
         <span class="status-dot" id="statusDot"></span>
         <span id="statusText">Idle</span>
       </div>
@@ -1006,7 +539,8 @@
 
     <div class="layout-grid">
       <div class="left-col">
-        <section class="glass-panel" aria-label="Minimal Testing Controls">
+        <section class="glass-panel" aria-label="Website URL Test Controls">
+          <label class="field-label" for="urlInput">Website URL</label>
           <div class="field-group">
             <div class="url-row">
               <input
@@ -1016,7 +550,15 @@
                 inputmode="url"
                 autocomplete="off"
                 placeholder="https://example.com"
+                aria-label="Website URL"
               />
+              <button
+                type="button"
+                id="clearUrlBtn"
+                class="clear-url-btn"
+                aria-label="Clear Website URL"
+                title="Clear URL"
+              >&#10005;</button>
             </div>
             <div class="chip-row">
               <button type="button" class="chip-btn active" id="btnHttps">https://</button>
@@ -1026,393 +568,77 @@
           </div>
 
           <div class="controls-row">
-            <button type="button" class="btn btn-primary" id="startBtn">Start</button>
-            <button type="button" class="btn btn-stop" id="stopBtn" disabled>Stop</button>
+            <button type="button" class="btn btn-primary" id="startBtn">Start Test</button>
+            <button type="button" class="btn btn-stop" id="stopBtn" disabled>Stop Test</button>
           </div>
 
           <div class="progress-meta">
-            <span id="liveStatusLabel">Live Status: Idle</span>
+            <span id="liveStatusLabel">Live Test Status: Idle</span>
             <span id="progressPercentLabel">0%</span>
           </div>
           <div class="progress-track">
             <div class="progress-fill" id="progressFill"></div>
           </div>
-
-          <div class="counters-grid" aria-label="Live Test Counters">
-            <div class="counter-pill">
-              <span class="counter-lbl">Visits</span>
-              <span class="counter-num" id="visitCountValue" style="color: var(--cyan);">0</span>
-            </div>
-            <div class="counter-pill">
-              <span class="counter-lbl">Failed</span>
-              <span class="counter-num" id="failedCountValue" style="color: var(--coral);">0</span>
-            </div>
-            <div class="counter-pill">
-              <span class="counter-lbl" id="liveClickCountLabel">Clicks</span>
-              <span class="counter-num" id="liveClickCountValue" style="color: var(--purple);">0</span>
-            </div>
-          </div>
-
-          <div class="timer-grid">
-            <div class="num-box">
-              <label for="viewSecInput">Viewing (s)</label>
-              <input id="viewSecInput" class="num-input" type="number" min="3" max="300" value="15" />
-            </div>
-            <div class="num-box">
-              <label for="pauseSecInput">Pause (s)</label>
-              <input id="pauseSecInput" class="num-input" type="number" min="0" max="120" value="3" />
-            </div>
-            <div class="num-box">
-              <label for="runsInput">Runs</label>
-              <input id="runsInput" class="num-input" type="number" min="1" max="50" value="3" />
-            </div>
-          </div>
-
-          <div class="scroll-section">
-            <div class="scroll-header">
-              <div>
-                <div class="toggle-label">Auto Scroll</div>
-                <div class="toggle-sub">Scroll Speed &amp; Preview Container</div>
-              </div>
-              <span class="scroll-badge" id="scrollStatusBadge">Idle</span>
-            </div>
-
-            <div class="scroll-pos-bar">
-              <span>Scroll Position</span>
-              <span class="scroll-pos-value" id="scrollPosLabel">0% • 0/0px</span>
-            </div>
-
-            <div class="scroll-controls-row">
-              <button type="button" class="btn btn-scroll-down" id="scrollDownBtn">Scroll Down</button>
-              <button type="button" class="btn btn-scroll-up" id="scrollUpBtn">Scroll Up</button>
-              <button type="button" class="btn btn-scroll-random" id="scrollRandomBtn">Random Scroll</button>
-              <button type="button" class="btn btn-scroll-pause" id="pauseScrollBtn" disabled>Pause</button>
-            </div>
-            <button type="button" class="btn btn-scroll-stop" id="stopScrollBtn" disabled>Stop Scroll</button>
-
-            <div class="chip-row" id="scrollSpeedRow">
-              <button type="button" class="chip-btn" data-speed="slow">Slow</button>
-              <button type="button" class="chip-btn active" data-speed="medium">Medium</button>
-              <button type="button" class="chip-btn" data-speed="fast">Fast</button>
-            </div>
-          </div>
-
-          <div class="toggle-row">
-            <div>
-              <div class="toggle-label">Auto Next</div>
-              <div class="toggle-sub">Automatically advance queued runs</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="autoNextToggle" checked />
-              <span class="slider"></span>
-            </label>
-          </div>
         </section>
 
-        <section class="glass-panel" aria-label="Clicks Automation">
-          <div class="vpn-header">
-            <div class="vpn-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M9 11V6a3 3 0 0 1 6 0v5"></path>
-                <path d="M12 11v9"></path>
-                <path d="M5 13a7 7 0 0 0 14 0"></path>
-              </svg>
-              <span>Clicks &amp; Tap Automation</span>
-            </div>
-            <span class="click-badge" id="clickCounterBadge">Clicks: 0/100 • Idle</span>
-          </div>
-
-          <div class="click-target-box" aria-label="Target Click Counter">
-            <div class="progress-meta" style="margin-bottom: 8px;">
-              <span>Target Click Counter</span>
-              <span id="clickTargetRatioLabel" style="color: var(--purple); font-weight: 700;">0/100 (0%)</span>
-            </div>
-
-            <div class="click-target-grid">
-              <div class="click-target-stat">
-                <span class="counter-lbl">Current Click</span>
-                <span class="counter-num" id="currentClickValue" style="color: var(--purple);">0</span>
-              </div>
-              <div class="click-target-stat">
-                <span class="counter-lbl">Click Target</span>
-                <span class="counter-num" id="targetClickDisplayValue" style="color: var(--cyan);">100</span>
-              </div>
-            </div>
-
-            <div class="click-progress-track">
-              <div class="click-progress-fill" id="clickTargetProgressFill"></div>
-            </div>
-
-            <div class="click-interval-row" style="margin-bottom: 0; background: rgba(13, 21, 56, 0.65);">
-              <label for="clickTargetInput" class="toggle-label">Click Target</label>
-              <input
-                id="clickTargetInput"
-                class="num-input"
-                style="width: 96px; text-align: right;"
-                type="number"
-                inputmode="numeric"
-                min="1"
-                max="10000"
-                value="100"
-                placeholder="100"
-              />
-            </div>
-
-            <div class="target-preset-row" id="clickTargetPresetRow">
-              <button type="button" class="chip-btn" data-target="50">50</button>
-              <button type="button" class="chip-btn active" data-target="100">100</button>
-              <button type="button" class="chip-btn" data-target="500">500</button>
-              <button type="button" class="chip-btn" data-target="1000">1000</button>
-            </div>
-          </div>
-
-          <div class="toggle-row" style="border-top: none; padding-top: 0; margin-bottom: 10px;">
-            <div>
-              <div class="toggle-label">Authorized Own Site / Test Page</div>
-              <div class="toggle-sub">Ads &amp; sponsored clicks are strictly blocked</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="authorizedSiteToggle" />
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="chip-row" id="clickModeRow" style="margin-bottom: 10px;">
-            <button type="button" class="chip-btn active" id="modeClickBtn" data-mode="click">Click Mode</button>
-            <button type="button" class="chip-btn" id="modeTapBtn" data-mode="tap">Tap Mode</button>
-          </div>
-
-          <div class="field-group" style="margin-bottom: 8px;">
-            <div class="url-row">
-              <input
-                id="clickSelectorInput"
-                class="url-input"
-                type="text"
-                autocomplete="off"
-                placeholder="CSS selector (optional for manual taps, e.g. #btn)"
-              />
-            </div>
-          </div>
-
-          <div class="click-actions-row">
-            <button type="button" class="btn btn-click-scan" id="scanTargetsBtn">Scan Targets</button>
-            <button type="button" class="btn btn-click-once" id="singleClickBtn">1x Click Test</button>
-          </div>
-
-          <div class="target-chips-row" id="clickTargetChips" style="display: none;"></div>
-
-          <div class="click-interval-row">
-            <label for="clickIntervalInput" class="toggle-label">Click Interval (s)</label>
-            <input id="clickIntervalInput" class="num-input" style="width: 72px; text-align: right;" type="number" min="1" max="60" value="2" />
-          </div>
-
-          <div class="click-actions-row">
-            <button type="button" class="btn btn-click-start" id="startClickBtn">Start Click Test</button>
-            <button type="button" class="btn btn-click-stop" id="stopClickBtn" disabled>Stop Click Test</button>
-          </div>
-          <button type="button" class="btn btn-click-reset" id="resetClickBtn">Reset Counter</button>
-
-          <div class="vpn-info-box" style="margin-bottom: 0;">
-            <div class="toggle-sub" id="clickStatusMsg">
-              Works on your own loaded preview page (same-origin iframe). Never used for ad clicking or artificial CTR.
-            </div>
-          </div>
-        </section>
-
-        <section class="glass-panel" aria-label="Random Interaction Testing Mode">
-          <div class="vpn-header">
-            <div class="vpn-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="16 3 21 3 21 8"></polyline>
-                <line x1="4" y1="20" x2="21" y2="3"></line>
-                <polyline points="21 16 21 21 16 21"></polyline>
-                <line x1="15" y1="15" x2="21" y2="21"></line>
-                <line x1="4" y1="4" x2="9" y2="9"></line>
-              </svg>
-              <span>Random Interaction Testing</span>
-            </div>
-            <span class="random-badge" id="randomStatusBadge">Idle</span>
-          </div>
-
-          <div class="click-target-box" aria-label="Random Tap Counter">
-            <div class="progress-meta" style="margin-bottom: 8px;">
-              <span>Random Tap Progress</span>
-              <span id="randomRatioLabel" style="color: var(--emerald); font-weight: 700;">0/20 (0%)</span>
-            </div>
-
-            <div class="click-target-grid">
-              <div class="click-target-stat">
-                <span class="counter-lbl">Live Tap Counter</span>
-                <span class="counter-num" id="randomTapCountValue" style="color: var(--emerald);">0</span>
-              </div>
-              <div class="click-target-stat">
-                <span class="counter-lbl">Tap Target</span>
-                <span class="counter-num" id="randomTapTargetValue" style="color: var(--cyan);">20</span>
-              </div>
-            </div>
-
-            <div class="click-progress-track" style="margin-bottom: 0;">
-              <div class="click-progress-fill" id="randomProgressFill"></div>
-            </div>
-          </div>
-
-          <div class="random-inputs-grid">
-            <div class="num-box">
-              <label for="randomTargetInput">Tap Target</label>
-              <input id="randomTargetInput" class="num-input" type="number" inputmode="numeric" min="1" max="5000" value="20" />
-            </div>
-            <div class="num-box">
-              <label for="randomDelayInput">Tap Delay (s)</label>
-              <input id="randomDelayInput" class="num-input" type="number" inputmode="numeric" min="1" max="30" value="2" />
-            </div>
-          </div>
-
-          <button type="button" class="btn btn-demo-page" id="loadDemoPageBtn">Load Demo Test Environment</button>
-
-          <div class="click-actions-row">
-            <button type="button" class="btn btn-click-start" id="startRandomBtn">Start Random Test</button>
-            <button type="button" class="btn btn-click-stop" id="stopRandomBtn" disabled>Stop</button>
-          </div>
-          <button type="button" class="btn btn-click-reset" id="resetRandomBtn">Reset Random Counter</button>
-
-          <div class="vpn-info-box" style="margin-bottom: 0;">
-            <div class="toggle-sub" id="randomStatusMsg">
-              Starts after verified page load. Performs safe random UI taps with scroll down/up cycles. Own Test Page &amp; Demo Environment only; ads are blocked.
-            </div>
-          </div>
-        </section>
-
-        <section class="glass-panel" aria-label="Impression and Click Diagnostic">
-          <div class="vpn-header">
-            <div class="vpn-title">
+        <section class="glass-panel" aria-label="Impression and Click Tracking Status">
+          <div class="panel-header">
+            <div class="panel-title">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <path d="m9 12 2 2 4-4"></path>
               </svg>
-              <span>Impression &amp; Click Diagnostic</span>
-            </div>
-            <span class="click-badge" id="diagResultBadge">Result: Idle</span>
-          </div>
-
-          <div class="diag-grid-2" aria-label="Impression vs Click Comparison">
-            <div class="diag-cell">
-              <span class="diag-cell-title">Impression Test</span>
-              <span class="diag-cell-val" id="diagImpressionVal" style="color: var(--cyan);">0 Loads</span>
-              <span class="toggle-sub" id="diagImpressionSub">Page load completions only</span>
-            </div>
-            <div class="diag-cell">
-              <span class="diag-cell-title">Click Test</span>
-              <span class="diag-cell-val" id="diagClickVal" style="color: var(--purple);">0 Events</span>
-              <span class="toggle-sub" id="diagClickSub">Real UI clicks/taps only</span>
+              <span>Impression &amp; Click Tracking</span>
             </div>
           </div>
 
-          <div class="diag-note-box">
-            <strong>Impression vs Click:</strong> Impression Count tracks completed page loads; Click Count tracks real button/link click events received by the DOM listener. Page loads never create fake clicks, and ads are strictly excluded.
-          </div>
-
-          <div class="diag-grid-2">
-            <div class="diag-cell">
-              <span class="diag-cell-title">Page Load Status</span>
-              <span class="diag-cell-val" id="diagPageLoadStatus">Idle</span>
+          <div class="status-grid-2">
+            <div class="metric-cell">
+              <span class="cell-title">Impression Status</span>
+              <span class="counter-num" id="impressionStatusVal" style="color: var(--cyan);">Not Tested</span>
+              <span class="cell-sub" id="impressionSubText">Verified Loads: 0</span>
             </div>
-            <div class="diag-cell">
-              <span class="diag-cell-title">Click Tracking Status</span>
-              <span class="diag-cell-val" id="diagTrackingStatus">Idle</span>
-            </div>
-            <div class="diag-cell">
-              <span class="diag-cell-title">Click Event Detection</span>
-              <span class="diag-cell-val" id="diagDetectionStatus">Click Event Not Received</span>
-            </div>
-            <div class="diag-cell">
-              <span class="diag-cell-title">Click Event Listener</span>
-              <span class="diag-cell-val" id="diagListenerStatus">Not Checked</span>
-            </div>
-            <div class="diag-cell">
-              <span class="diag-cell-title">Test Button Check</span>
-              <span class="diag-cell-val" id="diagButtonStatus">Pending</span>
-            </div>
-            <div class="diag-cell">
-              <span class="diag-cell-title">Test Link Navigation</span>
-              <span class="diag-cell-val" id="diagLinkStatus">Pending</span>
+            <div class="metric-cell">
+              <span class="cell-title">Click Tracking Status</span>
+              <span class="counter-num" id="clickTrackingVal" style="color: var(--purple);">Idle</span>
+              <span class="cell-sub" id="clickTrackingSubText">UI Clicks: 0</span>
             </div>
           </div>
 
-          <div class="click-actions-row">
-            <button type="button" class="btn btn-click-start" id="startDiagBtn">Start Diagnostic</button>
-            <button type="button" class="btn btn-click-stop" id="stopDiagBtn" disabled>Stop Diagnostic</button>
-          </div>
-
-          <div class="diag-checks-row">
-            <button type="button" class="btn btn-diag-sub" id="diagCheckListenerBtn">Verify Listener</button>
-            <button type="button" class="btn btn-diag-sub" id="diagTestButtonBtn">Test Button</button>
-            <button type="button" class="btn btn-diag-sub" id="diagTestLinkBtn">Test Link</button>
-          </div>
-
-          <div class="vpn-info-box" style="margin-bottom: 0;">
-            <div class="toggle-sub" id="diagStatusMsg">
-              Load your Demo Test Page or same-origin Test Page, then tap Start Diagnostic to verify listener, button click event, and link navigation.
+          <div class="status-grid-2">
+            <div class="metric-cell">
+              <span class="cell-title">Page Load Status</span>
+              <span class="cell-val" id="pageLoadStatusVal">Idle</span>
+            </div>
+            <div class="metric-cell">
+              <span class="cell-title">Click Event Listener</span>
+              <span class="cell-val" id="listenerStatusVal">Not Active</span>
             </div>
           </div>
-        </section>
 
-        <section class="glass-panel" aria-label="VPN Testing Module">
-          <div class="vpn-header">
-            <div class="vpn-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-              <span>VPN Testing</span>
-            </div>
-            <span class="vpn-badge" id="vpnStatusBadge">Native Android Required</span>
+          <div class="metric-cell-full" id="errorDetectionBox">
+            <span class="cell-title">Click Tracking Error Detection</span>
+            <span class="cell-val" id="errorDetectionVal" style="color: var(--emerald);">No Click Tracking Error Detected</span>
           </div>
 
-          <div class="toggle-sub">Supported VPN Providers (Country &amp; server selected in provider app)</div>
-          <div class="provider-chips" id="vpnProviderRow">
-            <button type="button" class="provider-chip active" data-provider="Android System VPN">Android System VPN</button>
-            <button type="button" class="provider-chip" data-provider="WireGuard">WireGuard</button>
-            <button type="button" class="provider-chip" data-provider="Proton VPN">Proton VPN</button>
-            <button type="button" class="provider-chip" data-provider="Mullvad VPN">Mullvad VPN</button>
-            <button type="button" class="provider-chip" data-provider="Tailscale">Tailscale</button>
-            <button type="button" class="provider-chip" data-provider="1.1.1.1 / WARP">1.1.1.1 / WARP</button>
-          </div>
+          <button type="button" class="btn btn-check" id="checkTrackingBtn" disabled>
+            Check Click Tracking
+          </button>
 
-          <div class="vpn-actions-row">
-            <button type="button" class="btn btn-vpn-connect" id="vpnConnectBtn">Connect</button>
-            <button type="button" class="btn btn-vpn-disconnect" id="vpnDisconnectBtn">Disconnect</button>
-            <button type="button" class="btn btn-vpn-verify" id="vpnVerifyBtn">Verify</button>
-          </div>
-
-          <div class="vpn-info-box" id="vpnInfoBox">
-            <div class="vpn-info-warn" id="vpnMessage">
-              Browser HTML cannot control or detect OS VPN tunnels. Use the native Android app or toggle your official VPN provider app before testing.
-            </div>
-            <div id="vpnVerifyResult" style="display: none;"></div>
-          </div>
-
-          <div class="toggle-row">
-            <div>
-              <div class="toggle-label">Require Active VPN</div>
-              <div class="toggle-sub" id="requireVpnSub">Native Android auto-stops tests if VPN drops (manual in browser)</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="requireVpnToggle" />
-              <span class="slider"></span>
-            </label>
+          <div class="status-banner">
+            <span id="statusMessageText" class="cell-sub">
+              Enter a Website URL and tap Start Test to check Page Load, Impression Status, and Click Tracking.
+            </span>
           </div>
         </section>
       </div>
 
       <section class="glass-panel" aria-label="Website Preview">
         <div class="preview-toolbar">
-          <div class="nav-actions">
-            <button type="button" class="icon-btn" id="backBtn" disabled>Back</button>
-            <button type="button" class="icon-btn" id="homeBtn" disabled>Home</button>
-            <button type="button" class="icon-btn" id="reloadBtn" disabled>Reload</button>
-          </div>
+          <button type="button" class="icon-btn" id="reloadBtn" disabled>Reload Preview</button>
           <a
             id="headerOpenBtn"
-            class="btn-ghost"
+            class="btn-ghost disabled"
             href="about:blank"
             target="_blank"
             rel="noopener noreferrer"
@@ -1423,13 +649,13 @@
           <iframe
             id="previewFrame"
             class="preview-iframe"
-            title="Embedded website preview"
-            sandbox="allow-scripts allow-forms allow-same-origin"
+            title="Website impression and click tracking preview"
+            sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
           ></iframe>
 
           <div class="preview-overlay" id="previewOverlay">
-            <h3 id="overlayTitle">Ready to Test</h3>
-            <p id="overlayDesc">Enter an HTTP or HTTPS URL and tap Start.</p>
+            <h3 id="overlayTitle">Ready for Website Test</h3>
+            <p id="overlayDesc">Enter an HTTP or HTTPS Website URL and tap Start Test to verify Page Load, Impression, and Click Tracking.</p>
             <a
               id="overlayOpenBtn"
               class="btn btn-primary"
@@ -1446,291 +672,117 @@
 
   <script>
     (() => {
-      if (window.__webVisitTesterInitialized) return;
-      window.__webVisitTesterInitialized = true;
+      if (window.__webVisitTrackingAppInit) return;
+      window.__webVisitTrackingAppInit = true;
 
-      // Strictly temporary in-memory session state only. No localStorage, IndexedDB, or history logs.
+      // In-memory session state only. Zero history, zero logs, zero persistent storage.
       const urlInput = document.getElementById("urlInput");
+      const clearUrlBtn = document.getElementById("clearUrlBtn");
       const urlError = document.getElementById("urlError");
       const btnHttps = document.getElementById("btnHttps");
       const btnHttp = document.getElementById("btnHttp");
-      const viewSecInput = document.getElementById("viewSecInput");
-      const pauseSecInput = document.getElementById("pauseSecInput");
-      const runsInput = document.getElementById("runsInput");
-      const autoNextToggle = document.getElementById("autoNextToggle");
-
-      const scrollDownBtn = document.getElementById("scrollDownBtn");
-      const scrollUpBtn = document.getElementById("scrollUpBtn");
-      const scrollRandomBtn = document.getElementById("scrollRandomBtn");
-      const pauseScrollBtn = document.getElementById("pauseScrollBtn");
-      const stopScrollBtn = document.getElementById("stopScrollBtn");
-      const scrollSpeedRow = document.getElementById("scrollSpeedRow");
-      const scrollStatusBadge = document.getElementById("scrollStatusBadge");
-      const scrollPosLabel = document.getElementById("scrollPosLabel");
-
-      const vpnProviderRow = document.getElementById("vpnProviderRow");
-      const vpnConnectBtn = document.getElementById("vpnConnectBtn");
-      const vpnDisconnectBtn = document.getElementById("vpnDisconnectBtn");
-      const vpnVerifyBtn = document.getElementById("vpnVerifyBtn");
-      const vpnMessage = document.getElementById("vpnMessage");
-      const vpnVerifyResult = document.getElementById("vpnVerifyResult");
-      const requireVpnToggle = document.getElementById("requireVpnToggle");
-
-      const clickCounterBadge = document.getElementById("clickCounterBadge");
-      const clickTargetRatioLabel = document.getElementById("clickTargetRatioLabel");
-      const currentClickValue = document.getElementById("currentClickValue");
-      const targetClickDisplayValue = document.getElementById("targetClickDisplayValue");
-      const clickTargetProgressFill = document.getElementById("clickTargetProgressFill");
-      const clickTargetInput = document.getElementById("clickTargetInput");
-      const clickTargetPresetRow = document.getElementById("clickTargetPresetRow");
-      const authorizedSiteToggle = document.getElementById("authorizedSiteToggle");
-      const modeClickBtn = document.getElementById("modeClickBtn");
-      const modeTapBtn = document.getElementById("modeTapBtn");
-      const clickSelectorInput = document.getElementById("clickSelectorInput");
-      const scanTargetsBtn = document.getElementById("scanTargetsBtn");
-      const singleClickBtn = document.getElementById("singleClickBtn");
-      const clickTargetChips = document.getElementById("clickTargetChips");
-      const clickIntervalInput = document.getElementById("clickIntervalInput");
-      const startClickBtn = document.getElementById("startClickBtn");
-      const stopClickBtn = document.getElementById("stopClickBtn");
-      const resetClickBtn = document.getElementById("resetClickBtn");
-      const clickStatusMsg = document.getElementById("clickStatusMsg");
-
-      const randomStatusBadge = document.getElementById("randomStatusBadge");
-      const randomRatioLabel = document.getElementById("randomRatioLabel");
-      const randomTapCountValue = document.getElementById("randomTapCountValue");
-      const randomTapTargetValue = document.getElementById("randomTapTargetValue");
-      const randomProgressFill = document.getElementById("randomProgressFill");
-      const randomTargetInput = document.getElementById("randomTargetInput");
-      const randomDelayInput = document.getElementById("randomDelayInput");
-      const loadDemoPageBtn = document.getElementById("loadDemoPageBtn");
-      const startRandomBtn = document.getElementById("startRandomBtn");
-      const stopRandomBtn = document.getElementById("stopRandomBtn");
-      const resetRandomBtn = document.getElementById("resetRandomBtn");
-      const randomStatusMsg = document.getElementById("randomStatusMsg");
-
-      const diagResultBadge = document.getElementById("diagResultBadge");
-      const diagImpressionVal = document.getElementById("diagImpressionVal");
-      const diagImpressionSub = document.getElementById("diagImpressionSub");
-      const diagClickVal = document.getElementById("diagClickVal");
-      const diagClickSub = document.getElementById("diagClickSub");
-      const diagPageLoadStatus = document.getElementById("diagPageLoadStatus");
-      const diagTrackingStatus = document.getElementById("diagTrackingStatus");
-      const diagDetectionStatus = document.getElementById("diagDetectionStatus");
-      const diagListenerStatus = document.getElementById("diagListenerStatus");
-      const diagButtonStatus = document.getElementById("diagButtonStatus");
-      const diagLinkStatus = document.getElementById("diagLinkStatus");
-      const startDiagBtn = document.getElementById("startDiagBtn");
-      const stopDiagBtn = document.getElementById("stopDiagBtn");
-      const diagCheckListenerBtn = document.getElementById("diagCheckListenerBtn");
-      const diagTestButtonBtn = document.getElementById("diagTestButtonBtn");
-      const diagTestLinkBtn = document.getElementById("diagTestLinkBtn");
-      const diagStatusMsg = document.getElementById("diagStatusMsg");
-
       const startBtn = document.getElementById("startBtn");
       const stopBtn = document.getElementById("stopBtn");
-      const backBtn = document.getElementById("backBtn");
-      const homeBtn = document.getElementById("homeBtn");
-      const reloadBtn = document.getElementById("reloadBtn");
 
-      const statusText = document.getElementById("statusText");
       const statusDot = document.getElementById("statusDot");
+      const statusText = document.getElementById("statusText");
       const liveStatusLabel = document.getElementById("liveStatusLabel");
       const progressPercentLabel = document.getElementById("progressPercentLabel");
       const progressFill = document.getElementById("progressFill");
-      const visitCountValue = document.getElementById("visitCountValue");
-      const failedCountValue = document.getElementById("failedCountValue");
-      const liveClickCountLabel = document.getElementById("liveClickCountLabel");
-      const liveClickCountValue = document.getElementById("liveClickCountValue");
 
+      const impressionStatusVal = document.getElementById("impressionStatusVal");
+      const impressionSubText = document.getElementById("impressionSubText");
+      const clickTrackingVal = document.getElementById("clickTrackingVal");
+      const clickTrackingSubText = document.getElementById("clickTrackingSubText");
+      const pageLoadStatusVal = document.getElementById("pageLoadStatusVal");
+      const listenerStatusVal = document.getElementById("listenerStatusVal");
+      const errorDetectionBox = document.getElementById("errorDetectionBox");
+      const errorDetectionVal = document.getElementById("errorDetectionVal");
+      const checkTrackingBtn = document.getElementById("checkTrackingBtn");
+      const statusMessageText = document.getElementById("statusMessageText");
+
+      const reloadBtn = document.getElementById("reloadBtn");
+      const headerOpenBtn = document.getElementById("headerOpenBtn");
       const previewFrame = document.getElementById("previewFrame");
       const previewOverlay = document.getElementById("previewOverlay");
       const overlayTitle = document.getElementById("overlayTitle");
       const overlayDesc = document.getElementById("overlayDesc");
       const overlayOpenBtn = document.getElementById("overlayOpenBtn");
-      const headerOpenBtn = document.getElementById("headerOpenBtn");
 
-      // Speeds in CSS pixels per second for smooth requestAnimationFrame scrolling
-      const SPEED_PX_PER_SEC = { slow: 65, medium: 165, fast: 340 };
-      const MIN_ACTION_COOLDOWN_MS = 300;
-      const LOAD_TIMEOUT_MS = 8000;
+      const LOAD_TIMEOUT_MS = 8500;
+      const FETCH_TIMEOUT_MS = 5500;
       const AD_SELECTOR_REGEX = /(adsbygoogle|doubleclick|googlesyndication|adservice|adsystem|adserver|adnxs|taboola|outbrain|mgid|sponsored|advertisement|ad-slot|ad_slot|ad-banner|ad_banner|google_ads|data-ad)/i;
-      const DEMO_TEST_URL = "demo://webvisittester.local";
-      const DEMO_TEST_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WebVisit Demo Test Environment</title>
-  <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { margin: 0; padding: 18px; background: linear-gradient(160deg, #06091a, #101944, #1b1045); color: #f8fafc; }
-    .hdr { padding: 16px; border-radius: 18px; background: rgba(255,255,255,0.08); border: 1px solid rgba(56,189,248,0.35); margin-bottom: 16px; }
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: rgba(52,211,153,0.18); color: #34d399; border: 1px solid rgba(52,211,153,0.45); }
-    .card { padding: 16px; border-radius: 16px; background: rgba(15,23,56,0.78); border: 1px solid rgba(255,255,255,0.14); margin-bottom: 16px; }
-    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    button, .demo-link { padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(56,189,248,0.5); background: rgba(56,189,248,0.16); color: #f8fafc; font-weight: 700; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
-    button.purple { border-color: rgba(168,85,247,0.55); background: rgba(168,85,247,0.2); }
-    button.emerald { border-color: rgba(52,211,153,0.55); background: rgba(52,211,153,0.18); }
-    #demoFeedback { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(6,9,26,0.7); color: #38bdf8; font-size: 13px; font-weight: 600; }
-    .spacer { height: 220px; display: flex; align-items: center; justify-content: center; border-radius: 14px; border: 1px dashed rgba(255,255,255,0.15); color: #94a3b8; margin-bottom: 16px; font-size: 13px; }
-  </style>
-</head>
-<body>
-  <div class="hdr" id="top">
-    <span class="badge">Safe Demo Test Environment</span>
-    <h2 style="margin:8px 0 4px;">WebVisit Interactive Test Page</h2>
-    <p style="margin:0;color:#cbd5e1;font-size:13px;">Built-in local environment for verifying Random Tap, Scroll Down &amp; Scroll Up interactions.</p>
-    <div id="demoFeedback">Waiting for UI interaction...</div>
-  </div>
-  <div class="card">
-    <h3>Section 1: Primary Navigation &amp; Actions</h3>
-    <div class="btn-row">
-      <button type="button" id="demoOverviewBtn" onclick="reportTap('Overview Tab')">Overview Tab</button>
-      <button type="button" class="purple" id="demoLayoutBtn" onclick="reportTap('Layout Check')">Layout Check</button>
-      <a href="#section-2" class="demo-link" onclick="reportTap('Jump Section 2')">Jump to Section 2</a>
-    </div>
-  </div>
-  <div class="spacer">Scrollable Test Spacer A (Viewport Test)</div>
-  <div class="card" id="section-2">
-    <h3>Section 2: Form &amp; Feature Controls</h3>
-    <div class="btn-row">
-      <button type="button" class="emerald" id="demoFeatureBtn" onclick="reportTap('Toggle Feature')">Toggle Feature</button>
-      <button type="button" id="demoVerifyBtn" onclick="reportTap('Verify Widget')">Verify Widget</button>
-      <button type="button" class="purple" id="demoFilterBtn" onclick="reportTap('Apply Filter')">Apply Filter</button>
-    </div>
-  </div>
-  <div class="spacer">Scrollable Test Spacer B (Mid-Page Scroll)</div>
-  <div class="card" id="section-3">
-    <h3>Section 3: Footer Actions</h3>
-    <div class="btn-row">
-      <button type="button" class="emerald" id="demoSubmitBtn" onclick="reportTap('Submit Demo Form')">Submit Demo Form</button>
-      <button type="button" id="demoRefreshBtn" onclick="reportTap('Refresh Panel')">Refresh Panel</button>
-      <a href="#top" class="demo-link" onclick="reportTap('Back to Top Link')">Scroll Anchor Top</a>
-    </div>
-  </div>
-  <script>
-    let demoTapSeq = 0;
-    function reportTap(name) {
-      demoTapSeq += 1;
-      const el = document.getElementById('demoFeedback');
-      if (el) el.textContent = 'Demo Event #' + demoTapSeq + ': Activated "' + name + '"';
-    }
-  <\/script>
-</body>
-</html>`;
 
-      // Manage a single AbortController per iframe document so duplicate event listeners are impossible
-      let previewBoundDoc = null;
-      let previewDocAbort = null;
-
-      const session = {
-        running: false,
-        currentRun: 0,
-        totalRuns: 3,
-        viewSec: 15,
-        pauseSec: 3,
-        visitCount: 0,
-        failedCount: 0,
-        countedVisitSeq: -1,
-        countedFailSeq: -1,
-        scrollDirection: "none", // "none" | "down" | "up" | "random"
-        scrollPaused: false,
-        randomSubDir: "down",    // "down" | "up"
-        randomSwitchAt: 0,
-        scrollSpeed: "medium",
-        scrollStatusText: "Idle",
-        scrollStatusColor: "#94a3b8",
-        scrollPosText: "0% • 0/0px",
-        scrollRafId: null,
-        lastFrameTime: 0,
-        subPixelCarry: 0,
-        scrollStuckFrames: 0,
-        scrollExpectedDelta: 0,
-        autoNext: true,
-        selectedVpnProvider: "Android System VPN",
-        interactionMode: "click", // "click" | "tap"
-        clickTestMode: "none",    // "none" | "auto" | "manual"
-        autoClickRunning: false,
-        autoClickTimerId: null,
-        actionLock: false,
-        lastInteractionAt: 0,
-        clickCount: 0,
-        clickTarget: 100,
-        clickStatusLabel: "Idle",
-        discoveredTargets: [],
-        randomRunning: false,
-        randomArmedOnLoad: false,
-        randomPhase: "idle", // idle | waiting_load | tapping | scrolling_down | scrolling_up | completed | failed | stopped | restricted
-        randomTapCount: 0,
-        randomTapTarget: 20,
-        randomTapDelaySec: 2,
-        randomScrollNextDir: "down",
-        randomLastSelector: "",
-        randomTimerId: null,
-        randomCycleSeq: 0,
-        randomStatusLabel: "Idle",
-        diagRunning: false,
-        diagRunSeq: 0,
-        diagTimerId: null,
-        diagListenerActive: false,
-        diagPageLoadText: "Idle",
-        diagTrackingText: "Idle",
-        diagDetectionText: "Click Event Not Received",
-        diagListenerText: "Not Checked",
-        diagButtonText: "Pending",
-        diagLinkText: "Pending",
-        diagResultLabel: "Idle",
-        diagResultColor: "#38bdf8",
-        diagMessage: "Load your Demo Test Page or same-origin Test Page, then tap Start Diagnostic to verify listener, button click event, and link navigation.",
-        diagMsgClass: "toggle-sub",
-        isDemoLoaded: false,
-        phase: "idle", // idle | loading | viewing | cooldown | blocked | failed | error | completed | stopped
-        phaseRemaining: 0,
+      const state = {
+        phase: "idle", // idle | loading | loaded | blocked | failed | network_error | stopped
         activeUrl: "",
         loadSeq: 0,
-        timerId: null,
-        loadTimeoutId: null,
-        loadStepTimeoutId: null,
-        activeAbortController: null
+        countedLoadSeq: -1,
+        impressionCount: 0,
+        verifiedUiClicks: 0,
+        impressionStatus: "Not Tested",
+        impressionColor: "#38bdf8",
+        clickTrackingStatus: "Idle",
+        clickTrackingColor: "#a855f7",
+        pageLoadStatus: "Idle",
+        listenerStatus: "Not Active",
+        errorText: "No Click Tracking Error Detected",
+        errorColor: "#34d399",
+        errorBorder: "rgba(255, 255, 255, 0.12)",
+        message: "Enter a Website URL and tap Start Test to check Page Load, Impression Status, and Click Tracking.",
+        messageClass: "cell-sub",
+        loadTimerId: null,
+        stepTimerId: null,
+        fetchAbortController: null
       };
+
+      let currentReachabilityPromise = null;
+      let boundDoc = null;
+      let previewAbortController = null;
+      let healthProbeInFlight = false;
+      let lastTrustedClickAt = 0;
+      let lastTrustedClickEl = null;
 
       function validateUrl(raw) {
         const trimmed = (raw || "").trim();
-        if (!trimmed) return { valid: false, error: "Enter a website URL to start testing." };
+        if (!trimmed) return { valid: false, error: "Enter a Website URL to start testing." };
         if (/\s/.test(trimmed)) return { valid: false, error: "URL cannot contain spaces." };
         if (!/^https?:\/\//i.test(trimmed)) {
           return { valid: false, error: "URL must start with http:// or https://" };
         }
         try {
           const parsed = new URL(trimmed);
-          if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-            return { valid: false, error: "Only HTTP and HTTPS protocols are supported." };
-          }
-          if (!parsed.hostname) return { valid: false, error: "Enter a valid website host." };
+          const host = parsed.hostname;
+          if (!host) return { valid: false, error: "Website URL must include a valid host." };
+          const ipv4 = /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+          const domain = /^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/;
+          const validHost = host.toLowerCase() === "localhost" || ipv4.test(host) || domain.test(host);
+          if (!validHost) return { valid: false, error: "Enter a valid domain, IPv4 address, or localhost." };
           return { valid: true, url: parsed.toString() };
         } catch {
           return { valid: false, error: "Enter a valid HTTP or HTTPS web address." };
         }
       }
 
-      function clampInt(val, min, max, fallback) {
-        const n = parseInt(val, 10);
-        if (Number.isNaN(n)) return fallback;
-        return Math.min(max, Math.max(min, n));
+      function syncExternalLinks(rawUrl) {
+        const check = validateUrl(rawUrl);
+        if (check.valid) {
+          headerOpenBtn.href = check.url;
+          headerOpenBtn.classList.remove("disabled");
+          overlayOpenBtn.href = check.url;
+        } else {
+          headerOpenBtn.href = "about:blank";
+          headerOpenBtn.classList.add("disabled");
+          overlayOpenBtn.href = "about:blank";
+        }
       }
 
-      function formatTimer(sec) {
-        const s = Math.max(0, Math.floor(sec));
-        return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-      }
-
-      function showOverlay(title, desc, showOpen = false) {
+      function showOverlay(title, desc, showOpenBtn) {
         previewFrame.style.display = "none";
         previewOverlay.style.display = "flex";
         overlayTitle.textContent = title;
         overlayDesc.textContent = desc;
-        overlayOpenBtn.style.display = showOpen ? "inline-flex" : "none";
+        overlayOpenBtn.style.display = showOpenBtn && headerOpenBtn.href !== "about:blank" ? "inline-flex" : "none";
       }
 
       function showIframe() {
@@ -1738,64 +790,41 @@
         previewFrame.style.display = "block";
       }
 
-      function syncExternalLinks(url) {
-        const check = validateUrl(url);
-        const safeHref = check.valid ? check.url : "about:blank";
-        headerOpenBtn.href = safeHref;
-        overlayOpenBtn.href = safeHref;
+      function detachPreviewListeners() {
+        if (previewAbortController) {
+          try { previewAbortController.abort(); } catch {}
+          previewAbortController = null;
+        }
+        boundDoc = null;
       }
 
-      function setScrollStatus(text, color) {
-        session.scrollStatusText = text;
-        session.scrollStatusColor = color;
-        scrollStatusBadge.textContent = text;
-        scrollStatusBadge.style.color = color;
-        scrollStatusBadge.style.borderColor = color;
+      function clearPendingAsyncWork() {
+        if (state.loadTimerId) clearTimeout(state.loadTimerId);
+        if (state.stepTimerId) clearTimeout(state.stepTimerId);
+        if (state.fetchAbortController) {
+          try { state.fetchAbortController.abort(); } catch {}
+        }
+        state.loadTimerId = null;
+        state.stepTimerId = null;
+        state.fetchAbortController = null;
       }
 
-      function setScrollPosition(pos, max) {
-        const safeMax = Math.max(0, Math.round(max));
-        const safePos = Math.max(0, Math.min(safeMax, Math.round(pos)));
-        const pct = safeMax > 0 ? Math.round((safePos / safeMax) * 100) : 0;
-        session.scrollPosText = `${pct}% • ${safePos}/${safeMax}px`;
-        scrollPosLabel.textContent = session.scrollPosText;
-      }
-
-      // Safely check same-origin iframe document access without bypassing cross-origin security
-      function getAccessibleIframeDocument() {
+      function getSameOriginAccess() {
         try {
-          if (!previewFrame || previewFrame.style.display === "none") return null;
+          if (previewFrame.style.display !== "block") return null;
+          const doc = previewFrame.contentDocument || (previewFrame.contentWindow && previewFrame.contentWindow.document);
           const win = previewFrame.contentWindow;
-          const doc = previewFrame.contentDocument || (win ? win.document : null);
-          if (!doc || !win) return null;
-          const href = doc.location && doc.location.href;
-          if (!href || (href === "about:blank" && !previewFrame.hasAttribute("srcdoc"))) return null;
-          if (!doc.documentElement && !doc.body) return null;
+          if (!doc || !win || !doc.documentElement) return null;
+          const href = doc.location ? doc.location.href : "";
+          if (!href || href === "about:blank") return null;
           return { doc, win };
         } catch {
           return null;
         }
       }
 
-      function isElementVisible(el, win) {
-        if (!el || !win) return false;
-        const style = win.getComputedStyle(el);
-        if (!style || style.display === "none" || style.visibility === "hidden" || parseFloat(style.opacity) === 0) {
-          return false;
-        }
-        const rect = el.getBoundingClientRect();
-        return rect.width >= 2 && rect.height >= 2;
-      }
-
-      function isElementInteractable(el, win) {
-        if (!isElementVisible(el, win)) return false;
-        if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
-        const style = win.getComputedStyle(el);
-        return style && style.pointerEvents !== "none";
-      }
-
-      function isProhibitedAdElement(el) {
-        if (!el) return true;
+      function isAdOrSponsoredElement(el) {
+        if (!el) return false;
         let cur = el;
         let depth = 0;
         while (cur && depth < 6) {
@@ -1816,1440 +845,459 @@
         return false;
       }
 
-      function spawnIframeTapRipple(doc, win, clientX, clientY, accentHex = "#38BDF8") {
+      function spawnSubtleTapRipple(doc, win, clientX, clientY) {
         try {
-          const root = doc.body || doc.documentElement;
+          const root = doc && (doc.body || doc.documentElement);
           if (!root) return;
-
-          let layer = doc.getElementById("__wv_ripple_layer");
+          let layer = doc.getElementById("__wv_tap_ripple_layer");
           if (!layer) {
             layer = doc.createElement("div");
-            layer.id = "__wv_ripple_layer";
+            layer.id = "__wv_tap_ripple_layer";
             layer.setAttribute("aria-hidden", "true");
             layer.style.cssText = "position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:2147483647;";
             root.appendChild(layer);
           }
-
           const ripple = doc.createElement("span");
           ripple.setAttribute("aria-hidden", "true");
-          const x = Number.isFinite(clientX) ? clientX : (win.innerWidth || 300) / 2;
-          const y = Number.isFinite(clientY) ? clientY : (win.innerHeight || 300) / 2;
-          const rgb = accentHex === "#34D399"
-            ? "52, 211, 153"
-            : (accentHex === "#A855F7" ? "168, 85, 247" : "56, 189, 248");
-
+          const x = Number.isFinite(clientX) ? clientX : ((win.innerWidth || 300) / 2);
+          const y = Number.isFinite(clientY) ? clientY : ((win.innerHeight || 300) / 2);
           ripple.style.cssText =
-            `position:fixed;left:${x}px;top:${y}px;width:46px;height:46px;border-radius:9999px;` +
+            `position:fixed;left:${x}px;top:${y}px;width:44px;height:44px;border-radius:9999px;` +
             `pointer-events:none;box-sizing:border-box;` +
-            `background:radial-gradient(circle, rgba(${rgb}, 0.34) 0%, rgba(${rgb}, 0.12) 55%, rgba(${rgb}, 0) 75%);` +
-            `border:1.5px solid rgba(${rgb}, 0.72);` +
-            `box-shadow:0 0 12px rgba(${rgb}, 0.28);` +
+            `background:radial-gradient(circle, rgba(56, 189, 248, 0.34) 0%, rgba(56, 189, 248, 0.12) 55%, rgba(56, 189, 248, 0) 75%);` +
+            `border:1.5px solid rgba(56, 189, 248, 0.72);` +
             `transform:translate(-50%, -50%) scale(0.22);opacity:0.9;`;
-
           layer.appendChild(ripple);
-
-          const cleanup = () => {
-            try { ripple.remove(); } catch {}
-          };
-
+          const cleanup = () => { try { ripple.remove(); } catch {} };
           if (typeof ripple.animate === "function") {
             const anim = ripple.animate(
               [
                 { transform: "translate(-50%, -50%) scale(0.22)", opacity: 0.9 },
-                { transform: "translate(-50%, -50%) scale(1.3)", opacity: 0 }
+                { transform: "translate(-50%, -50%) scale(1.28)", opacity: 0 }
               ],
-              { duration: 480, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "forwards" }
+              { duration: 450, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "forwards" }
             );
             anim.onfinish = cleanup;
-            setTimeout(cleanup, 560);
-          } else {
-            ripple.style.transition = "transform 0.46s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.46s ease-out";
-            win.requestAnimationFrame(() => {
-              ripple.style.transform = "translate(-50%, -50%) scale(1.3)";
-              ripple.style.opacity = "0";
-            });
             setTimeout(cleanup, 520);
+          } else {
+            setTimeout(cleanup, 450);
           }
-        } catch {
-          // Ignore DOM restriction errors cleanly
-        }
+        } catch {}
       }
 
-      function detachPreviewHandlers() {
-        if (previewDocAbort) {
-          try { previewDocAbort.abort(); } catch {}
-          previewDocAbort = null;
-        }
-        previewBoundDoc = null;
-        session.diagListenerActive = false;
-      }
-
-      // Attach a single debounced touch/click guard inside same-origin preview using AbortController so duplicate listeners cannot accumulate
-      function attachSameOriginPreviewHandlers(access, forceRebind = false) {
+      function attachSameOriginClickObserver(access) {
         if (!access || !access.doc) return false;
         const { doc, win } = access;
-        if (!forceRebind && previewBoundDoc === doc && doc.__wvClickObserverActive === 1) {
-          session.diagListenerActive = true;
-          return true;
-        }
+        if (boundDoc === doc && previewAbortController) return true;
 
-        detachPreviewHandlers();
-        previewDocAbort = new AbortController();
-        previewBoundDoc = doc;
-        const signal = previewDocAbort.signal;
-        doc.__wvClickObserverActive = 1;
-        session.diagListenerActive = true;
-
-        try {
-          if (!doc.getElementById("__webvisit_touch_css") && doc.head) {
-            const st = doc.createElement("style");
-            st.id = "__webvisit_touch_css";
-            st.textContent = "a, button, [role='button'], input, select, textarea { touch-action: manipulation; }";
-            doc.head.appendChild(st);
-          }
-        } catch {
-          // Ignore CSP style insertion blocks cleanly
-        }
-
-        let lastDirectEl = null;
-        let lastDirectAt = 0;
-        let scrollReportTick = 0;
+        detachPreviewListeners();
+        previewAbortController = new AbortController();
+        const { signal } = previewAbortController;
 
         doc.addEventListener("click", (ev) => {
-          doc.__wvLastCapturedEvent = {
-            isTrusted: Boolean(ev.isTrusted),
-            timestamp: Date.now(),
-            tagName: ev.target && ev.target.tagName ? ev.target.tagName.toLowerCase() : ""
-          };
-          if (!ev.isTrusted) return;
-          const rawTarget = ev.target && ev.target.closest
+          if (healthProbeInFlight) return;
+
+          // Respect Invalid Traffic Filtering: ignore synthetic/untrusted events
+          if (!ev.isTrusted) {
+            state.clickTrackingStatus = "Invalid Traffic Filtered";
+            state.clickTrackingColor = "#fbbf24";
+            state.errorText = "Invalid Traffic Filtered: Synthetic untrusted click ignored.";
+            state.errorColor = "#fbbf24";
+            state.errorBorder = "rgba(251, 191, 36, 0.45)";
+            state.message = "Untrusted synthetic click was ignored and not counted.";
+            state.messageClass = "info-warn";
+            updateUI();
+            return;
+          }
+
+          // Preserve normal ad network Click Tracking & Invalid Traffic Filtering:
+          // never cancel, spoof, or intercept ad/sponsored clicks.
+          if (isAdOrSponsoredElement(ev.target)) {
+            state.clickTrackingStatus = "Ad Network Protected";
+            state.clickTrackingColor = "#38bdf8";
+            state.errorText = "Ad Network Protection Active: Ad click was not altered or intercepted.";
+            state.errorColor = "#38bdf8";
+            state.errorBorder = "rgba(56, 189, 248, 0.4)";
+            state.message = "Ad interaction handled naturally by the site/ad network. Only non-ad UI interactions are tracked here.";
+            state.messageClass = "cell-sub";
+            updateUI();
+            return;
+          }
+
+          const clickable = ev.target && ev.target.closest
             ? ev.target.closest('button, a[href], [role="button"], input[type="button"], input[type="submit"], [onclick]')
             : null;
-          if (!rawTarget) return;
-
-          if (!authorizedSiteToggle.checked && !session.isDemoLoaded) {
-            setClickFeedback("Restricted", "#fb7185", "Enable 'Authorized Own Site / Test Page' to count preview clicks.", "vpn-info-err");
-            session.diagTrackingText = "Blocked (Unconfirmed)";
-            session.diagDetectionText = "Click Event Not Received";
-            renderDiagnosticUI();
-            return;
-          }
+          if (!clickable) return;
 
           const now = performance.now();
-          if (rawTarget === lastDirectEl && now - lastDirectAt < 280) {
-            ev.preventDefault();
-            ev.stopImmediatePropagation();
-            return;
-          }
-          lastDirectEl = rawTarget;
-          lastDirectAt = now;
-
-          if (isProhibitedAdElement(rawTarget)) {
-            setClickFeedback("Ad Blocked", "#fb7185", "Ad click blocked by policy guard.", "vpn-info-err");
+          if (clickable === lastTrustedClickEl && now - lastTrustedClickAt < 250) {
+            state.clickTrackingStatus = "Invalid Traffic Filtered";
+            state.clickTrackingColor = "#fbbf24";
+            state.errorText = "Rapid duplicate click burst (<250ms) ignored to prevent false click counts.";
+            state.errorColor = "#fbbf24";
+            state.errorBorder = "rgba(251, 191, 36, 0.45)";
+            updateUI();
             return;
           }
 
-          const hasPointerCoord = (typeof ev.clientX === "number" && typeof ev.clientY === "number") && (ev.clientX !== 0 || ev.clientY !== 0);
-          let tapX = ev.clientX;
-          let tapY = ev.clientY;
-          if (!hasPointerCoord) {
-            const r = rawTarget.getBoundingClientRect();
-            tapX = r.left + r.width / 2;
-            tapY = r.top + r.height / 2;
-          }
-          spawnIframeTapRipple(doc, win, tapX, tapY, session.interactionMode === "tap" ? "#A855F7" : "#38BDF8");
+          lastTrustedClickEl = clickable;
+          lastTrustedClickAt = now;
 
-          const label = (rawTarget.innerText || rawTarget.value || rawTarget.getAttribute("aria-label") || rawTarget.tagName)
+          const rect = clickable.getBoundingClientRect ? clickable.getBoundingClientRect() : null;
+          const hasCoord = Number.isFinite(ev.clientX) && Number.isFinite(ev.clientY) && (ev.clientX !== 0 || ev.clientY !== 0);
+          const rx = hasCoord ? ev.clientX : (rect ? rect.left + rect.width / 2 : (win.innerWidth || 300) / 2);
+          const ry = hasCoord ? ev.clientY : (rect ? rect.top + rect.height / 2 : (win.innerHeight || 300) / 2);
+          spawnSubtleTapRipple(doc, win, rx, ry);
+
+          const label = (clickable.innerText || clickable.value || clickable.getAttribute("aria-label") || clickable.tagName)
             .replace(/\s+/g, " ")
             .trim()
-            .slice(0, 24) || rawTarget.tagName.toLowerCase();
+            .slice(0, 24) || "element";
 
-          recordVerifiedClickEvent(label, "direct");
+          state.verifiedUiClicks += 1;
+          state.clickTrackingStatus = "Click Event Received";
+          state.clickTrackingColor = "#34d399";
+          state.listenerStatus = "Active (0 Duplicates)";
+          state.errorText = "No Click Tracking Error Detected";
+          state.errorColor = "#34d399";
+          state.errorBorder = "rgba(255, 255, 255, 0.12)";
+          state.message = `Real user click received on "${label}". Impression and Click Tracking verified separately.`;
+          state.messageClass = "info-ok";
+          updateUI();
         }, { capture: true, signal });
 
-        doc.addEventListener("scroll", () => {
-          const now = performance.now();
-          if (now - scrollReportTick < 60) return;
-          scrollReportTick = now;
-          const target = detectScrollTarget(doc, win, session.scrollDirection === "up" ? "up" : "down");
-          if (target) {
-            setScrollPosition(target.getTop(), target.maxScroll);
-          }
-        }, { passive: true, capture: true, signal });
-
+        boundDoc = doc;
         return true;
-      }
-
-      // Accurately detect the scrollable container (window/root or inner overflow-y container)
-      function detectScrollTarget(doc, win, direction) {
-        const candidates = [];
-        const rootEl = doc.scrollingElement || doc.documentElement || doc.body;
-        const docHeight = Math.max(
-          rootEl ? rootEl.scrollHeight : 0,
-          doc.documentElement ? doc.documentElement.scrollHeight : 0,
-          doc.body ? doc.body.scrollHeight : 0
-        );
-        const viewportH = win.innerHeight || (rootEl ? rootEl.clientHeight : 0);
-        const winMax = Math.max(0, docHeight - viewportH);
-
-        if (winMax > 2) {
-          candidates.push({
-            isWindow: true,
-            el: rootEl || doc.documentElement || doc.body,
-            maxScroll: winMax,
-            getTop: () => Math.max(0, win.scrollY || win.pageYOffset || (rootEl ? rootEl.scrollTop : 0)),
-            setTop: (nextTop) => {
-              const targetEl = doc.scrollingElement || doc.documentElement || doc.body;
-              const prevBeh = targetEl && targetEl.style ? targetEl.style.scrollBehavior : "";
-              if (targetEl && targetEl.style && prevBeh !== "auto") {
-                targetEl.style.scrollBehavior = "auto";
-              }
-              try {
-                win.scrollTo({ top: nextTop, left: win.scrollX || 0, behavior: "auto" });
-              } catch {
-                win.scrollTo(win.scrollX || 0, nextTop);
-              }
-              if (targetEl && Math.abs((win.scrollY || targetEl.scrollTop) - nextTop) > 2 && targetEl.scrollTop !== nextTop) {
-                targetEl.scrollTop = nextTop;
-              }
-              if (targetEl && targetEl.style) {
-                targetEl.style.scrollBehavior = prevBeh;
-              }
-            }
-          });
-        }
-
-        const elements = doc.querySelectorAll("*");
-        const limit = Math.min(elements.length, 700);
-        for (let i = 0; i < limit; i += 1) {
-          const el = elements[i];
-          if (el === rootEl || el === doc.documentElement || el === doc.body) continue;
-          const style = win.getComputedStyle(el);
-          if (!style) continue;
-          if (style.display === "none" || style.visibility === "hidden") continue;
-          const oy = style.overflowY;
-          if ((oy === "auto" || oy === "scroll" || oy === "overlay") && el.scrollHeight > el.clientHeight + 4) {
-            const rect = el.getBoundingClientRect();
-            if (rect.width < 20 || rect.height < 20) continue;
-            const elMax = el.scrollHeight - el.clientHeight;
-            candidates.push({
-              isWindow: false,
-              el,
-              maxScroll: elMax,
-              getTop: () => el.scrollTop,
-              setTop: (nextTop) => {
-                const prevBeh = el.style.scrollBehavior;
-                if (prevBeh !== "auto") el.style.scrollBehavior = "auto";
-                if (typeof el.scrollTo === "function") {
-                  try {
-                    el.scrollTo({ top: nextTop, left: el.scrollLeft, behavior: "auto" });
-                  } catch {
-                    el.scrollTop = nextTop;
-                  }
-                } else {
-                  el.scrollTop = nextTop;
-                }
-                el.style.scrollBehavior = prevBeh;
-              }
-            });
-          }
-        }
-
-        if (candidates.length === 0) return null;
-
-        if (direction === "up") {
-          for (let i = 0; i < candidates.length; i += 1) {
-            if (candidates[i].getTop() > 1) return candidates[i];
-          }
-        } else {
-          for (let i = 0; i < candidates.length; i += 1) {
-            const c = candidates[i];
-            if (c.getTop() < c.maxScroll - 1) return c;
-          }
-        }
-        return candidates[0];
-      }
-
-      function nextRandomIntervalMs() {
-        return 1100 + Math.random() * 2100;
-      }
-
-      function updateActiveScrollLabel() {
-        if (session.scrollDirection === "none") return;
-        if (session.scrollPaused) {
-          setScrollStatus("Paused", "#fbbf24");
-          return;
-        }
-        if (session.scrollDirection === "up") {
-          setScrollStatus(`Scrolling Up (${session.scrollSpeed})`, "#a855f7");
-        } else if (session.scrollDirection === "down") {
-          setScrollStatus(`Scrolling Down (${session.scrollSpeed})`, "#38bdf8");
-        } else if (session.scrollDirection === "random") {
-          const dirText = session.randomSubDir === "up" ? "Up" : "Down";
-          setScrollStatus(`Random • ${dirText} (${session.scrollSpeed})`, "#34d399");
-        }
-      }
-
-      function cancelScrollRaf() {
-        if (session.scrollRafId !== null) {
-          cancelAnimationFrame(session.scrollRafId);
-          session.scrollRafId = null;
-        }
-      }
-
-      function stopScrolling(reasonText = "Stopped", color = "#fbbf24") {
-        cancelScrollRaf();
-        session.scrollDirection = "none";
-        session.scrollPaused = false;
-        session.randomSwitchAt = 0;
-        session.lastFrameTime = 0;
-        session.subPixelCarry = 0;
-        session.scrollStuckFrames = 0;
-        session.scrollExpectedDelta = 0;
-        setScrollStatus(reasonText, color);
-        updateUI();
-      }
-
-      function togglePauseScrolling() {
-        if (session.scrollDirection === "none") return;
-        if (!session.scrollPaused) {
-          session.scrollPaused = true;
-          cancelScrollRaf();
-          setScrollStatus("Paused", "#fbbf24");
-          updateUI();
-        } else {
-          const access = getAccessibleIframeDocument();
-          if (!access) {
-            stopScrolling("Cross-Origin Restricted", "#fb7185");
-            return;
-          }
-          session.scrollPaused = false;
-          session.lastFrameTime = 0;
-          session.subPixelCarry = 0;
-          session.scrollStuckFrames = 0;
-          session.scrollExpectedDelta = 0;
-          if (session.scrollDirection === "random") {
-            session.randomSwitchAt = performance.now() + nextRandomIntervalMs();
-          }
-          updateActiveScrollLabel();
-          updateUI();
-          session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
-        }
-      }
-
-      function runScrollAnimationFrame(timestamp) {
-        if (session.scrollDirection === "none" || session.scrollPaused) {
-          session.scrollRafId = null;
-          return;
-        }
-
-        const access = getAccessibleIframeDocument();
-        if (!access) {
-          stopScrolling("Cross-Origin Restricted", "#fb7185");
-          return;
-        }
-
-        const { doc, win } = access;
-
-        if (session.scrollDirection === "random" && timestamp >= session.randomSwitchAt) {
-          session.randomSubDir = session.randomSubDir === "down" ? "up" : "down";
-          session.randomSwitchAt = timestamp + nextRandomIntervalMs();
-          session.scrollStuckFrames = 0;
-          session.scrollExpectedDelta = 0;
-          updateActiveScrollLabel();
-        }
-
-        const effectiveDir = session.scrollDirection === "random"
-          ? session.randomSubDir
-          : session.scrollDirection;
-
-        const target = detectScrollTarget(doc, win, effectiveDir);
-        if (!target || target.maxScroll <= 2) {
-          setScrollPosition(0, 0);
-          stopScrolling("Page Not Scrollable", "#fb7185");
-          return;
-        }
-
-        if (!session.lastFrameTime) {
-          session.lastFrameTime = timestamp;
-        }
-        const dtSec = Math.min(0.05, Math.max(0, (timestamp - session.lastFrameTime) / 1000));
-        session.lastFrameTime = timestamp;
-
-        const speed = SPEED_PX_PER_SEC[session.scrollSpeed] || 165;
-        session.subPixelCarry += speed * dtSec;
-        const stepPx = Math.floor(session.subPixelCarry);
-
-        if (stepPx >= 1) {
-          session.subPixelCarry -= stepPx;
-          const beforeTop = target.getTop();
-          const maxScroll = target.maxScroll;
-
-          if (effectiveDir === "up") {
-            if (beforeTop <= 1) {
-              setScrollPosition(0, maxScroll);
-              if (session.scrollDirection === "random") {
-                session.randomSubDir = "down";
-                session.randomSwitchAt = timestamp + nextRandomIntervalMs();
-                session.scrollStuckFrames = 0;
-                session.scrollExpectedDelta = 0;
-                updateActiveScrollLabel();
-              } else {
-                stopScrolling("Reached Top", "#fbbf24");
-                return;
-              }
-            } else {
-              const desiredTop = Math.max(0, beforeTop - stepPx);
-              target.setTop(desiredTop);
-              const afterTop = target.getTop();
-              setScrollPosition(afterTop, maxScroll);
-
-              const expectedMove = Math.abs(beforeTop - desiredTop);
-              const actualMove = Math.abs(afterTop - beforeTop);
-              if (expectedMove >= 1 && actualMove < 0.25) {
-                session.scrollStuckFrames += 1;
-                session.scrollExpectedDelta += expectedMove;
-                if (session.scrollStuckFrames >= 10 && session.scrollExpectedDelta >= 12) {
-                  stopScrolling("Scroll Stuck", "#fb7185");
-                  return;
-                }
-              } else {
-                session.scrollStuckFrames = 0;
-                session.scrollExpectedDelta = 0;
-              }
-
-              if (afterTop <= 1) {
-                if (session.scrollDirection === "random") {
-                  session.randomSubDir = "down";
-                  session.randomSwitchAt = timestamp + nextRandomIntervalMs();
-                  updateActiveScrollLabel();
-                } else {
-                  stopScrolling("Reached Top", "#fbbf24");
-                  return;
-                }
-              }
-            }
-          } else {
-            if (beforeTop >= maxScroll - 1) {
-              setScrollPosition(maxScroll, maxScroll);
-              if (session.scrollDirection === "random") {
-                session.randomSubDir = "up";
-                session.randomSwitchAt = timestamp + nextRandomIntervalMs();
-                session.scrollStuckFrames = 0;
-                session.scrollExpectedDelta = 0;
-                updateActiveScrollLabel();
-              } else {
-                stopScrolling("Reached Bottom", "#fbbf24");
-                return;
-              }
-            } else {
-              const desiredTop = Math.min(maxScroll, beforeTop + stepPx);
-              target.setTop(desiredTop);
-              const afterTop = target.getTop();
-              setScrollPosition(afterTop, maxScroll);
-
-              const expectedMove = Math.abs(desiredTop - beforeTop);
-              const actualMove = Math.abs(afterTop - beforeTop);
-              if (expectedMove >= 1 && actualMove < 0.25) {
-                session.scrollStuckFrames += 1;
-                session.scrollExpectedDelta += expectedMove;
-                if (session.scrollStuckFrames >= 10 && session.scrollExpectedDelta >= 12) {
-                  stopScrolling("Scroll Stuck", "#fb7185");
-                  return;
-                }
-              } else {
-                session.scrollStuckFrames = 0;
-                session.scrollExpectedDelta = 0;
-              }
-
-              if (afterTop >= maxScroll - 1) {
-                if (session.scrollDirection === "random") {
-                  session.randomSubDir = "up";
-                  session.randomSwitchAt = timestamp + nextRandomIntervalMs();
-                  updateActiveScrollLabel();
-                } else {
-                  stopScrolling("Reached Bottom", "#fbbf24");
-                  return;
-                }
-              }
-            }
-          }
-        }
-
-        session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
-      }
-
-      function startScrolling(direction) {
-        cancelScrollRaf();
-
-        const access = getAccessibleIframeDocument();
-        if (!access) {
-          session.scrollDirection = "none";
-          session.scrollPaused = false;
-          if (previewFrame.style.display === "block") {
-            setScrollStatus("Cross-Origin Restricted", "#fb7185");
-          } else {
-            setScrollStatus("Load Preview First", "#fbbf24");
-          }
-          updateUI();
-          return;
-        }
-
-        attachSameOriginPreviewHandlers(access);
-
-        const initialCheckDir = direction === "up" ? "up" : "down";
-        const target = detectScrollTarget(access.doc, access.win, initialCheckDir);
-        if (!target || target.maxScroll <= 2) {
-          setScrollPosition(0, 0);
-          session.scrollDirection = "none";
-          session.scrollPaused = false;
-          setScrollStatus("Page Not Scrollable", "#fb7185");
-          updateUI();
-          return;
-        }
-
-        const currentTop = target.getTop();
-        setScrollPosition(currentTop, target.maxScroll);
-
-        if (direction === "up" && currentTop <= 1) {
-          session.scrollDirection = "none";
-          session.scrollPaused = false;
-          setScrollStatus("Already At Top", "#fbbf24");
-          updateUI();
-          return;
-        }
-
-        if (direction === "down" && currentTop >= target.maxScroll - 1) {
-          session.scrollDirection = "none";
-          session.scrollPaused = false;
-          setScrollStatus("Already At Bottom", "#fbbf24");
-          updateUI();
-          return;
-        }
-
-        session.scrollDirection = direction;
-        session.scrollPaused = false;
-        session.lastFrameTime = 0;
-        session.subPixelCarry = 0;
-        session.scrollStuckFrames = 0;
-        session.scrollExpectedDelta = 0;
-
-        if (direction === "random") {
-          session.randomSubDir = currentTop >= target.maxScroll - 4 ? "up" : (currentTop <= 4 ? "down" : (Math.random() < 0.7 ? "down" : "up"));
-          session.randomSwitchAt = performance.now() + nextRandomIntervalMs();
-        }
-
-        updateActiveScrollLabel();
-        updateUI();
-        session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
-      }
-
-      function buildCssSelector(el, doc) {
-        const escapeId = (id) => (window.CSS && CSS.escape ? CSS.escape(id) : id.replace(/([^\w-])/g, "\\$1"));
-        if (el.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(el.id)) {
-          const candidate = `#${escapeId(el.id)}`;
-          try {
-            if (doc.querySelector(candidate) === el) return candidate;
-          } catch {}
-        }
-        const testId = el.getAttribute && el.getAttribute("data-testid");
-        if (testId) {
-          const candidate = `${el.tagName.toLowerCase()}[data-testid="${testId.replace(/"/g, '\\"')}"]`;
-          try {
-            if (doc.querySelector(candidate) === el) return candidate;
-          } catch {}
-        }
-        const parts = [];
-        let cur = el;
-        while (cur && cur.nodeType === 1 && cur.tagName.toLowerCase() !== "html") {
-          const tag = cur.tagName.toLowerCase();
-          if (cur.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(cur.id)) {
-            parts.unshift(`#${escapeId(cur.id)}`);
-            break;
-          }
-          let sib = cur;
-          let idx = 1;
-          while (sib.previousElementSibling) {
-            sib = sib.previousElementSibling;
-            if (sib.tagName === cur.tagName) idx += 1;
-          }
-          parts.unshift(`${tag}:nth-of-type(${idx})`);
-          cur = cur.parentElement;
-        }
-        const full = parts.join(" > ");
-        try {
-          if (full && doc.querySelector(full) === el) return full;
-        } catch {}
-        return full;
-      }
-
-      function setClickFeedback(label, color, msg, className) {
-        session.clickStatusLabel = label;
-        clickCounterBadge.style.color = color;
-        clickCounterBadge.style.borderColor = color;
-        clickStatusMsg.className = className;
-        clickStatusMsg.textContent = msg;
-        updateUI();
-      }
-
-      function renderTargetChips() {
-        clickTargetChips.innerHTML = "";
-        if (!session.discoveredTargets.length) {
-          clickTargetChips.style.display = "none";
-          return;
-        }
-        clickTargetChips.style.display = "flex";
-        session.discoveredTargets.forEach((item) => {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "target-chip" + (clickSelectorInput.value.trim() === item.selector ? " active" : "");
-          btn.textContent = `${item.tagType}: ${item.label}`;
-          btn.addEventListener("click", () => {
-            if (session.autoClickRunning) return;
-            clickSelectorInput.value = item.selector;
-            renderTargetChips();
-            setClickFeedback("Idle", "#38bdf8", `Selected "${item.label}" (${item.selector}).`, "vpn-info-ok");
-          });
-          clickTargetChips.appendChild(btn);
-        });
-      }
-
-      function stopAutoClick(reason = "Click Test stopped.", color = "#fbbf24", statusLabel = "Stopped") {
-        if (session.autoClickTimerId) {
-          clearInterval(session.autoClickTimerId);
-          session.autoClickTimerId = null;
-        }
-        session.autoClickRunning = false;
-        session.clickTestMode = "none";
-        session.actionLock = false;
-        const msgClass = (statusLabel === "Ad Blocked" || statusLabel === "Restricted")
-          ? "vpn-info-err"
-          : (statusLabel === "Completed" ? "vpn-info-ok" : "vpn-info-warn");
-        setClickFeedback(statusLabel, color, reason, msgClass);
-      }
-
-      function completeClickTargetReached(customReason = null) {
-        const msg = customReason ||
-          `Target reached (${session.clickCount}/${session.clickTarget}). Click Test stopped automatically.`;
-        stopAutoClick(msg, "#34d399", "Completed");
-      }
-
-      function resetClickCounter() {
-        if (session.autoClickTimerId) {
-          clearInterval(session.autoClickTimerId);
-          session.autoClickTimerId = null;
-        }
-        session.autoClickRunning = false;
-        session.clickTestMode = "none";
-        session.actionLock = false;
-        session.clickCount = 0;
-        session.lastInteractionAt = 0;
-        setClickFeedback(
-          "Idle",
-          "#38bdf8",
-          `Click counter reset (0/${session.clickTarget}).`,
-          "vpn-info-ok"
-        );
-      }
-
-      function dispatchSingleActivation(el, win, doc, mode, rippleAccent = null) {
-        if (el.scrollIntoView) {
-          el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
-        }
-        const rect = el.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        const accent = rippleAccent || (mode === "tap" ? "#A855F7" : "#38BDF8");
-        spawnIframeTapRipple(doc, win, cx, cy, accent);
-
-        if (mode === "tap") {
-          let touchHandled = false;
-          if (typeof win.Touch === "function" && typeof win.TouchEvent === "function") {
-            try {
-              const touchObj = new win.Touch({
-                identifier: Date.now() % 100000,
-                target: el,
-                clientX: cx,
-                clientY: cy,
-                screenX: cx,
-                screenY: cy,
-                pageX: cx + (win.scrollX || 0),
-                pageY: cy + (win.scrollY || 0),
-                radiusX: 4,
-                radiusY: 4,
-                force: 1
-              });
-              el.dispatchEvent(new win.TouchEvent("touchstart", {
-                bubbles: true,
-                cancelable: true,
-                view: win,
-                touches: [touchObj],
-                targetTouches: [touchObj],
-                changedTouches: [touchObj]
-              }));
-              const touchEndEvent = new win.TouchEvent("touchend", {
-                bubbles: true,
-                cancelable: true,
-                view: win,
-                touches: [],
-                targetTouches: [],
-                changedTouches: [touchObj]
-              });
-              touchHandled = !el.dispatchEvent(touchEndEvent);
-            } catch {
-              // Some desktop engines block Touch constructor; PointerEvent touch dispatch continues cleanly below
-            }
-          }
-
-          if (typeof win.PointerEvent === "function") {
-            el.dispatchEvent(new win.PointerEvent("pointerdown", {
-              bubbles: true, cancelable: true, view: win, pointerType: "touch", isPrimary: true, clientX: cx, clientY: cy
-            }));
-            const pUpCanceled = !el.dispatchEvent(new win.PointerEvent("pointerup", {
-              bubbles: true, cancelable: true, view: win, pointerType: "touch", isPrimary: true, clientX: cx, clientY: cy
-            }));
-            touchHandled = touchHandled || pUpCanceled;
-          }
-
-          if (!touchHandled) {
-            if (typeof el.focus === "function") {
-              try { el.focus({ preventScroll: true }); } catch {}
-            }
-            el.click();
-          }
-        } else {
-          if (typeof win.PointerEvent === "function") {
-            el.dispatchEvent(new win.PointerEvent("pointerdown", {
-              bubbles: true, cancelable: true, view: win, pointerType: "mouse", isPrimary: true, clientX: cx, clientY: cy
-            }));
-          }
-          el.dispatchEvent(new win.MouseEvent("mousedown", {
-            bubbles: true, cancelable: true, view: win, clientX: cx, clientY: cy, button: 0
-          }));
-          if (typeof win.PointerEvent === "function") {
-            el.dispatchEvent(new win.PointerEvent("pointerup", {
-              bubbles: true, cancelable: true, view: win, pointerType: "mouse", isPrimary: true, clientX: cx, clientY: cy
-            }));
-          }
-          el.dispatchEvent(new win.MouseEvent("mouseup", {
-            bubbles: true, cancelable: true, view: win, clientX: cx, clientY: cy, button: 0
-          }));
-          if (typeof el.focus === "function") {
-            try { el.focus({ preventScroll: true }); } catch {}
-          }
-          el.click();
-        }
-      }
-
-      function recordVerifiedClickEvent(label, sourceType = "auto") {
-        const safeLabel = label || "UI element";
-        if (session.autoClickRunning && session.clickCount >= session.clickTarget) {
-          completeClickTargetReached();
-          return false;
-        }
-
-        session.clickCount += 1;
-        session.lastInteractionAt = performance.now();
-        session.diagDetectionText = "Click Event Received";
-        session.diagTrackingText = "Active";
-        session.diagListenerText = "Active (0 Duplicates)";
-
-        if (session.autoClickRunning && session.clickCount >= session.clickTarget) {
-          completeClickTargetReached(
-            `Target reached on "${safeLabel}" (${session.clickCount}/${session.clickTarget}). Click Test stopped automatically.`
-          );
-          renderDiagnosticUI();
-          return true;
-        }
-
-        if (sourceType === "direct") {
-          const runningLabel = session.clickTestMode === "manual"
-            ? "Listening"
-            : (session.interactionMode === "tap" ? "Auto Tapping" : "Auto Clicking");
-          setClickFeedback(
-            session.autoClickRunning ? runningLabel : "Active",
-            session.autoClickRunning ? "#34d399" : "#38bdf8",
-            `Counted direct tap on "${safeLabel}" (${session.clickCount}/${session.clickTarget}).`,
-            "vpn-info-ok"
-          );
-        } else if (sourceType === "auto") {
-          const actionWord = session.interactionMode === "tap" ? "tap" : "click";
-          const nextLabel = session.autoClickRunning ? (session.interactionMode === "tap" ? "Auto Tapping" : "Auto Clicking") : "Idle";
-          const nextColor = session.autoClickRunning ? "#34d399" : "#38bdf8";
-          setClickFeedback(
-            nextLabel,
-            nextColor,
-            `Tested ${actionWord} on "${safeLabel}" (${session.clickCount}/${session.clickTarget}).`,
-            "vpn-info-ok"
-          );
-        } else {
-          updateUI();
-        }
-        renderDiagnosticUI();
-        return true;
-      }
-
-      function executeSafeClickOnce() {
-        const now = performance.now();
-        if (session.actionLock || now - session.lastInteractionAt < MIN_ACTION_COOLDOWN_MS) {
-          return false;
-        }
-        if (session.autoClickRunning && session.clickCount >= session.clickTarget) {
-          completeClickTargetReached();
-          return false;
-        }
-        session.actionLock = true;
-        try {
-          if (!authorizedSiteToggle.checked && !session.isDemoLoaded) {
-            stopAutoClick("Confirm this is your own website or authorized test page first.", "#fb7185", "Restricted");
-            return false;
-          }
-          const selector = (clickSelectorInput.value || "").trim();
-          if (!selector) {
-            stopAutoClick("Enter a CSS selector or scan targets first.", "#fbbf24", "No Target");
-            return false;
-          }
-          if (AD_SELECTOR_REGEX.test(selector)) {
-            stopAutoClick("Blocked: Clicking ads or CTR manipulation is strictly prohibited.", "#fb7185", "Ad Blocked");
-            return false;
-          }
-          const access = getAccessibleIframeDocument();
-          if (!access) {
-            stopAutoClick(
-              previewFrame.style.display === "block"
-                ? "Cross-origin website restriction: Browser security blocks clicking external domains. Use a same-origin page or the native Android app."
-                : "Load your website preview first before running Click Test.",
-              "#fb7185",
-              "Restricted"
-            );
-            return false;
-          }
-
-          attachSameOriginPreviewHandlers(access);
-
-          const el = access.doc.querySelector(selector);
-          if (!el) {
-            stopAutoClick("Selected button/link was not found on the current preview.", "#fbbf24", "No Target");
-            return false;
-          }
-          if (isProhibitedAdElement(el)) {
-            stopAutoClick("Blocked: Ad or sponsored elements cannot be clicked.", "#fb7185", "Ad Blocked");
-            return false;
-          }
-          if (!isElementInteractable(el, access.win)) {
-            stopAutoClick("Target element is hidden, disabled, or non-interactive.", "#fbbf24", "No Target");
-            return false;
-          }
-
-          const mode = session.interactionMode;
-          const prevOutline = el.style.outline;
-          el.style.outline = mode === "tap" ? "2px solid #A855F7" : "2px solid #38BDF8";
-          setTimeout(() => { try { el.style.outline = prevOutline; } catch {} }, 320);
-
-          dispatchSingleActivation(el, access.win, access.doc, mode);
-          const label = (el.innerText || el.value || el.getAttribute("aria-label") || el.tagName).replace(/\s+/g, " ").trim().slice(0, 24);
-          return recordVerifiedClickEvent(label || el.tagName.toLowerCase(), "auto");
-        } catch (err) {
-          stopAutoClick(`Interaction blocked (${err && err.message ? err.message : "Restricted"}).`, "#fb7185", "Restricted");
-          return false;
-        } finally {
-          session.actionLock = false;
-        }
-      }
-
-      function renderCounters() {
-        const isTap = session.interactionMode === "tap";
-        const target = Math.max(1, session.clickTarget || 1);
-        const pct = Math.min(100, Math.round((session.clickCount / target) * 100));
-        visitCountValue.textContent = String(session.visitCount);
-        failedCountValue.textContent = String(session.failedCount);
-        liveClickCountLabel.textContent = isTap ? "Taps" : "Clicks";
-        liveClickCountValue.textContent = `${session.clickCount}/${target}`;
-        currentClickValue.textContent = String(session.clickCount);
-        targetClickDisplayValue.textContent = String(target);
-        clickTargetRatioLabel.textContent = `${session.clickCount}/${target} (${pct}%)`;
-        clickTargetProgressFill.style.width = `${pct}%`;
-        const countWord = isTap ? "Taps" : "Clicks";
-        clickCounterBadge.textContent = `${countWord}: ${session.clickCount}/${target} • ${session.clickStatusLabel}`;
       }
 
       function updateUI() {
-        const labels = {
-          idle: ["Idle", "#38bdf8"],
-          loading: ["Loading", "#38bdf8"],
-          viewing: ["Viewing", "#34d399"],
-          cooldown: ["Pausing", "#fbbf24"],
-          blocked: ["Restricted", "#fb7185"],
-          failed: ["Failed", "#fb7185"],
-          error: ["Error", "#fb7185"],
-          completed: ["Completed", "#34d399"],
-          stopped: ["Stopped", "#fbbf24"]
+        const phaseMeta = {
+          idle: ["Idle", "#38bdf8", 0],
+          loading: ["Loading", "#38bdf8", 35],
+          loaded: ["Loaded", "#34d399", 100],
+          blocked: ["Blocked", "#fbbf24", 100],
+          failed: ["Failed", "#fb7185", 0],
+          network_error: ["Network Error", "#fb7185", 0],
+          stopped: ["Stopped", "#fbbf24", 0]
         };
-        const [label, color] = labels[session.phase] || ["Idle", "#38bdf8"];
-        statusText.textContent = session.running ? `${label} • ${formatTimer(session.phaseRemaining)}` : label;
+
+        const [label, color, pct] = phaseMeta[state.phase] || phaseMeta.idle;
+        statusText.textContent = label;
         statusDot.style.background = color;
         statusDot.style.boxShadow = `0 0 10px ${color}`;
-
-        liveStatusLabel.textContent = session.running
-          ? `${label} • Run ${session.currentRun}/${session.totalRuns}`
-          : `Live Status: ${label}`;
-
-        let pct = 0;
-        if (session.phase === "completed") {
-          pct = 100;
-        } else if (session.running && session.totalRuns > 0) {
-          const elapsedFraction = session.phase === "viewing" && session.viewSec > 0
-            ? Math.max(0, Math.min(1, (session.viewSec - session.phaseRemaining) / session.viewSec))
-            : (session.phase === "cooldown" ? 1 : 0);
-          pct = Math.min(99, Math.round((((session.currentRun - 1) + elapsedFraction) / session.totalRuns) * 100));
-        }
+        liveStatusLabel.textContent = `Live Test Status: ${label}`;
         progressPercentLabel.textContent = `${pct}%`;
         progressFill.style.width = `${pct}%`;
 
-        urlInput.disabled = session.running;
-        btnHttps.disabled = session.running;
-        btnHttp.disabled = session.running;
-        viewSecInput.disabled = session.running;
-        pauseSecInput.disabled = session.running;
-        runsInput.disabled = session.running || !session.autoNext;
-        autoNextToggle.disabled = session.running;
-        startBtn.disabled = session.running;
-        stopBtn.disabled = !session.running;
+        const isLoading = state.phase === "loading";
+        const hasSession = state.phase !== "idle" && state.phase !== "stopped";
+        const canReload = Boolean(state.activeUrl) &&
+          state.phase !== "failed" &&
+          state.phase !== "network_error";
 
-        scrollDownBtn.classList.toggle("active", session.scrollDirection === "down" && !session.scrollPaused);
-        scrollUpBtn.classList.toggle("active", session.scrollDirection === "up" && !session.scrollPaused);
-        scrollRandomBtn.classList.toggle("active", session.scrollDirection === "random" && !session.scrollPaused);
-        pauseScrollBtn.classList.toggle("active", session.scrollPaused);
+        urlInput.disabled = isLoading;
+        clearUrlBtn.classList.toggle("visible", urlInput.value.length > 0 && !isLoading);
+        btnHttps.disabled = isLoading;
+        btnHttp.disabled = isLoading;
+        startBtn.disabled = isLoading;
+        stopBtn.disabled = !hasSession;
+        reloadBtn.disabled = !canReload;
+        checkTrackingBtn.disabled = !Boolean(state.activeUrl) || isLoading || state.phase === "failed" || state.phase === "network_error";
 
-        scrollDownBtn.disabled = session.scrollDirection === "down" && !session.scrollPaused;
-        scrollUpBtn.disabled = session.scrollDirection === "up" && !session.scrollPaused;
-        scrollRandomBtn.disabled = session.scrollDirection === "random" && !session.scrollPaused;
-        pauseScrollBtn.disabled = session.scrollDirection === "none";
-        pauseScrollBtn.textContent = session.scrollPaused ? "Resume" : "Pause";
-        stopScrollBtn.disabled = session.scrollDirection === "none";
-        scrollPosLabel.textContent = session.scrollPosText;
+        impressionStatusVal.textContent = state.impressionStatus;
+        impressionStatusVal.style.color = state.impressionColor;
+        impressionSubText.textContent = `Verified Loads: ${state.impressionCount}`;
 
-        const hasActive = Boolean(session.activeUrl) &&
-          session.phase !== "blocked" &&
-          session.phase !== "failed" &&
-          session.phase !== "error";
-        backBtn.disabled = !hasActive;
-        homeBtn.disabled = !session.activeUrl;
-        reloadBtn.disabled = !hasActive;
+        clickTrackingVal.textContent = state.clickTrackingStatus;
+        clickTrackingVal.style.color = state.clickTrackingColor;
+        clickTrackingSubText.textContent = `UI Clicks: ${state.verifiedUiClicks}`;
 
-        const isTap = session.interactionMode === "tap";
-        modeClickBtn.classList.toggle("active", !isTap);
-        modeTapBtn.classList.toggle("active-purple", isTap);
-        modeClickBtn.disabled = session.autoClickRunning;
-        modeTapBtn.disabled = session.autoClickRunning;
+        pageLoadStatusVal.textContent = state.pageLoadStatus;
+        listenerStatusVal.textContent = state.listenerStatus;
+        errorDetectionVal.textContent = state.errorText;
+        errorDetectionVal.style.color = state.errorColor;
+        errorDetectionBox.style.borderColor = state.errorBorder;
 
-        singleClickBtn.textContent = isTap ? "1x Tap Test" : "1x Click Test";
-        startClickBtn.textContent = isTap ? "Start Tap Test" : "Start Click Test";
-        stopClickBtn.textContent = isTap ? "Stop Tap Test" : "Stop Click Test";
-
-        clickTargetPresetRow.querySelectorAll("button[data-target]").forEach((btn) => {
-          const presetVal = parseInt(btn.getAttribute("data-target") || "0", 10);
-          btn.classList.toggle("active", presetVal === session.clickTarget);
-        });
-
-        renderCounters();
-        clickSelectorInput.disabled = session.autoClickRunning;
-        clickIntervalInput.disabled = session.autoClickRunning;
-        scanTargetsBtn.disabled = session.autoClickRunning;
-        singleClickBtn.disabled = session.autoClickRunning;
-        startClickBtn.disabled = session.autoClickRunning;
-        stopClickBtn.disabled = !session.autoClickRunning;
+        statusMessageText.className = state.messageClass;
+        statusMessageText.textContent = state.message;
       }
 
-      function renderRandomInteractionUI() {
-        const target = Math.max(1, session.randomTapTarget || 1);
-        const pct = Math.min(100, Math.round((session.randomTapCount / target) * 100));
-        randomTapCountValue.textContent = String(session.randomTapCount);
-        randomTapTargetValue.textContent = String(target);
-        randomRatioLabel.textContent = `${session.randomTapCount}/${target} (${pct}%)`;
-        randomProgressFill.style.width = `${pct}%`;
+      function resetSession(nextPhase) {
+        state.loadSeq += 1;
+        clearPendingAsyncWork();
+        detachPreviewListeners();
+        lastTrustedClickAt = 0;
+        lastTrustedClickEl = null;
 
-        const isBusy = session.randomRunning || session.randomArmedOnLoad;
-        randomTargetInput.disabled = false;
-        randomDelayInput.disabled = isBusy;
-        startRandomBtn.disabled = isBusy;
-        stopRandomBtn.disabled = !isBusy;
-        loadDemoPageBtn.disabled = session.running || isBusy;
-      }
+        const isStopped = nextPhase === "stopped";
+        state.phase = nextPhase;
+        state.activeUrl = "";
+        state.countedLoadSeq = -1;
+        state.impressionCount = 0;
+        state.verifiedUiClicks = 0;
+        state.impressionStatus = isStopped ? "Stopped" : "Not Tested";
+        state.impressionColor = isStopped ? "#fbbf24" : "#38bdf8";
+        state.clickTrackingStatus = isStopped ? "Stopped" : "Idle";
+        state.clickTrackingColor = isStopped ? "#fbbf24" : "#a855f7";
+        state.pageLoadStatus = isStopped ? "Stopped" : "Idle";
+        state.listenerStatus = isStopped ? "Stopped" : "Not Active";
+        state.errorText = "No Click Tracking Error Detected";
+        state.errorColor = "#34d399";
+        state.errorBorder = "rgba(255, 255, 255, 0.12)";
+        state.message = isStopped
+          ? "Test stopped and temporary state cleared (no history or logs saved)."
+          : "Enter a Website URL and tap Start Test to check Page Load, Impression Status, and Click Tracking.";
+        state.messageClass = isStopped ? "info-warn" : "cell-sub";
 
-      function setRandomFeedback(badgeText, color, msg, msgClass) {
-        session.randomStatusLabel = badgeText;
-        randomStatusBadge.textContent = badgeText;
-        randomStatusBadge.style.color = color;
-        randomStatusBadge.style.borderColor = color;
-        randomStatusMsg.className = msgClass;
-        randomStatusMsg.textContent = msg;
-        renderRandomInteractionUI();
-      }
-
-      function renderDiagnosticUI() {
-        diagImpressionVal.textContent = `${session.visitCount} ${session.visitCount === 1 ? "Load" : "Loads"}`;
-        diagImpressionSub.textContent = session.visitCount > 0
-          ? (session.isDemoLoaded ? "Demo page load verified" : "Verified page load(s)")
-          : (session.failedCount > 0 ? "Load failed (not counted)" : "Page load completions only");
-        diagClickVal.textContent = `${session.clickCount} ${session.clickCount === 1 ? "Event" : "Events"}`;
-        diagClickSub.textContent = session.clickCount > 0
-          ? "Real non-ad click events received"
-          : "Real UI clicks/taps only";
-
-        diagPageLoadStatus.textContent = session.diagPageLoadText;
-        diagTrackingStatus.textContent = session.diagTrackingText;
-        diagDetectionStatus.textContent = session.diagDetectionText;
-        diagListenerStatus.textContent = session.diagListenerText;
-        diagButtonStatus.textContent = session.diagButtonText;
-        diagLinkStatus.textContent = session.diagLinkText;
-
-        diagDetectionStatus.style.color = session.diagDetectionText === "Click Event Received"
-          ? "#34d399"
-          : (session.diagDetectionText.includes("Not Received") || session.diagDetectionText.includes("Blocked") ? "#fbbf24" : "#f8fafc");
-        diagButtonStatus.style.color = session.diagButtonText.startsWith("Verified")
-          ? "#34d399"
-          : (session.diagButtonText.includes("Not") || session.diagButtonText.includes("Failed") || session.diagButtonText.includes("Blocked") ? "#fb7185" : "#f8fafc");
-        diagLinkStatus.style.color = session.diagLinkText.startsWith("Verified")
-          ? "#34d399"
-          : (session.diagLinkText.includes("Not") || session.diagLinkText.includes("Failed") || session.diagLinkText.includes("Blocked") ? "#fb7185" : "#f8fafc");
-
-        diagResultBadge.textContent = `Result: ${session.diagResultLabel}`;
-        diagResultBadge.style.color = session.diagResultColor;
-        diagResultBadge.style.borderColor = session.diagResultColor;
-
-        diagStatusMsg.className = session.diagMsgClass;
-        diagStatusMsg.textContent = session.diagMessage;
-
-        startDiagBtn.disabled = session.diagRunning;
-        stopDiagBtn.disabled = !session.diagRunning;
-        diagCheckListenerBtn.disabled = session.diagRunning;
-        diagTestButtonBtn.disabled = session.diagRunning;
-        diagTestLinkBtn.disabled = session.diagRunning;
-      }
-
-      function setDiagnosticFeedback(resultLabel, color, msg, msgClass) {
-        session.diagResultLabel = resultLabel;
-        session.diagResultColor = color;
-        session.diagMessage = msg;
-        session.diagMsgClass = msgClass;
-        renderDiagnosticUI();
-      }
-
-      function syncDiagnosticPageLoadState() {
-        if (session.phase === "loading") {
-          session.diagPageLoadText = "Loading";
-          session.diagTrackingText = "Waiting for Load";
-        } else if (session.phase === "failed" || session.phase === "error" || session.phase === "blocked") {
-          session.diagPageLoadText = session.phase === "error" ? "Network Error" : "Load Failed";
-          session.diagTrackingText = "Unavailable";
-          session.diagDetectionText = "Click Event Not Received";
-        } else if (session.isDemoLoaded && previewFrame.style.display === "block") {
-          session.diagPageLoadText = "Loaded (Demo Page)";
-          session.diagTrackingText = session.diagListenerActive ? "Listening" : "Ready";
-        } else if (previewFrame.style.display === "block" && session.activeUrl) {
-          const access = getAccessibleIframeDocument();
-          if (access) {
-            session.diagPageLoadText = "Loaded (Same-Origin)";
-            session.diagTrackingText = session.diagListenerActive ? "Listening" : "Ready";
-          } else {
-            session.diagPageLoadText = "Loaded (Cross-Origin)";
-            session.diagTrackingText = "Cross-Origin Blocked";
-            session.diagDetectionText = "Click Event Not Received";
-            session.diagListenerText = "Blocked by Iframe Policy";
-          }
-        } else if (session.phase === "stopped") {
-          session.diagPageLoadText = "Stopped";
-          session.diagTrackingText = "Stopped";
-        } else {
-          session.diagPageLoadText = "Idle";
-          session.diagTrackingText = "Idle";
-        }
-        renderDiagnosticUI();
-      }
-
-      function clearPendingNetworkAndTimers() {
-        if (session.timerId) clearInterval(session.timerId);
-        if (session.loadTimeoutId) clearTimeout(session.loadTimeoutId);
-        if (session.loadStepTimeoutId) clearTimeout(session.loadStepTimeoutId);
-        if (session.autoClickTimerId) clearInterval(session.autoClickTimerId);
-        if (session.randomTimerId) clearTimeout(session.randomTimerId);
-        if (session.diagTimerId) clearTimeout(session.diagTimerId);
-        if (session.activeAbortController) {
-          try { session.activeAbortController.abort(); } catch {}
-        }
-        session.timerId = null;
-        session.loadTimeoutId = null;
-        session.loadStepTimeoutId = null;
-        session.autoClickTimerId = null;
-        session.randomTimerId = null;
-        session.diagTimerId = null;
-        session.activeAbortController = null;
-      }
-
-      function clearTemporarySession(nextPhase, resetCounters = true) {
-        session.loadSeq += 1;
-        session.randomCycleSeq += 1;
-        session.diagRunSeq += 1;
-        clearPendingNetworkAndTimers();
-        detachPreviewHandlers();
-        session.autoClickRunning = false;
-        session.clickTestMode = "none";
-        session.randomRunning = false;
-        session.randomArmedOnLoad = false;
-        session.randomPhase = "idle";
-        session.diagRunning = false;
-        session.isDemoLoaded = false;
-        session.actionLock = false;
-        session.discoveredTargets = [];
-        session.clickStatusLabel = "Idle";
-        clickCounterBadge.style.color = "#38bdf8";
-        clickCounterBadge.style.borderColor = "rgba(56, 189, 248, 0.45)";
-        clickStatusMsg.className = "toggle-sub";
-        clickStatusMsg.textContent = "Works on your own loaded preview page (same-origin iframe). Never used for ad clicking or artificial CTR.";
-        renderTargetChips();
-
-        session.diagPageLoadText = nextPhase === "stopped" ? "Stopped" : "Idle";
-        session.diagTrackingText = nextPhase === "stopped" ? "Stopped" : "Idle";
-        session.diagDetectionText = "Click Event Not Received";
-        session.diagListenerText = "Not Checked";
-        session.diagButtonText = "Pending";
-        session.diagLinkText = "Pending";
-        session.diagResultLabel = nextPhase === "stopped" ? "Stopped" : "Idle";
-        session.diagResultColor = nextPhase === "stopped" ? "#fbbf24" : "#38bdf8";
-        session.diagMessage = "Load your Demo Test Page or same-origin Test Page, then tap Start Diagnostic to verify listener, button click event, and link navigation.";
-        session.diagMsgClass = "toggle-sub";
-
-        if (resetCounters) {
-          session.visitCount = 0;
-          session.failedCount = 0;
-          session.clickCount = 0;
-          session.randomTapCount = 0;
-          session.countedVisitSeq = -1;
-          session.countedFailSeq = -1;
-        }
-
-        session.running = false;
-        session.currentRun = 0;
-        session.phaseRemaining = 0;
-        session.activeUrl = "";
-        session.phase = nextPhase;
-        setScrollPosition(0, 0);
-        stopScrolling(nextPhase === "idle" ? "Idle" : "Stopped", nextPhase === "idle" ? "#94a3b8" : "#fbbf24");
-        previewFrame.removeAttribute("srcdoc");
         previewFrame.src = "about:blank";
         syncExternalLinks(urlInput.value);
-        setRandomFeedback("Idle", "#34d399", "Starts after verified page load. Performs safe random UI taps with scroll down/up cycles. Own Test Page & Demo Environment only; ads are blocked.", "toggle-sub");
-        renderDiagnosticUI();
-        updateUI();
-      }
-
-      function finishSessionPreservingResults(finalPhase, title, desc, showOpen = false) {
-        session.loadSeq += 1;
-        session.randomCycleSeq += 1;
-        clearPendingNetworkAndTimers();
-        session.autoClickRunning = false;
-        session.clickTestMode = "none";
-        session.randomRunning = false;
-        session.randomArmedOnLoad = false;
-        session.actionLock = false;
-        session.running = false;
-        session.phaseRemaining = 0;
-        session.phase = finalPhase;
-        stopScrolling("Idle", "#94a3b8");
-        if (finalPhase === "completed") {
-          previewFrame.removeAttribute("srcdoc");
-          previewFrame.src = "about:blank";
-          session.activeUrl = "";
-          session.isDemoLoaded = false;
-        }
-        showOverlay(title, desc, showOpen);
-        updateUI();
-      }
-
-      async function verifyUrlReachability(url, seq) {
-        if (typeof navigator !== "undefined" && navigator.onLine === false) {
-          return { ok: false, isNetworkError: true, reason: "Network offline. No active internet connection." };
-        }
-        if (typeof window !== "undefined" && window.location && window.location.protocol === "https:" && /^http:\/\//i.test(url)) {
-          return { ok: false, isNetworkError: false, reason: "Mixed content blocked: HTTPS preview cannot load an HTTP URL." };
-        }
-
-        const controller = new AbortController();
-        session.activeAbortController = controller;
-        const abortTimer = setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS - 500);
-
-        try {
-          const corsResp = await fetch(url, {
-            method: "GET",
-            mode: "cors",
-            cache: "no-store",
-            signal: controller.signal
-          });
-          clearTimeout(abortTimer);
-          if (seq !== session.loadSeq) return { ok: false, aborted: true };
-          if (!corsResp.ok) {
-            return { ok: false, isNetworkError: false, reason: `HTTP ${corsResp.status} error returned by server.` };
-          }
-          return { ok: true, httpStatus: corsResp.status };
-        } catch (corsErr) {
-          if (seq !== session.loadSeq || (corsErr && corsErr.name === "AbortError")) {
-            clearTimeout(abortTimer);
-            return { ok: false, isNetworkError: true, reason: "Connection timed out while checking target website." };
-          }
-          try {
-            await fetch(url, {
-              method: "GET",
-              mode: "no-cors",
-              cache: "no-store",
-              signal: controller.signal
-            });
-            clearTimeout(abortTimer);
-            if (seq !== session.loadSeq) return { ok: false, aborted: true };
-            return { ok: true, opaque: true };
-          } catch (netErr) {
-            clearTimeout(abortTimer);
-            if (seq !== session.loadSeq) return { ok: false, aborted: true };
-            const msg = netErr && netErr.name === "AbortError"
-              ? "Request timed out before website responded."
-              : "Network error: Website unreachable or blocked by connection security.";
-            return { ok: false, isNetworkError: true, reason: msg };
-          }
-        } finally {
-          if (session.activeAbortController === controller) {
-            session.activeAbortController = null;
-          }
-        }
-      }
-
-      function handleRunLoadFailure(seq, nextPhase, reason) {
-        if (!session.running || seq !== session.loadSeq) return;
-        clearTimeout(session.loadTimeoutId);
-        session.loadTimeoutId = null;
-        if (session.countedFailSeq !== seq) {
-          session.countedFailSeq = seq;
-          session.failedCount += 1;
-        }
-        stopScrolling(nextPhase === "error" ? "Network Error" : "Load Failed", "#fb7185");
-        if (session.randomRunning || session.randomArmedOnLoad) {
-          stopRandomInteraction(`Stopped: Page load failed (${reason})`, "Load Failed", "#fb7185", "vpn-info-err");
-        }
-        syncDiagnosticPageLoadState();
-        if (session.diagRunning) {
-          stopDiagnosticRun("Failed", "#fb7185", `Diagnostic Failed: Page load failed (${reason})`, "vpn-info-err");
-        }
-
-        const canContinueQueue = nextPhase !== "error" &&
-          session.autoNext &&
-          session.currentRun < session.totalRuns &&
-          (typeof navigator === "undefined" || navigator.onLine !== false);
-
-        if (canContinueQueue) {
-          session.phase = nextPhase;
-          showOverlay("Page Load Failed", `${reason} Advancing to next run...`, true);
-          updateUI();
-          setTimeout(() => {
-            if (!session.running || seq !== session.loadSeq) return;
-            if (session.pauseSec > 0) {
-              session.phase = "cooldown";
-              session.phaseRemaining = session.pauseSec;
-              previewFrame.removeAttribute("srcdoc");
-              previewFrame.src = "about:blank";
-              showOverlay("Pause Interval", `${session.pauseSec}s before next test`, false);
-              updateUI();
-            } else {
-              beginRun(session.currentRun + 1);
-            }
-          }, 1200);
-          return;
-        }
-
-        finishSessionPreservingResults(
-          nextPhase,
-          nextPhase === "error" ? "Network / Connection Error" : "Page Load Failed",
-          reason,
-          true
+        showOverlay(
+          isStopped ? "Test Stopped" : "Ready for Website Test",
+          isStopped
+            ? "Session cleared cleanly with zero history or logs."
+            : "Enter an HTTP or HTTPS Website URL and tap Start Test to verify Page Load, Impression, and Click Tracking.",
+          false
         );
+        updateUI();
       }
 
-      async function onPreviewLoadedForSeq(seq, reachabilityPromise) {
-        if (!session.running || seq !== session.loadSeq) return;
-        const currentSrc = previewFrame.getAttribute("src") || "";
-        const hasSrcdoc = previewFrame.hasAttribute("srcdoc");
-        if (!hasSrcdoc && (!currentSrc || currentSrc === "about:blank")) return;
-
-        let access = getAccessibleIframeDocument();
-        if (access) {
-          attachSameOriginPreviewHandlers(access, true);
-          if (access.doc.readyState === "loading") {
-            await new Promise((res) => {
-              const done = () => res();
-              access.doc.addEventListener("DOMContentLoaded", done, { once: true });
-              setTimeout(done, 1200);
-            });
-          }
-          if (!session.running || seq !== session.loadSeq) return;
+      async function checkUrlReachability(url, seq) {
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          return { ok: false, isNetwork: true, reason: "Network offline. Check your internet connection." };
         }
+        if (typeof fetch !== "function") {
+          return { ok: true, isNetwork: false, reason: "" };
+        }
+        if (state.fetchAbortController) {
+          try { state.fetchAbortController.abort(); } catch {}
+        }
+        const controller = new AbortController();
+        state.fetchAbortController = controller;
+        const tid = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        try {
+          await fetch(url, { mode: "no-cors", cache: "no-store", signal: controller.signal });
+          clearTimeout(tid);
+          return { ok: true, isNetwork: false, reason: "" };
+        } catch (err) {
+          clearTimeout(tid);
+          if (seq !== state.loadSeq || state.phase !== "loading") {
+            return { ok: true, isNetwork: false, reason: "" };
+          }
+          const isTimeout = err && err.name === "AbortError";
+          return {
+            ok: false,
+            isNetwork: true,
+            reason: isTimeout
+              ? "Network Error: Connection timed out before website responded."
+              : "Network Error: Unable to reach website (DNS, TLS, or network failure)."
+          };
+        }
+      }
 
-        if (reachabilityPromise) {
-          const probe = await reachabilityPromise;
-          if (!session.running || seq !== session.loadSeq) return;
-          if (probe && !probe.ok && !probe.aborted) {
-            handleRunLoadFailure(seq, probe.isNetworkError ? "error" : "failed", probe.reason || "Website failed to respond.");
+      function markLoadFailure(seq, isNetworkError, reason) {
+        if (seq !== state.loadSeq) return;
+        clearPendingAsyncWork();
+        detachPreviewListeners();
+        state.phase = isNetworkError ? "network_error" : "failed";
+        state.impressionStatus = isNetworkError ? "Not Verified (Network Error)" : "Not Verified (Load Failed)";
+        state.impressionColor = "#fb7185";
+        state.pageLoadStatus = isNetworkError ? "Network Error" : "Load Failed";
+        state.clickTrackingStatus = "Unavailable";
+        state.clickTrackingColor = "#fb7185";
+        state.listenerStatus = "Unavailable";
+        state.errorText = reason;
+        state.errorColor = "#fb7185";
+        state.errorBorder = "rgba(251, 113, 133, 0.45)";
+        state.message = reason;
+        state.messageClass = "info-err";
+        showOverlay(isNetworkError ? "Network Error" : "Page Load Failed", reason, true);
+        updateUI();
+      }
+
+      async function handleIframeLoaded(seq, reachPromise) {
+        if (seq !== state.loadSeq || state.phase !== "loading") return;
+
+        if (reachPromise) {
+          const check = await reachPromise;
+          if (seq !== state.loadSeq || state.phase !== "loading") return;
+          if (!check.ok) {
+            markLoadFailure(seq, check.isNetwork, check.reason);
             return;
           }
         }
 
-        clearTimeout(session.loadTimeoutId);
-        session.loadTimeoutId = null;
+        clearTimeout(state.loadTimerId);
+        state.loadTimerId = null;
 
-        if (session.countedVisitSeq !== seq) {
-          session.countedVisitSeq = seq;
-          session.visitCount += 1;
-        }
-
-        session.phase = "viewing";
         showIframe();
-
-        access = getAccessibleIframeDocument();
+        const access = getSameOriginAccess();
         if (access) {
-          attachSameOriginPreviewHandlers(access);
-          const t = detectScrollTarget(access.doc, access.win, "down");
-          if (t) {
-            setScrollPosition(t.getTop(), t.maxScroll);
-          } else {
-            setScrollPosition(0, 0);
+          try {
+            if (access.doc.title && /(404|not found|500|502|503|blocked|access denied)/i.test(access.doc.title)) {
+              markLoadFailure(seq, false, `Page Load Failed: Error document detected ("${access.doc.title.slice(0, 48)}").`);
+              return;
+            }
+          } catch {}
+
+          if (state.countedLoadSeq !== seq) {
+            state.countedLoadSeq = seq;
+            state.impressionCount += 1;
           }
-        }
-        syncDiagnosticPageLoadState();
-        if (session.scrollDirection !== "none" && !session.scrollPaused && !session.randomRunning) {
-          startScrolling(session.scrollDirection);
+
+          const listenerAttached = attachSameOriginClickObserver(access);
+          state.phase = "loaded";
+          state.impressionStatus = "Impression Verified";
+          state.impressionColor = "#34d399";
+          state.pageLoadStatus = "Loaded (Same-Origin)";
+          state.listenerStatus = listenerAttached ? "Active (0 Duplicates)" : "Error: Listener Failed";
+          state.clickTrackingStatus = listenerAttached ? "Listener Active" : "Click Tracking Error";
+          state.clickTrackingColor = listenerAttached ? "#38bdf8" : "#fb7185";
+          state.errorText = listenerAttached
+            ? "No Click Tracking Error Detected"
+            : "Click Tracking Error: Unable to bind DOM click listener.";
+          state.errorColor = listenerAttached ? "#34d399" : "#fb7185";
+          state.errorBorder = listenerAttached ? "rgba(255, 255, 255, 0.12)" : "rgba(251, 113, 133, 0.45)";
+          state.message = "Page loaded cleanly and Impression verified. Tap inside your website preview to test real UI click tracking.";
+          state.messageClass = "info-ok";
+        } else {
+          // Cross-origin or iframe-blocked external domain in browser HTML
+          if (state.countedLoadSeq !== seq) {
+            state.countedLoadSeq = seq;
+            state.impressionCount += 1;
+          }
+          state.phase = "blocked";
+          state.impressionStatus = "Loaded (Cross-Origin)";
+          state.impressionColor = "#fbbf24";
+          state.pageLoadStatus = "Loaded (Cross-Origin / Frame)";
+          state.clickTrackingStatus = "Blocked (Cross-Origin)";
+          state.clickTrackingColor = "#fbbf24";
+          state.listenerStatus = "Blocked by Iframe Policy";
+          state.errorText = "Cross-Origin Restriction: Browser security blocks reading DOM or attaching Click Tracking listeners on external domains in an iframe (or site restricts framing via X-Frame-Options/CSP).";
+          state.errorColor = "#fbbf24";
+          state.errorBorder = "rgba(251, 191, 36, 0.45)";
+          state.message = "Impression reached external host, but browser Cross-Origin iframe policy blocks DOM Click Tracking inspection. Use same-origin URLs in browser or the native Android WebView app.";
+          state.messageClass = "info-warn";
         }
         updateUI();
-
-        if (session.randomArmedOnLoad && !session.randomRunning) {
-          session.randomArmedOnLoad = false;
-          beginRandomInteractionLoop();
-        }
       }
 
-      let currentReachabilityPromise = null;
+      function runClickTrackingHealthCheck() {
+        if (!state.activeUrl || state.phase === "idle" || state.phase === "stopped") {
+          state.errorText = "Start a test on a Website URL before checking Click Tracking.";
+          state.errorColor = "#fb7185";
+          state.errorBorder = "rgba(251, 113, 133, 0.45)";
+          updateUI();
+          return;
+        }
+        if (state.phase === "failed" || state.phase === "network_error") {
+          state.errorText = "Page failed to load. Fix Page Load or Network Error first.";
+          state.errorColor = "#fb7185";
+          state.errorBorder = "rgba(251, 113, 133, 0.45)";
+          updateUI();
+          return;
+        }
+
+        const access = getSameOriginAccess();
+        if (!access) {
+          state.phase = "blocked";
+          state.clickTrackingStatus = "Blocked (Cross-Origin)";
+          state.clickTrackingColor = "#fbbf24";
+          state.listenerStatus = "Blocked by Iframe Policy";
+          state.errorText = "Cross-Origin Restriction detected: Browser blocks inspecting click listeners across origins inside an iframe.";
+          state.errorColor = "#fbbf24";
+          state.errorBorder = "rgba(251, 191, 36, 0.45)";
+          state.message = "Cannot inspect Click Event Listener on cross-origin domain from browser HTML.";
+          state.messageClass = "info-warn";
+          updateUI();
+          return;
+        }
+
+        const { doc, win } = access;
+        // 1. Ensure single deduplicated listener is bound
+        const attached = attachSameOriginClickObserver(access);
+        if (!attached) {
+          state.clickTrackingStatus = "Click Tracking Error";
+          state.clickTrackingColor = "#fb7185";
+          state.listenerStatus = "Error: Not Bound";
+          state.errorText = "Click Tracking Error: Could not attach DOM click listener.";
+          state.errorColor = "#fb7185";
+          state.errorBorder = "rgba(251, 113, 133, 0.45)";
+          updateUI();
+          return;
+        }
+
+        // 2. Check if document body has pointer-events: none blocking interactions
+        const bodyStyle = doc.body ? win.getComputedStyle(doc.body) : null;
+        if (bodyStyle && bodyStyle.pointerEvents === "none") {
+          state.clickTrackingStatus = "Click Tracking Error";
+          state.clickTrackingColor = "#fb7185";
+          state.listenerStatus = "Blocked by CSS (pointer-events: none)";
+          state.errorText = "Click Tracking Error: Document body has pointer-events: none which blocks user clicks.";
+          state.errorColor = "#fb7185";
+          state.errorBorder = "rgba(251, 113, 133, 0.45)";
+          state.message = "Error detected: CSS pointer-events: none is preventing clicks on the page.";
+          state.messageClass = "info-err";
+          updateUI();
+          return;
+        }
+
+        // 3. Verify DOM click pipeline using an isolated hidden probe (never alters Click Counter or touches site/ads)
+        let probeReceived = false;
+        const probeEl = doc.createElement("button");
+        probeEl.type = "button";
+        probeEl.setAttribute("aria-hidden", "true");
+        probeEl.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+        probeEl.addEventListener("click", () => { probeReceived = true; }, { once: true });
+        (doc.body || doc.documentElement).appendChild(probeEl);
+        healthProbeInFlight = true;
+        try {
+          probeEl.click();
+        } finally {
+          healthProbeInFlight = false;
+          try { probeEl.remove(); } catch {}
+        }
+
+        if (probeReceived) {
+          state.listenerStatus = "Active (0 Duplicates)";
+          if (state.verifiedUiClicks === 0) {
+            state.clickTrackingStatus = "Listener Active";
+            state.clickTrackingColor = "#38bdf8";
+          }
+          state.errorText = "No Click Tracking Error Detected";
+          state.errorColor = "#34d399";
+          state.errorBorder = "rgba(255, 255, 255, 0.12)";
+          state.message = "Click Event Listener verified active (0 duplicates, CSS pointer-events clear).";
+          state.messageClass = "info-ok";
+        } else {
+          state.listenerStatus = "Error: Probe Failed";
+          state.clickTrackingStatus = "Click Tracking Error";
+          state.clickTrackingColor = "#fb7185";
+          state.errorText = "Click Tracking Error: DOM click event pipeline did not respond.";
+          state.errorColor = "#fb7185";
+          state.errorBorder = "rgba(251, 113, 133, 0.45)";
+          state.message = "Click Event Listener failed to receive DOM click event.";
+          state.messageClass = "info-err";
+        }
+        updateUI();
+      }
 
       previewFrame.addEventListener("load", () => {
         const attrSrc = previewFrame.getAttribute("src") || "";
-        const hasSrcdoc = previewFrame.hasAttribute("srcdoc");
-        if (!hasSrcdoc && (!attrSrc || attrSrc === "about:blank")) return;
-        const access = getAccessibleIframeDocument();
+        if (!attrSrc || attrSrc === "about:blank") return;
+        const access = getSameOriginAccess();
         if (access) {
-          attachSameOriginPreviewHandlers(access, true);
-          if (session.isDemoLoaded && session.phase === "viewing") {
-            const t = detectScrollTarget(access.doc, access.win, "down");
-            if (t) setScrollPosition(t.getTop(), t.maxScroll);
-          }
+          attachSameOriginClickObserver(access);
         }
-        syncDiagnosticPageLoadState();
-        if (session.running && session.phase === "loading") {
-          onPreviewLoadedForSeq(session.loadSeq, currentReachabilityPromise);
+        if (state.phase === "loading") {
+          handleIframeLoaded(state.loadSeq, currentReachabilityPromise);
         }
       });
 
       previewFrame.addEventListener("error", () => {
-        if (session.randomRunning || session.randomArmedOnLoad) {
-          stopRandomInteraction("Stopped: Page load error.", "Load Failed", "#fb7185", "vpn-info-err");
+        if (state.phase === "loading") {
+          markLoadFailure(state.loadSeq, true, "Network or frame error while loading Website URL.");
         }
-        if (!session.running) return;
-        handleRunLoadFailure(session.loadSeq, "error", "Website preview failed to load due to a network or embedding restriction.");
       });
-
-      function beginRun(runNumber) {
-        session.loadSeq += 1;
-        const seq = session.loadSeq;
-        if (session.loadTimeoutId) {
-          clearTimeout(session.loadTimeoutId);
-          session.loadTimeoutId = null;
-        }
-        if (session.loadStepTimeoutId) {
-          clearTimeout(session.loadStepTimeoutId);
-          session.loadStepTimeoutId = null;
-        }
-        if (session.activeAbortController) {
-          try { session.activeAbortController.abort(); } catch {}
-          session.activeAbortController = null;
-        }
-        cancelScrollRaf();
-        setScrollPosition(0, 0);
-
-        session.currentRun = runNumber;
-        session.phase = "loading";
-        session.phaseRemaining = session.viewSec;
-        syncExternalLinks(session.activeUrl);
-        updateUI();
-        showOverlay("Loading Embedded Preview...", `Run ${runNumber} of ${session.totalRuns}`, false);
-
-        if (typeof navigator !== "undefined" && navigator.onLine === false) {
-          handleRunLoadFailure(seq, "error", "Network offline. Check your internet connection.");
-          return;
-        }
-
-        currentReachabilityPromise = verifyUrlReachability(session.activeUrl, seq);
-
-        previewFrame.removeAttribute("srcdoc");
-        previewFrame.src = "about:blank";
-        session.loadStepTimeoutId = setTimeout(() => {
-          if (!session.running || seq !== session.loadSeq) return;
-          previewFrame.src = session.activeUrl;
-        }, 50);
-
-        session.loadTimeoutId = setTimeout(() => {
-          if (session.running && seq === session.loadSeq && session.phase === "loading") {
-            handleRunLoadFailure(seq, "failed", "Page load timed out or site blocked embedded loading.");
-          }
-        }, LOAD_TIMEOUT_MS);
-      }
-
-      function tick() {
-        if (!session.running) return;
-
-        if (session.phase === "viewing") {
-          if (session.phaseRemaining > 1) {
-            session.phaseRemaining -= 1;
-            updateUI();
-          } else if (session.randomRunning || session.randomArmedOnLoad) {
-            // Keep preview active while Random Interaction Testing is finishing its Tap & Scroll cycle
-            updateUI();
-          } else {
-            stopScrolling("Idle", "#94a3b8");
-            if (session.currentRun < session.totalRuns && session.autoNext) {
-              if (session.pauseSec > 0) {
-                session.phase = "cooldown";
-                session.phaseRemaining = session.pauseSec;
-                previewFrame.removeAttribute("srcdoc");
-                previewFrame.src = "about:blank";
-                showOverlay("Pause Interval", `${session.pauseSec}s before next test`, false);
-                updateUI();
-              } else {
-                beginRun(session.currentRun + 1);
-              }
-            } else {
-              const allFailed = session.visitCount === 0 && session.failedCount > 0;
-              finishSessionPreservingResults(
-                allFailed ? "failed" : "completed",
-                allFailed ? "Testing Failed" : "Testing Completed",
-                `Verified Visits: ${session.visitCount} • Failed: ${session.failedCount} • Clicks: ${session.clickCount}`,
-                allFailed
-              );
-            }
-          }
-        } else if (session.phase === "cooldown") {
-          if (session.phaseRemaining > 1) {
-            session.phaseRemaining -= 1;
-            overlayDesc.textContent = `${session.phaseRemaining}s before next test`;
-            updateUI();
-          } else {
-            beginRun(session.currentRun + 1);
-          }
-        }
-      }
 
       urlInput.addEventListener("input", () => {
         const lower = urlInput.value.trim().toLowerCase();
@@ -3257,1035 +1305,86 @@
         btnHttp.classList.toggle("active", lower.startsWith("http://"));
         const check = validateUrl(urlInput.value);
         urlError.textContent = urlInput.value.trim() && !check.valid ? check.error : "";
+        clearUrlBtn.classList.toggle("visible", urlInput.value.length > 0 && state.phase !== "loading");
         syncExternalLinks(urlInput.value);
       });
 
+      clearUrlBtn.addEventListener("click", () => {
+        if (state.phase === "loading") return;
+        urlInput.value = "";
+        urlError.textContent = "";
+        urlInput.dispatchEvent(new Event("input"));
+        urlInput.focus();
+      });
+
       btnHttps.addEventListener("click", () => {
+        if (state.phase === "loading") return;
         urlInput.value = "https://" + urlInput.value.trim().replace(/^https?:\/\//i, "");
         urlInput.dispatchEvent(new Event("input"));
       });
 
       btnHttp.addEventListener("click", () => {
+        if (state.phase === "loading") return;
         urlInput.value = "http://" + urlInput.value.trim().replace(/^https?:\/\//i, "");
         urlInput.dispatchEvent(new Event("input"));
       });
 
-      scrollDownBtn.addEventListener("click", () => startScrolling("down"));
-      scrollUpBtn.addEventListener("click", () => startScrolling("up"));
-      scrollRandomBtn.addEventListener("click", () => startScrolling("random"));
-      pauseScrollBtn.addEventListener("click", togglePauseScrolling);
-      stopScrollBtn.addEventListener("click", () => stopScrolling("Stopped", "#fbbf24"));
-
-      scrollSpeedRow.querySelectorAll("button[data-speed]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          session.scrollSpeed = btn.getAttribute("data-speed") || "medium";
-          scrollSpeedRow.querySelectorAll("button[data-speed]").forEach((b) => {
-            b.classList.toggle("active", b === btn);
-          });
-          updateActiveScrollLabel();
-        });
-      });
-
-      vpnProviderRow.querySelectorAll("button[data-provider]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          session.selectedVpnProvider = btn.getAttribute("data-provider") || "Android System VPN";
-          vpnProviderRow.querySelectorAll("button[data-provider]").forEach((b) => {
-            b.classList.toggle("active", b === btn);
-          });
-          vpnMessage.className = "vpn-info-warn";
-          vpnMessage.textContent = `Selected ${session.selectedVpnProvider}. Open its official app or Android VPN Settings to choose country/server (not controllable from browser HTML).`;
-        });
-      });
-
-      vpnConnectBtn.addEventListener("click", () => {
-        vpnMessage.className = "vpn-info-warn";
-        vpnMessage.textContent = `Browser sandboxes cannot open or connect ${session.selectedVpnProvider} directly. Use the WebVisit Tester Android app or connect via your device VPN settings, then tap Verify.`;
-      });
-
-      vpnDisconnectBtn.addEventListener("click", () => {
-        vpnMessage.className = "vpn-info-warn";
-        vpnMessage.textContent = `Disconnect must be performed inside ${session.selectedVpnProvider} or Android System VPN Settings. Browser HTML never fakes VPN tunnel status.`;
-      });
-
-      vpnVerifyBtn.addEventListener("click", async () => {
-        vpnVerifyBtn.disabled = true;
-        vpnVerifyBtn.textContent = "Checking...";
-        vpnVerifyResult.style.display = "block";
-        vpnVerifyResult.className = "vpn-info-warn";
-        vpnVerifyResult.textContent = "Querying current public exit network...";
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        try {
-          const resp = await fetch("https://ipinfo.io/json", {
-            signal: controller.signal,
-            cache: "no-store"
-          });
-          clearTimeout(timeoutId);
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const data = await resp.json();
-          const loc = [data.country, data.region].filter(Boolean).join(", ") || "Unknown";
-          const org = data.org ? ` • Network: ${data.org}` : "";
-          vpnVerifyResult.className = "vpn-info-ok";
-          vpnVerifyResult.textContent = `Exit IP: ${data.ip || "Unknown"} • Region: ${loc}${org}`;
-        } catch (err) {
-          clearTimeout(timeoutId);
-          vpnVerifyResult.className = "vpn-info-err";
-          vpnVerifyResult.textContent = `Verification failed (${err && err.message ? err.message : "Network/CORS blocked"}). Run Verify in the native Android app for direct verification.`;
-        } finally {
-          vpnVerifyBtn.disabled = false;
-          vpnVerifyBtn.textContent = "Verify";
-        }
-      });
-
-      requireVpnToggle.addEventListener("change", () => {
-        if (requireVpnToggle.checked) {
-          vpnMessage.className = "vpn-info-warn";
-          vpnMessage.textContent = "Note: Automatic VPN drop detection (TRANSPORT_VPN) requires the native Android app. Browser HTML cannot detect OS VPN state.";
-        }
-      });
-
-      authorizedSiteToggle.addEventListener("change", () => {
-        if (!authorizedSiteToggle.checked) {
-          if (session.autoClickRunning) {
-            stopAutoClick("Stopped: Authorization unchecked.", "#fbbf24", "Stopped");
-          }
-          if ((session.randomRunning || session.randomArmedOnLoad) && !session.isDemoLoaded) {
-            stopRandomInteraction("Stopped: Authorization unchecked.", "Stopped", "#fbbf24", "vpn-info-warn");
-          }
-        }
-      });
-
-      [modeClickBtn, modeTapBtn].forEach((btn) => {
-        btn.addEventListener("click", () => {
-          if (session.autoClickRunning) return;
-          session.interactionMode = btn.getAttribute("data-mode") === "tap" ? "tap" : "click";
-          updateUI();
-        });
-      });
-
-      scanTargetsBtn.addEventListener("click", () => {
-        const access = getAccessibleIframeDocument();
-        if (!access) {
-          setClickFeedback(
-            "Restricted",
-            "#fb7185",
-            previewFrame.style.display === "block"
-              ? "Cross-origin iframe restricted in browser HTML. Use the native Android app for external sites."
-              : "Load your website preview first before scanning targets.",
-            "vpn-info-err"
-          );
-          return;
-        }
-        attachSameOriginPreviewHandlers(access);
-        try {
-          const nodes = access.doc.querySelectorAll('button, a[href], [role="button"], input[type="button"], input[type="submit"]');
-          const found = [];
-          const seen = new Set();
-          for (let i = 0; i < nodes.length && found.length < 18; i += 1) {
-            const el = nodes[i];
-            if (!isElementInteractable(el, access.win)) continue;
-            if (isProhibitedAdElement(el)) continue;
-            const sel = buildCssSelector(el, access.doc);
-            if (!sel || seen.has(sel)) continue;
-            seen.add(sel);
-            let txt = (el.innerText || el.value || el.getAttribute("aria-label") || el.tagName).replace(/\s+/g, " ").trim();
-            if (!txt) txt = el.tagName.toLowerCase();
-            if (txt.length > 26) txt = txt.slice(0, 26) + "...";
-            found.push({ selector: sel, label: txt, tagType: el.tagName.toLowerCase() });
-          }
-          session.discoveredTargets = found;
-          if (!clickSelectorInput.value.trim() && found.length > 0) {
-            clickSelectorInput.value = found[0].selector;
-          }
-          renderTargetChips();
-          if (found.length === 0) {
-            setClickFeedback("No Target", "#fbbf24", "No visible safe buttons or links found in this view.", "vpn-info-warn");
-          } else {
-            setClickFeedback("Idle", "#38bdf8", `Found ${found.length} interactive button/link target(s).`, "vpn-info-ok");
-          }
-        } catch (err) {
-          setClickFeedback("Restricted", "#fb7185", `Target scan blocked (${err && err.message ? err.message : "Restricted"}).`, "vpn-info-err");
-        }
-      });
-
-      singleClickBtn.addEventListener("click", () => {
-        executeSafeClickOnce();
-      });
-
-      function applyClickTargetValue(rawValue, commitInput = false) {
-        const parsed = parseInt(String(rawValue || "").trim(), 10);
-        if (Number.isNaN(parsed) || parsed < 1) {
-          if (commitInput) {
-            session.clickTarget = 1;
-            clickTargetInput.value = "1";
-            updateUI();
-          }
-          return false;
-        }
-        const safeTarget = Math.min(10000, Math.max(1, parsed));
-        session.clickTarget = safeTarget;
-        if (commitInput) {
-          clickTargetInput.value = String(safeTarget);
-        }
-        if (session.autoClickRunning && session.clickCount >= session.clickTarget) {
-          completeClickTargetReached();
-          return true;
-        }
-        updateUI();
-        return true;
-      }
-
-      clickTargetInput.addEventListener("input", () => {
-        applyClickTargetValue(clickTargetInput.value, false);
-      });
-
-      clickTargetInput.addEventListener("change", () => {
-        if (!applyClickTargetValue(clickTargetInput.value, true)) {
-          session.clickTarget = 100;
-          clickTargetInput.value = "100";
-          updateUI();
-        }
-      });
-
-      clickTargetPresetRow.querySelectorAll("button[data-target]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const val = clampInt(btn.getAttribute("data-target"), 1, 10000, 100);
-          clickTargetInput.value = String(val);
-          applyClickTargetValue(val, true);
-          setClickFeedback(
-            session.autoClickRunning ? session.clickStatusLabel : "Idle",
-            session.autoClickRunning ? "#34d399" : "#38bdf8",
-            `Click Target updated to ${val} (${session.clickCount}/${val}).`,
-            "vpn-info-ok"
-          );
-        });
-      });
-
-      startClickBtn.addEventListener("click", () => {
-        if (session.autoClickRunning) return;
-        const rawTarget = parseInt((clickTargetInput.value || "").trim(), 10);
-        if (Number.isNaN(rawTarget) || rawTarget < 1) {
-          setClickFeedback("Invalid Target", "#fb7185", "Enter a valid Click Target (1 to 10000).", "vpn-info-err");
-          return;
-        }
-        session.clickTarget = Math.min(10000, rawTarget);
-        clickTargetInput.value = String(session.clickTarget);
-
-        const intervalSec = clampInt(clickIntervalInput.value, 1, 60, 2);
-        clickIntervalInput.value = String(intervalSec);
-
-        if (!authorizedSiteToggle.checked && !session.isDemoLoaded) {
-          setClickFeedback("Restricted", "#fb7185", "Confirm this is your own website or authorized test page first.", "vpn-info-err");
-          return;
-        }
-
-        const access = getAccessibleIframeDocument();
-        if (!access) {
-          setClickFeedback(
-            "Restricted",
-            "#fb7185",
-            previewFrame.style.display === "block"
-              ? "Cross-origin website restriction: Browser security blocks Click Test on external domains. Use a same-origin page or the native Android app."
-              : "Load your website preview first before starting Click Test.",
-            "vpn-info-err"
-          );
-          return;
-        }
-        attachSameOriginPreviewHandlers(access);
-
-        if (session.clickCount >= session.clickTarget) {
-          setClickFeedback(
-            "Completed",
-            "#34d399",
-            `Target ${session.clickCount}/${session.clickTarget} already reached. Press Reset Counter or raise Click Target.`,
-            "vpn-info-ok"
-          );
-          return;
-        }
-
-        const selector = (clickSelectorInput.value || "").trim();
-        if (selector && AD_SELECTOR_REGEX.test(selector)) {
-          setClickFeedback("Ad Blocked", "#fb7185", "Blocked: Ad elements and artificial clicks are strictly prohibited.", "vpn-info-err");
-          return;
-        }
-
-        if (session.autoClickTimerId) {
-          clearInterval(session.autoClickTimerId);
-          session.autoClickTimerId = null;
-        }
-        session.autoClickRunning = true;
-
-        if (!selector) {
-          session.clickTestMode = "manual";
-          setClickFeedback(
-            "Listening",
-            "#34d399",
-            `Click Test active (${session.clickCount}/${session.clickTarget}): Tap buttons/links inside preview or set a selector for Auto Click.`,
-            "vpn-info-ok"
-          );
-          return;
-        }
-
-        session.clickTestMode = "auto";
-        const modeWord = session.interactionMode === "tap" ? "Tap Test" : "Click Test";
-        setClickFeedback(
-          session.interactionMode === "tap" ? "Auto Tapping" : "Auto Clicking",
-          "#34d399",
-          `${modeWord} active (${session.clickCount}/${session.clickTarget}) every ${intervalSec}s`,
-          "vpn-info-ok"
-        );
-        executeSafeClickOnce();
-        if (session.autoClickRunning) {
-          session.autoClickTimerId = setInterval(() => {
-            if (!session.autoClickRunning) return;
-            if (session.clickCount >= session.clickTarget) {
-              completeClickTargetReached();
-              return;
-            }
-            executeSafeClickOnce();
-          }, intervalSec * 1000);
-        }
-      });
-
-      stopClickBtn.addEventListener("click", () => {
-        const modeWord = session.interactionMode === "tap" ? "Tap Test" : "Click Test";
-        stopAutoClick(`${modeWord} stopped (${session.clickCount}/${session.clickTarget}).`, "#fbbf24", "Stopped");
-      });
-
-      resetClickBtn.addEventListener("click", () => {
-        resetClickCounter();
-      });
-
-      autoNextToggle.addEventListener("change", () => {
-        session.autoNext = autoNextToggle.checked;
-        updateUI();
-      });
-
-      // --- Random Interaction Testing Engine (Own Test Page & Demo Environment Only, Zero Ads) ---
-
-      function scanSafeRandomElements(doc, win) {
-        const nodes = doc.querySelectorAll('button, a[href], [role="button"], input[type="button"], input[type="submit"]');
-        const viewportH = win.innerHeight || 360;
-        const inViewport = [];
-        const allSafe = [];
-        const currentOrigin = (doc.location && doc.location.origin && doc.location.origin !== "null") ? doc.location.origin : "";
-
-        for (let i = 0; i < nodes.length && allSafe.length < 40; i += 1) {
-          const el = nodes[i];
-          if (!isElementInteractable(el, win)) continue;
-          if (isProhibitedAdElement(el)) continue;
-
-          if (el.tagName && el.tagName.toLowerCase() === "a") {
-            const hrefAttr = el.getAttribute("href") || "";
-            if (/^https?:\/\//i.test(hrefAttr) && currentOrigin) {
-              try {
-                const parsedHref = new URL(hrefAttr, doc.location.href);
-                if (parsedHref.origin !== currentOrigin) continue;
-              } catch {
-                continue;
-              }
-            }
-          }
-
-          const sel = buildCssSelector(el, doc);
-          if (!sel) continue;
-          const rect = el.getBoundingClientRect();
-          const item = { el, selector: sel };
-          allSafe.push(item);
-          if (rect.bottom > 8 && rect.top < viewportH - 8) {
-            inViewport.push(item);
-          }
-        }
-        return inViewport.length > 0 ? inViewport : allSafe;
-      }
-
-      function stopRandomInteraction(reason = "Random Interaction stopped.", badge = "Stopped", color = "#fbbf24", msgClass = "vpn-info-warn") {
-        session.randomCycleSeq += 1;
-        if (session.randomTimerId) {
-          clearTimeout(session.randomTimerId);
-          session.randomTimerId = null;
-        }
-        session.randomRunning = false;
-        session.randomArmedOnLoad = false;
-        session.randomPhase = badge.toLowerCase();
-        cancelScrollRaf();
-        setRandomFeedback(badge, color, reason, msgClass);
-        updateUI();
-      }
-
-      function performSmoothScrollStep(direction, cycleSeq) {
-        return new Promise((resolve) => {
-          if (!session.randomRunning || cycleSeq !== session.randomCycleSeq) {
-            resolve(false);
-            return;
-          }
-          const access = getAccessibleIframeDocument();
-          if (!access) {
-            resolve(false);
-            return;
-          }
-          const { doc, win } = access;
-          const target = detectScrollTarget(doc, win, direction);
-          if (!target || target.maxScroll <= 2) {
-            resolve(false);
-            return;
-          }
-
-          let chosenDir = direction;
-          if (chosenDir === "down" && target.getTop() >= target.maxScroll - 2) {
-            chosenDir = "up";
-          } else if (chosenDir === "up" && target.getTop() <= 2) {
-            chosenDir = "down";
-          }
-
-          setScrollStatus(chosenDir === "down" ? "Random Scroll Down" : "Random Scroll Up", chosenDir === "down" ? "#38bdf8" : "#a855f7");
-          setRandomFeedback(
-            chosenDir === "down" ? "Scrolling Down" : "Scrolling Up",
-            chosenDir === "down" ? "#38bdf8" : "#a855f7",
-            `Scrolling ${chosenDir} before re-scanning UI elements (${session.randomTapCount}/${session.randomTapTarget})...`,
-            "vpn-info-ok"
-          );
-
-          const startTop = target.getTop();
-          const distance = Math.max(140, Math.round((win.innerHeight || 340) * 0.65));
-          const goalTop = chosenDir === "down"
-            ? Math.min(target.maxScroll, startTop + distance)
-            : Math.max(0, startTop - distance);
-          const durationMs = 1000;
-          const startTime = performance.now();
-
-          function frame(now) {
-            if (!session.randomRunning || cycleSeq !== session.randomCycleSeq) {
-              resolve(false);
-              return;
-            }
-            const t = Math.min(1, (now - startTime) / durationMs);
-            const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-            const nextTop = startTop + (goalTop - startTop) * eased;
-            target.setTop(nextTop);
-            setScrollPosition(target.getTop(), target.maxScroll);
-
-            if (t < 1) {
-              session.scrollRafId = requestAnimationFrame(frame);
-            } else {
-              session.scrollRafId = null;
-              session.randomScrollNextDir = chosenDir === "down" ? "up" : "down";
-              resolve(true);
-            }
-          }
-          session.scrollRafId = requestAnimationFrame(frame);
-        });
-      }
-
-      async function beginRandomInteractionLoop() {
-        session.randomCycleSeq += 1;
-        const cycleSeq = session.randomCycleSeq;
-        session.randomRunning = true;
-        session.randomArmedOnLoad = false;
-        session.randomScrollNextDir = "down";
-        session.randomLastSelector = "";
-        updateUI();
-
-        let tapsSinceScroll = 0;
-
-        while (session.randomRunning && cycleSeq === session.randomCycleSeq) {
-          if (session.phase === "failed" || session.phase === "error" || session.phase === "blocked") {
-            stopRandomInteraction("Stopped: Page load failed.", "Load Failed", "#fb7185", "vpn-info-err");
-            return;
-          }
-          if (!session.isDemoLoaded && !authorizedSiteToggle.checked) {
-            stopRandomInteraction("Stopped: Authorized Test Page or Demo Environment required.", "Restricted", "#fb7185", "vpn-info-err");
-            return;
-          }
-          const access = getAccessibleIframeDocument();
-          if (!access) {
-            stopRandomInteraction(
-              "Cross-origin restriction: Random Interaction only runs on your own same-origin Test Page or the Demo Environment.",
-              "Restricted",
-              "#fb7185",
-              "vpn-info-err"
-            );
-            return;
-          }
-
-          if (session.randomTapCount >= session.randomTapTarget) {
-            stopRandomInteraction(
-              `Random Interaction completed (${session.randomTapCount}/${session.randomTapTarget} taps).`,
-              "Completed",
-              "#34d399",
-              "vpn-info-ok"
-            );
-            return;
-          }
-
-          if (tapsSinceScroll >= 2) {
-            await performSmoothScrollStep(session.randomScrollNextDir, cycleSeq);
-            if (!session.randomRunning || cycleSeq !== session.randomCycleSeq) return;
-            tapsSinceScroll = 0;
-            await new Promise((res) => {
-              session.randomTimerId = setTimeout(res, 350);
-            });
-            if (!session.randomRunning || cycleSeq !== session.randomCycleSeq) return;
-            continue;
-          }
-
-          const candidates = scanSafeRandomElements(access.doc, access.win);
-          if (!candidates.length) {
-            stopRandomInteraction("No safe non-ad UI elements found to tap on this test page.", "No Target", "#fbbf24", "vpn-info-warn");
-            return;
-          }
-
-          const filtered = candidates.length > 1
-            ? candidates.filter((c) => c.selector !== session.randomLastSelector)
-            : candidates;
-          const pick = filtered[Math.floor(Math.random() * filtered.length)] || candidates[0];
-          session.randomLastSelector = pick.selector;
-
-          const prevOutline = pick.el.style.outline;
-          pick.el.style.outline = "2px solid #34D399";
-          setTimeout(() => { try { pick.el.style.outline = prevOutline; } catch {} }, 350);
-
-          dispatchSingleActivation(pick.el, access.win, access.doc, "tap", "#34D399");
-          session.randomTapCount += 1;
-          tapsSinceScroll += 1;
-
-          const elLabel = (pick.el.innerText || pick.el.value || pick.el.getAttribute("aria-label") || pick.el.tagName)
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 22) || "UI element";
-
-          if (session.randomTapCount >= session.randomTapTarget) {
-            stopRandomInteraction(
-              `Target reached (${session.randomTapCount}/${session.randomTapTarget}) after tapping "${elLabel}".`,
-              "Completed",
-              "#34d399",
-              "vpn-info-ok"
-            );
-            return;
-          }
-
-          setRandomFeedback(
-            "Random Tapping",
-            "#34d399",
-            `Tapped "${elLabel}" (${session.randomTapCount}/${session.randomTapTarget}) • Next in ${session.randomTapDelaySec}s`,
-            "vpn-info-ok"
-          );
-
-          await new Promise((res) => {
-            session.randomTimerId = setTimeout(res, session.randomTapDelaySec * 1000);
-          });
-        }
-      }
-
-      // --- Impression & Click Tracking Diagnostic Engine ---
-
-      function verifyDiagnosticAccess(requireAuthForExternal = true) {
-        if (session.phase === "failed" || session.phase === "error" || session.phase === "blocked") {
-          session.diagPageLoadText = session.phase === "error" ? "Network Error" : "Load Failed";
-          session.diagTrackingText = "Unavailable";
-          session.diagDetectionText = "Click Event Not Received";
-          return { ok: false, result: "Failed", color: "#fb7185", reason: "Page failed to load in preview. Resolve page load failure first." };
-        }
-        if (previewFrame.style.display !== "block" || !session.activeUrl) {
-          session.diagPageLoadText = "Not Loaded";
-          session.diagTrackingText = "Idle";
-          session.diagDetectionText = "Click Event Not Received";
-          return { ok: false, result: "Failed", color: "#fb7185", reason: "Preview is not loaded. Load the Demo Test Page or start a URL test first." };
-        }
-        const access = getAccessibleIframeDocument();
-        if (!access) {
-          session.diagPageLoadText = "Loaded (Cross-Origin)";
-          session.diagTrackingText = "Cross-Origin Blocked";
-          session.diagDetectionText = "Click Event Not Received";
-          session.diagListenerText = "Blocked by Iframe Policy";
-          session.diagButtonText = "Blocked";
-          session.diagLinkText = "Blocked";
-          return {
-            ok: false,
-            result: "Blocked",
-            color: "#fbbf24",
-            reason: "Cross-origin iframe restriction: External site DOM cannot be inspected in browser HTML. Load your Demo Test Page, same-origin site, or use Native Android."
-          };
-        }
-        if (requireAuthForExternal && !session.isDemoLoaded && !authorizedSiteToggle.checked) {
-          session.diagTrackingText = "Blocked (Unconfirmed)";
-          session.diagDetectionText = "Click Event Not Received";
-          return {
-            ok: false,
-            result: "Blocked",
-            color: "#fbbf24",
-            reason: "Authorization required: Check 'Authorized Own Site / Test Page' or load the Demo Test Page."
-          };
-        }
-        session.diagPageLoadText = session.isDemoLoaded ? "Loaded (Demo Page)" : "Loaded (Same-Origin)";
-        return { ok: true, access };
-      }
-
-      function verifyClickListenerOnce(access) {
-        const bound = attachSameOriginPreviewHandlers(access, true);
-        if (!bound) {
-          session.diagTrackingText = "Listener Failed";
-          session.diagListenerText = "Failed";
-          return false;
-        }
-        let probeReceived = false;
-        const probeEl = access.doc.createElement("button");
-        probeEl.type = "button";
-        probeEl.setAttribute("aria-hidden", "true");
-        probeEl.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
-        const onProbe = () => { probeReceived = true; };
-        probeEl.addEventListener("click", onProbe, { once: true });
-        (access.doc.body || access.doc.documentElement).appendChild(probeEl);
-        try {
-          probeEl.click();
-        } finally {
-          try { probeEl.remove(); } catch {}
-        }
-        session.diagListenerText = probeReceived ? "Active (0 Duplicates)" : "Not Responding";
-        session.diagTrackingText = probeReceived ? "Listening" : "Listener Failed";
-        return probeReceived;
-      }
-
-      function verifyTestButtonClick(access) {
-        const { doc, win } = access;
-        const preferred = doc.getElementById("demoOverviewBtn");
-        let btnEl = (preferred && isElementInteractable(preferred, win) && !isProhibitedAdElement(preferred)) ? preferred : null;
-        if (!btnEl) {
-          const btns = doc.querySelectorAll('button, input[type="button"], input[type="submit"], [role="button"]');
-          for (let i = 0; i < btns.length; i += 1) {
-            if (isElementInteractable(btns[i], win) && !isProhibitedAdElement(btns[i])) {
-              btnEl = btns[i];
-              break;
-            }
-          }
-        }
-        if (!btnEl) {
-          session.diagButtonText = "No Safe Button";
-          session.diagDetectionText = "Click Event Not Received";
-          return { ok: false, reason: "No safe non-ad button found on preview page." };
-        }
-
-        let domClickFired = false;
-        const oneShot = (ev) => {
-          if (ev.target === btnEl || btnEl.contains(ev.target)) {
-            domClickFired = true;
-          }
-        };
-        doc.addEventListener("click", oneShot, { capture: true, once: true });
-        dispatchSingleActivation(btnEl, win, doc, session.interactionMode, "#38BDF8");
-        doc.removeEventListener("click", oneShot, true);
-
-        const label = (btnEl.innerText || btnEl.value || btnEl.getAttribute("aria-label") || "Test Button")
-          .replace(/\s+/g, " ")
-          .trim()
-          .slice(0, 22);
-
-        if (domClickFired) {
-          session.diagButtonText = `Verified (${label})`;
-          session.diagDetectionText = "Click Event Received";
-          recordVerifiedClickEvent(label, "diag");
-          return { ok: true, label };
-        }
-        session.diagButtonText = "Not Received";
-        session.diagDetectionText = "Click Event Not Received";
-        return { ok: false, reason: `Test button "${label}" did not emit a DOM click event.` };
-      }
-
-      function verifyTestLinkNavigation(access) {
-        const { doc, win } = access;
-        const curOrigin = (doc.location && doc.location.origin && doc.location.origin !== "null") ? doc.location.origin : "";
-        const links = doc.querySelectorAll("a[href]");
-        let linkEl = null;
-        for (let i = 0; i < links.length; i += 1) {
-          const a = links[i];
-          if (!isElementInteractable(a, win) || isProhibitedAdElement(a)) continue;
-          const hrefAttr = a.getAttribute("href") || "";
-          if (/^javascript:/i.test(hrefAttr)) continue;
-          if (/^https?:\/\//i.test(hrefAttr) && curOrigin) {
-            try {
-              const u = new URL(hrefAttr, doc.location.href);
-              if (u.origin !== curOrigin) continue;
-            } catch {
-              continue;
-            }
-          }
-          linkEl = a;
-          break;
-        }
-        if (!linkEl) {
-          session.diagLinkText = "No Safe Link";
-          return { ok: false, reason: "No safe same-origin test link found on preview page." };
-        }
-
-        const beforeHref = doc.location ? doc.location.href : "";
-        const beforeHash = doc.location ? doc.location.hash : "";
-        const hrefAttr = linkEl.getAttribute("href") || "";
-        let linkClickFired = false;
-        const oneShot = (ev) => {
-          if (ev.target === linkEl || linkEl.contains(ev.target)) {
-            linkClickFired = true;
-          }
-        };
-        doc.addEventListener("click", oneShot, { capture: true, once: true });
-        dispatchSingleActivation(linkEl, win, doc, "click", "#A855F7");
-        doc.removeEventListener("click", oneShot, true);
-
-        const afterHref = doc.location ? doc.location.href : "";
-        const afterHash = doc.location ? doc.location.hash : "";
-        const navigated = (afterHref !== beforeHref) ||
-          (afterHash !== beforeHash) ||
-          (hrefAttr.startsWith("#") && afterHash === hrefAttr);
-        const label = (linkEl.innerText || hrefAttr || "Test Link").replace(/\s+/g, " ").trim().slice(0, 22);
-
-        if (linkClickFired && navigated) {
-          session.diagLinkText = `Verified (${afterHash || label})`;
-          session.diagDetectionText = "Click Event Received";
-          recordVerifiedClickEvent(label, "diag");
-          return { ok: true, label, navigated: true };
-        }
-        if (linkClickFired) {
-          session.diagLinkText = "Click Only (No Nav)";
-          session.diagDetectionText = "Click Event Received";
-          recordVerifiedClickEvent(label, "diag");
-          return { ok: false, reason: `Link "${label}" emitted click but target navigation did not change URL/hash.` };
-        }
-        session.diagLinkText = "Not Received";
-        session.diagDetectionText = "Click Event Not Received";
-        return { ok: false, reason: `Test link "${label}" did not emit click or navigate.` };
-      }
-
-      function stopDiagnosticRun(resultLabel = "Stopped", color = "#fbbf24", msg = "Diagnostic test stopped.", msgClass = "vpn-info-warn") {
-        session.diagRunSeq += 1;
-        if (session.diagTimerId) {
-          clearTimeout(session.diagTimerId);
-          session.diagTimerId = null;
-        }
-        session.diagRunning = false;
-        setDiagnosticFeedback(resultLabel, color, msg, msgClass);
-      }
-
-      async function runFullDiagnostic() {
-        if (session.diagRunning) return;
-        session.diagRunSeq += 1;
-        const seq = session.diagRunSeq;
-        session.diagRunning = true;
-        session.diagButtonText = "Testing...";
-        session.diagLinkText = "Waiting...";
-        setDiagnosticFeedback("Running", "#38bdf8", "Checking page load & verifying click event listener...", "vpn-info-ok");
-
-        const check = verifyDiagnosticAccess(true);
-        if (!check.ok) {
-          stopDiagnosticRun(check.result, check.color, check.reason, check.result === "Blocked" ? "vpn-info-warn" : "vpn-info-err");
-          return;
-        }
-
-        const listenerOk = verifyClickListenerOnce(check.access);
-        if (!listenerOk) {
-          stopDiagnosticRun("Failed", "#fb7185", "Diagnostic Failed: Click Event Listener did not respond.", "vpn-info-err");
-          return;
-        }
-        renderDiagnosticUI();
-
-        await new Promise((r) => { session.diagTimerId = setTimeout(r, 320); });
-        if (!session.diagRunning || seq !== session.diagRunSeq) return;
-
-        const btnRes = verifyTestButtonClick(check.access);
-        if (!btnRes.ok) {
-          stopDiagnosticRun("Failed", "#fb7185", `Diagnostic Failed: ${btnRes.reason}`, "vpn-info-err");
-          return;
-        }
-        setDiagnosticFeedback("Running", "#38bdf8", `Test Button verified ("${btnRes.label}"). Testing Link navigation...`, "vpn-info-ok");
-
-        await new Promise((r) => { session.diagTimerId = setTimeout(r, 420); });
-        if (!session.diagRunning || seq !== session.diagRunSeq) return;
-
-        const linkRes = verifyTestLinkNavigation(check.access);
-        if (!linkRes.ok) {
-          stopDiagnosticRun("Failed", "#fb7185", `Diagnostic Failed: ${linkRes.reason}`, "vpn-info-err");
-          return;
-        }
-
-        stopDiagnosticRun(
-          "Passed",
-          "#34d399",
-          `Diagnostic Passed: Impression=${session.visitCount}, Click=${session.clickCount}. Listener active (0 duplicates), Test Button & Test Link navigation verified.`,
-          "vpn-info-ok"
-        );
-      }
-
-      startDiagBtn.addEventListener("click", () => {
-        runFullDiagnostic();
-      });
-
-      stopDiagBtn.addEventListener("click", () => {
-        stopDiagnosticRun("Stopped", "#fbbf24", "Click Tracking Diagnostic stopped.", "vpn-info-warn");
-      });
-
-      diagCheckListenerBtn.addEventListener("click", () => {
-        const check = verifyDiagnosticAccess(false);
-        if (!check.ok) {
-          setDiagnosticFeedback(check.result, check.color, check.reason, check.result === "Blocked" ? "vpn-info-warn" : "vpn-info-err");
-          return;
-        }
-        const ok = verifyClickListenerOnce(check.access);
-        setDiagnosticFeedback(
-          ok ? "Listening" : "Failed",
-          ok ? "#34d399" : "#fb7185",
-          ok ? "Click Event Listener verified active (0 duplicate listeners)." : "Click Event Listener verification failed.",
-          ok ? "vpn-info-ok" : "vpn-info-err"
-        );
-      });
-
-      diagTestButtonBtn.addEventListener("click", () => {
-        const check = verifyDiagnosticAccess(true);
-        if (!check.ok) {
-          setDiagnosticFeedback(check.result, check.color, check.reason, check.result === "Blocked" ? "vpn-info-warn" : "vpn-info-err");
-          return;
-        }
-        verifyClickListenerOnce(check.access);
-        const res = verifyTestButtonClick(check.access);
-        setDiagnosticFeedback(
-          res.ok ? "Passed" : "Failed",
-          res.ok ? "#34d399" : "#fb7185",
-          res.ok ? `Click Event Received from Test Button ("${res.label}").` : `Click Event Not Received: ${res.reason}`,
-          res.ok ? "vpn-info-ok" : "vpn-info-err"
-        );
-      });
-
-      diagTestLinkBtn.addEventListener("click", () => {
-        const check = verifyDiagnosticAccess(true);
-        if (!check.ok) {
-          setDiagnosticFeedback(check.result, check.color, check.reason, check.result === "Blocked" ? "vpn-info-warn" : "vpn-info-err");
-          return;
-        }
-        verifyClickListenerOnce(check.access);
-        const res = verifyTestLinkNavigation(check.access);
-        setDiagnosticFeedback(
-          res.ok ? "Passed" : "Failed",
-          res.ok ? "#34d399" : "#fb7185",
-          res.ok ? `Test Link click & navigation verified ("${res.label}").` : `Test Link check failed: ${res.reason}`,
-          res.ok ? "vpn-info-ok" : "vpn-info-err"
-        );
-      });
-
-      loadDemoPageBtn.addEventListener("click", () => {
-        if (session.running || session.randomRunning || session.diagRunning) return;
-        clearTemporarySession("viewing", false);
-        session.isDemoLoaded = true;
-        session.activeUrl = DEMO_TEST_URL;
-        session.phase = "viewing";
-        session.visitCount += 1;
-        previewFrame.srcdoc = DEMO_TEST_HTML;
-        showIframe();
-        syncDiagnosticPageLoadState();
-        setRandomFeedback(
-          "Demo Ready",
-          "#34d399",
-          "Demo Test Environment loaded (1 verified Impression). Tap 'Start Random Test' or 'Start Diagnostic'.",
-          "vpn-info-ok"
-        );
-        updateUI();
-      });
-
-      randomTargetInput.addEventListener("input", () => {
-        const parsed = parseInt((randomTargetInput.value || "").trim(), 10);
-        if (!Number.isNaN(parsed) && parsed >= 1) {
-          session.randomTapTarget = Math.min(5000, parsed);
-          if (session.randomRunning && session.randomTapCount >= session.randomTapTarget) {
-            stopRandomInteraction(
-              `Random Interaction completed (${session.randomTapCount}/${session.randomTapTarget} taps).`,
-              "Completed",
-              "#34d399",
-              "vpn-info-ok"
-            );
-            return;
-          }
-          renderRandomInteractionUI();
-        }
-      });
-
-      randomDelayInput.addEventListener("change", () => {
-        const d = clampInt(randomDelayInput.value, 1, 30, 2);
-        randomDelayInput.value = String(d);
-        session.randomTapDelaySec = d;
-      });
-
-      startRandomBtn.addEventListener("click", () => {
-        if (session.randomRunning || session.randomArmedOnLoad) return;
-
-        const targetVal = clampInt(randomTargetInput.value, 1, 5000, 20);
-        randomTargetInput.value = String(targetVal);
-        session.randomTapTarget = targetVal;
-
-        const delayVal = clampInt(randomDelayInput.value, 1, 30, 2);
-        randomDelayInput.value = String(delayVal);
-        session.randomTapDelaySec = delayVal;
-
-        if (session.randomTapCount >= session.randomTapTarget) {
-          setRandomFeedback(
-            "Completed",
-            "#34d399",
-            `Tap Target (${session.randomTapCount}/${session.randomTapTarget}) already reached. Press Reset or raise Tap Target.`,
-            "vpn-info-ok"
-          );
-          return;
-        }
-
-        if (!session.isDemoLoaded && !authorizedSiteToggle.checked) {
-          setRandomFeedback(
-            "Restricted",
-            "#fb7185",
-            "Random Interaction only works on your own Test Page ('Authorized Own Site') or Demo Environment ('Load Demo Test Environment').",
-            "vpn-info-err"
-          );
-          return;
-        }
-
-        if (session.phase === "viewing" || session.isDemoLoaded) {
-          const access = getAccessibleIframeDocument();
-          if (!access) {
-            setRandomFeedback(
-              "Restricted",
-              "#fb7185",
-              "Cross-origin restriction: Cannot access external site DOM. Use your same-origin Test Page, Demo Environment, or Android app.",
-              "vpn-info-err"
-            );
-            return;
-          }
-          beginRandomInteractionLoop();
-          return;
-        }
-
-        if (session.running && session.phase === "loading") {
-          session.randomArmedOnLoad = true;
-          setRandomFeedback(
-            "Waiting Load",
-            "#38bdf8",
-            "Waiting for page load to finish before starting Random Interaction...",
-            "vpn-info-ok"
-          );
-          return;
-        }
-
-        const check = validateUrl(urlInput.value);
-        if (!check.valid) {
-          setRandomFeedback(
-            "Load Failed",
-            "#fb7185",
-            "Load Demo Test Environment or enter a valid Test Page URL first.",
-            "vpn-info-err"
-          );
-          return;
-        }
-
-        session.randomArmedOnLoad = true;
-        setRandomFeedback(
-          "Waiting Load",
-          "#38bdf8",
-          "Loading Test Page; Random Interaction will begin once page load completes...",
-          "vpn-info-ok"
-        );
-        startBtn.click();
-      });
-
-      stopRandomBtn.addEventListener("click", () => {
-        stopRandomInteraction(
-          `Random Interaction stopped (${session.randomTapCount}/${session.randomTapTarget}).`,
-          "Stopped",
-          "#fbbf24",
-          "vpn-info-warn"
-        );
-      });
-
-      resetRandomBtn.addEventListener("click", () => {
-        stopRandomInteraction("Random Tap Counter reset.", "Idle", "#34d399", "vpn-info-ok");
-        session.randomTapCount = 0;
-        session.randomLastSelector = "";
-        setRandomFeedback("Idle", "#34d399", `Counter reset (0/${session.randomTapTarget}). Ready to start.`, "vpn-info-ok");
-      });
-
       startBtn.addEventListener("click", () => {
-        if (session.running) return;
+        if (state.phase === "loading") return;
         const check = validateUrl(urlInput.value);
         if (!check.valid) {
           urlError.textContent = check.error;
           return;
         }
-        urlError.textContent = "";
-        urlInput.value = check.url;
-
-        const keepArmed = session.randomArmedOnLoad;
-        clearTemporarySession("loading", true);
-        if (keepArmed) {
-          session.randomArmedOnLoad = true;
-          setRandomFeedback(
-            "Waiting Load",
-            "#38bdf8",
-            "Loading Test Page; Random Interaction will start after page load completes...",
-            "vpn-info-ok"
-          );
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          urlError.textContent = "Network offline. Check your internet connection.";
+          return;
         }
 
-        session.viewSec = clampInt(viewSecInput.value, 3, 300, 15);
-        session.pauseSec = clampInt(pauseSecInput.value, 0, 120, 3);
-        session.autoNext = autoNextToggle.checked;
-        session.totalRuns = session.autoNext ? clampInt(runsInput.value, 1, 50, 3) : 1;
-        session.running = true;
-        session.activeUrl = check.url;
+        urlError.textContent = "";
+        urlInput.value = check.url;
+        resetSession("loading");
+        state.activeUrl = check.url;
+        const seq = state.loadSeq;
+        state.impressionStatus = "Checking Load...";
+        state.impressionColor = "#38bdf8";
+        state.pageLoadStatus = "Loading...";
+        state.clickTrackingStatus = "Waiting for Load";
+        state.clickTrackingColor = "#94a3b8";
+        state.listenerStatus = "Pending";
+        state.message = "Loading Website URL to verify Impression and Click Tracking...";
+        syncExternalLinks(check.url);
+        showOverlay("Loading Website Preview...", check.url, false);
+        updateUI();
 
-        beginRun(1);
-        session.timerId = setInterval(tick, 1000);
+        currentReachabilityPromise = checkUrlReachability(check.url, seq);
+        previewFrame.src = "about:blank";
+        state.stepTimerId = setTimeout(() => {
+          if (state.phase !== "loading" || seq !== state.loadSeq) return;
+          previewFrame.src = check.url;
+        }, 50);
+
+        state.loadTimerId = setTimeout(() => {
+          if (state.phase === "loading" && seq === state.loadSeq) {
+            markLoadFailure(seq, false, "Page Load Failed: Timed out or website blocked iframe embedding (X-Frame-Options/CSP).");
+          }
+        }, LOAD_TIMEOUT_MS);
       });
 
       stopBtn.addEventListener("click", () => {
-        if (!session.running && !session.isDemoLoaded && !session.randomRunning) return;
-        clearTemporarySession("stopped", true);
-        showOverlay("Session Stopped & Cleared", "Temporary session data and counters cleared.", false);
-      });
-
-      backBtn.addEventListener("click", () => {
-        const access = getAccessibleIframeDocument();
-        if (access && access.win) {
-          access.win.history.back();
-        }
-      });
-
-      homeBtn.addEventListener("click", () => {
-        if (session.isDemoLoaded) {
-          previewFrame.srcdoc = DEMO_TEST_HTML;
-        } else if (session.activeUrl) {
-          previewFrame.removeAttribute("srcdoc");
-          previewFrame.src = session.activeUrl;
-        }
+        resetSession("stopped");
       });
 
       reloadBtn.addEventListener("click", () => {
-        if (session.isDemoLoaded) {
-          previewFrame.srcdoc = DEMO_TEST_HTML;
-          return;
-        }
-        if (!session.activeUrl) return;
-        const access = getAccessibleIframeDocument();
-        if (access && access.win) {
-          access.win.location.reload();
-        } else {
-          previewFrame.src = session.activeUrl;
-        }
+        if (!state.activeUrl || state.phase === "loading") return;
+        startBtn.click();
       });
 
-      window.addEventListener("offline", () => {
-        if (session.running && session.phase === "loading") {
-          handleRunLoadFailure(session.loadSeq, "error", "Internet connection lost during page load.");
-        }
+      checkTrackingBtn.addEventListener("click", () => {
+        runClickTrackingHealthCheck();
       });
 
-      window.addEventListener("beforeunload", () => {
-        clearTemporarySession("idle", true);
-      });
-
-      renderRandomInteractionUI();
-      renderDiagnosticUI();
+      syncExternalLinks("");
       updateUI();
     })();
   </script>
