@@ -55,6 +55,7 @@ import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Stop
@@ -228,13 +229,16 @@ fun WebVisitTesterApp(
                                     uiState = uiState,
                                     onAuthorizedChanged = viewModel::setAuthorizedOwnSite,
                                     onClickModeChanged = viewModel::setClickInteractionMode,
+                                    onClickTargetInputChanged = viewModel::updateClickTargetInput,
+                                    onClickTargetPresetSelected = viewModel::selectClickTargetPreset,
                                     onSelectorChanged = viewModel::onClickSelectorChanged,
                                     onSelectTarget = viewModel::selectDiscoveredTarget,
                                     onScanTargets = viewModel::scanClickTargets,
                                     onClickIntervalChanged = viewModel::updateClickInterval,
                                     onSingleClickTest = viewModel::triggerSingleClickTest,
                                     onStartAutoClick = viewModel::startAutoClick,
-                                    onStopAutoClick = { viewModel.stopAutoClick() }
+                                    onStopAutoClick = { viewModel.stopAutoClick() },
+                                    onResetClickCounter = viewModel::resetClickCounter
                                 )
 
                                 VpnTestingPanel(
@@ -271,6 +275,7 @@ fun WebVisitTesterApp(
                                 onOpenExternal = openWebsiteInBrowser,
                                 onTargetsScanned = viewModel::onClickTargetsScanned,
                                 onClickExecuted = viewModel::onSingleClickExecuted,
+                                onDirectPreviewClick = viewModel::onDirectPreviewClick,
                                 modifier = Modifier.weight(1.05f)
                             )
                         }
@@ -297,13 +302,16 @@ fun WebVisitTesterApp(
                             uiState = uiState,
                             onAuthorizedChanged = viewModel::setAuthorizedOwnSite,
                             onClickModeChanged = viewModel::setClickInteractionMode,
+                            onClickTargetInputChanged = viewModel::updateClickTargetInput,
+                            onClickTargetPresetSelected = viewModel::selectClickTargetPreset,
                             onSelectorChanged = viewModel::onClickSelectorChanged,
                             onSelectTarget = viewModel::selectDiscoveredTarget,
                             onScanTargets = viewModel::scanClickTargets,
                             onClickIntervalChanged = viewModel::updateClickInterval,
                             onSingleClickTest = viewModel::triggerSingleClickTest,
                             onStartAutoClick = viewModel::startAutoClick,
-                            onStopAutoClick = { viewModel.stopAutoClick() }
+                            onStopAutoClick = { viewModel.stopAutoClick() },
+                            onResetClickCounter = viewModel::resetClickCounter
                         )
 
                         VpnTestingPanel(
@@ -338,7 +346,8 @@ fun WebVisitTesterApp(
                             onBlockedOrError = viewModel::onPreviewBlockedOrError,
                             onOpenExternal = openWebsiteInBrowser,
                             onTargetsScanned = viewModel::onClickTargetsScanned,
-                            onClickExecuted = viewModel::onSingleClickExecuted
+                            onClickExecuted = viewModel::onSingleClickExecuted,
+                            onDirectPreviewClick = viewModel::onDirectPreviewClick
                         )
                     }
                 }
@@ -365,7 +374,7 @@ private fun MinimalHeaderBar(
         targetValue = when (status) {
             TestSessionStatus.VIEWING, TestSessionStatus.COMPLETED -> EmeraldSuccess
             TestSessionStatus.PAUSING_BETWEEN, TestSessionStatus.STOPPED -> AmberWarning
-            TestSessionStatus.BLOCKED, TestSessionStatus.ERROR -> CoralDanger
+            TestSessionStatus.BLOCKED, TestSessionStatus.FAILED, TestSessionStatus.ERROR -> CoralDanger
             else -> ElectricCyan
         },
         label = "live_status_color"
@@ -670,7 +679,36 @@ private fun MinimalControlPanel(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            LiveCounterPill(
+                label = "Visits",
+                value = uiState.visitCount.toString(),
+                accentColor = ElectricCyan,
+                testTag = "visit_count_text",
+                modifier = Modifier.weight(1f)
+            )
+            LiveCounterPill(
+                label = "Failed",
+                value = uiState.failedCount.toString(),
+                accentColor = CoralDanger,
+                testTag = "failed_count_text",
+                modifier = Modifier.weight(1f)
+            )
+            LiveCounterPill(
+                label = if (uiState.clickMode == ClickInteractionMode.TAP) "Taps" else "Clicks",
+                value = "${uiState.clickCount}/${uiState.clickTarget}",
+                accentColor = LuminousPurple,
+                testTag = "live_click_count_text",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
 
         DurationStepperRow(
             label = stringResource(R.string.label_view_duration),
@@ -1132,21 +1170,32 @@ private fun ClicksAutomationPanel(
     uiState: WebVisitUiState,
     onAuthorizedChanged: (Boolean) -> Unit,
     onClickModeChanged: (ClickInteractionMode) -> Unit,
+    onClickTargetInputChanged: (String) -> Unit,
+    onClickTargetPresetSelected: (Int) -> Unit,
     onSelectorChanged: (String) -> Unit,
     onSelectTarget: (ClickTargetItem) -> Unit,
     onScanTargets: () -> Unit,
     onClickIntervalChanged: (Int) -> Unit,
     onSingleClickTest: () -> Unit,
     onStartAutoClick: () -> Unit,
-    onStopAutoClick: () -> Unit
+    onStopAutoClick: () -> Unit,
+    onResetClickCounter: () -> Unit
 ) {
     val clickBadgeColor = when (uiState.clickStatus) {
-        ClickTestStatus.RUNNING -> EmeraldSuccess
+        ClickTestStatus.RUNNING, ClickTestStatus.COMPLETED -> EmeraldSuccess
         ClickTestStatus.BLOCKED_AD, ClickTestStatus.RESTRICTED -> CoralDanger
         ClickTestStatus.STOPPED, ClickTestStatus.NO_TARGET -> AmberWarning
         ClickTestStatus.IDLE -> ElectricCyan
     }
     val isTapMode = uiState.clickMode == ClickInteractionMode.TAP
+    val safeTarget = uiState.clickTarget.coerceAtLeast(1)
+    val clickRatioFraction = (uiState.clickCount.toFloat() / safeTarget.toFloat()).coerceIn(0f, 1f)
+    val animatedClickProgress by animateFloatAsState(
+        targetValue = clickRatioFraction,
+        animationSpec = spring(),
+        label = "click_target_progress"
+    )
+    val focusManager = LocalFocusManager.current
 
     LiquidGlassPanel(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -1179,11 +1228,151 @@ private fun ClicksAutomationPanel(
             ) {
                 val countLabel = if (isTapMode) "Taps" else "Clicks"
                 Text(
-                    text = "$countLabel: ${uiState.clickCount} • ${uiState.clickStatus.label}",
+                    text = "$countLabel: ${uiState.clickCount}/$safeTarget • ${uiState.clickStatus.label}",
                     style = MaterialTheme.typography.labelSmall,
                     color = clickBadgeColor,
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Target Click Counter Panel (Separate Current Click, Click Target, Progress Bar, Input & Presets)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MidnightDeep.copy(alpha = 0.58f))
+                .border(1.dp, GlassStrokeViolet, RoundedCornerShape(16.dp))
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Target Click Counter",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = TextSecondary
+                )
+                Text(
+                    text = "${uiState.clickCount}/$safeTarget (${(animatedClickProgress * 100).toInt()}%)",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = LuminousPurple,
+                    modifier = Modifier.testTag("click_target_ratio_text")
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LiveCounterPill(
+                    label = "Current Click",
+                    value = uiState.clickCount.toString(),
+                    accentColor = LuminousPurple,
+                    testTag = "current_click_stat",
+                    modifier = Modifier.weight(1f)
+                )
+                LiveCounterPill(
+                    label = "Click Target",
+                    value = safeTarget.toString(),
+                    accentColor = ElectricCyan,
+                    testTag = "target_click_stat",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(MidnightDeep.copy(alpha = 0.85f))
+                    .border(1.dp, GlassStrokeSubtle, RoundedCornerShape(999.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedClickProgress)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(LuminousPurple, ElectricCyan, EmeraldSuccess)
+                            )
+                        )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = uiState.clickTargetInput,
+                onValueChange = onClickTargetInputChanged,
+                singleLine = true,
+                label = { Text("Click Target (e.g. 50, 100, 500, 1000)", color = TextMuted) },
+                placeholder = { Text("100", color = TextMuted) },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() }
+                ),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = ElectricCyan,
+                    unfocusedBorderColor = GlassStrokeSubtle,
+                    focusedContainerColor = MidnightNavy.copy(alpha = 0.65f),
+                    unfocusedContainerColor = MidnightNavy.copy(alpha = 0.50f),
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("click_target_input")
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(50, 100, 500, 1000).forEach { preset ->
+                    val selected = safeTarget == preset
+                    val shape = RoundedCornerShape(10.dp)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(shape)
+                            .background(
+                                if (selected) ElectricCyan.copy(alpha = 0.22f)
+                                else MidnightNavy.copy(alpha = 0.55f)
+                            )
+                            .border(
+                                1.dp,
+                                if (selected) ElectricCyan.copy(alpha = 0.65f) else GlassStrokeSubtle,
+                                shape
+                            )
+                            .clickable { onClickTargetPresetSelected(preset) }
+                            .padding(vertical = 8.dp)
+                            .testTag("click_target_preset_$preset"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = preset.toString(),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = if (selected) ElectricCyan else TextSecondary
+                        )
+                    }
+                }
             }
         }
 
@@ -1391,6 +1580,18 @@ private fun ClicksAutomationPanel(
             )
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        GlassActionButton(
+            text = stringResource(R.string.btn_reset_click_counter),
+            icon = Icons.Rounded.Refresh,
+            onClick = onResetClickCounter,
+            enabled = uiState.clickCount > 0 || uiState.clickStatus != ClickTestStatus.IDLE,
+            accentColor = TextSecondary,
+            testTag = "reset_click_counter_button",
+            modifier = Modifier.fillMaxWidth()
+        )
+
         uiState.clickStatusMessage?.let { msg ->
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -1398,7 +1599,7 @@ private fun ClicksAutomationPanel(
                 style = MaterialTheme.typography.labelSmall,
                 color = when (uiState.clickStatus) {
                     ClickTestStatus.BLOCKED_AD, ClickTestStatus.RESTRICTED -> CoralDanger
-                    ClickTestStatus.RUNNING -> EmeraldSuccess
+                    ClickTestStatus.RUNNING, ClickTestStatus.COMPLETED -> EmeraldSuccess
                     ClickTestStatus.STOPPED, ClickTestStatus.NO_TARGET -> AmberWarning
                     ClickTestStatus.IDLE -> ElectricCyan
                 }
@@ -1546,6 +1747,39 @@ private fun SingleFileHtmlDialog(
             }
         }
     )
+}
+
+@Composable
+private fun LiveCounterPill(
+    label: String,
+    value: String,
+    accentColor: androidx.compose.ui.graphics.Color,
+    testTag: String,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(MidnightDeep.copy(alpha = 0.6f))
+            .border(1.dp, GlassStrokeSubtle, shape)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .testTag(testTag),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = label.uppercase(Locale.US),
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMuted,
+            maxLines = 1
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = accentColor,
+            maxLines = 1
+        )
+    }
 }
 
 private fun formatTimer(totalSec: Int): String {

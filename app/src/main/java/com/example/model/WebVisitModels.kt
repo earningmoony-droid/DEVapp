@@ -8,6 +8,7 @@ enum class TestSessionStatus(val displayLabel: String) {
     VIEWING("Viewing"),
     PAUSING_BETWEEN("Pausing"),
     BLOCKED("Restricted"),
+    FAILED("Failed"),
     COMPLETED("Completed"),
     STOPPED("Stopped"),
     ERROR("Error")
@@ -82,7 +83,8 @@ data class ClickTargetItem(
 
 enum class ClickTestStatus(val label: String) {
     IDLE("Idle"),
-    RUNNING("Auto Active"),
+    RUNNING("Active"),
+    COMPLETED("Completed"),
     STOPPED("Stopped"),
     BLOCKED_AD("Ad Blocked"),
     RESTRICTED("Restricted"),

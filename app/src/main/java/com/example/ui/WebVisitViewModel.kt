@@ -53,9 +53,12 @@ data class WebVisitUiState(
     val clickMode: ClickInteractionMode = ClickInteractionMode.CLICK,
     val clickIntervalSec: Int = 2,
     val clickSelector: String = "",
+    val clickTargetInput: String = "100",
+    val clickTarget: Int = 100,
     val discoveredClickTargets: List<ClickTargetItem> = emptyList(),
     val isScanningTargets: Boolean = false,
     val isAutoClickRunning: Boolean = false,
+    val isManualClickListening: Boolean = false,
     val clickCount: Int = 0,
     val clickStatus: ClickTestStatus = ClickTestStatus.IDLE,
     val clickStatusMessage: String? = null,
@@ -66,12 +69,15 @@ data class WebVisitUiState(
     val status: TestSessionStatus = TestSessionStatus.IDLE,
     val activeUrl: String? = null,
     val previewLoadToken: Int = 0,
+    val visitCount: Int = 0,
+    val failedCount: Int = 0,
     val currentRunNumber: Int = 0,
     val activeTotalRuns: Int = 1,
     val phaseRemainingSec: Int = 0,
     val overallProgress: Float = 0f,
     val isPreviewLoading: Boolean = false,
     val previewBlockedReason: String? = null,
+    val lastLoadWasNetworkError: Boolean = false,
     val canGoBack: Boolean = false,
     val webCommand: WebCommandEvent? = null,
     val isHtmlSheetVisible: Boolean = false
@@ -89,6 +95,8 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     private var commandSeq: Long = 0L
     private var wasVpnActive: Boolean = false
     private var lastSingleTriggerAtMs: Long = 0L
+    private var countedVisitToken: Int = -1
+    private var countedFailToken: Int = -1
 
     init {
         refreshInstalledProviders()
@@ -365,6 +373,72 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         _uiState.update { it.copy(clickIntervalSec = seconds.coerceIn(1, 60)) }
     }
 
+    fun updateClickTargetInput(rawInput: String) {
+        val digitsOnly = rawInput.filter { it.isDigit() }.take(5)
+        val parsed = digitsOnly.toIntOrNull()?.coerceIn(1, 10000)
+        _uiState.update { state ->
+            val nextTarget = parsed ?: state.clickTarget
+            val reachedNow = state.isAutoClickRunning && parsed != null && state.clickCount >= nextTarget
+            if (reachedNow) {
+                autoClickJob?.cancel()
+                autoClickJob = null
+            }
+            state.copy(
+                clickTargetInput = digitsOnly,
+                clickTarget = nextTarget,
+                isAutoClickRunning = if (reachedNow) false else state.isAutoClickRunning,
+                isManualClickListening = if (reachedNow) false else state.isManualClickListening,
+                clickStatus = if (reachedNow) ClickTestStatus.COMPLETED else state.clickStatus,
+                clickStatusMessage = if (reachedNow) {
+                    "Target reached (${state.clickCount}/$nextTarget). Click Test stopped automatically."
+                } else {
+                    state.clickStatusMessage
+                }
+            )
+        }
+    }
+
+    fun selectClickTargetPreset(target: Int) {
+        val safeTarget = target.coerceIn(1, 10000)
+        _uiState.update { state ->
+            val reachedNow = state.isAutoClickRunning && state.clickCount >= safeTarget
+            if (reachedNow) {
+                autoClickJob?.cancel()
+                autoClickJob = null
+            }
+            state.copy(
+                clickTargetInput = safeTarget.toString(),
+                clickTarget = safeTarget,
+                isAutoClickRunning = if (reachedNow) false else state.isAutoClickRunning,
+                isManualClickListening = if (reachedNow) false else state.isManualClickListening,
+                clickStatus = if (reachedNow) ClickTestStatus.COMPLETED else state.clickStatus,
+                clickStatusMessage = if (reachedNow) {
+                    "Target reached (${state.clickCount}/$safeTarget). Click Test stopped automatically."
+                } else {
+                    "Click Target updated to $safeTarget (${state.clickCount}/$safeTarget)."
+                }
+            )
+        }
+    }
+
+    fun resetClickCounter() {
+        autoClickJob?.cancel()
+        autoClickJob = null
+        lastSingleTriggerAtMs = 0L
+        _uiState.update { state ->
+            val safeTarget = state.clickTargetInput.toIntOrNull()?.coerceIn(1, 10000) ?: state.clickTarget
+            state.copy(
+                clickTarget = safeTarget,
+                clickTargetInput = safeTarget.toString(),
+                isAutoClickRunning = false,
+                isManualClickListening = false,
+                clickCount = 0,
+                clickStatus = ClickTestStatus.IDLE,
+                clickStatusMessage = "Click counter reset (0/$safeTarget)."
+            )
+        }
+    }
+
     fun scanClickTargets() {
         val state = _uiState.value
         if (state.activeUrl == null || state.previewBlockedReason != null || state.status == TestSessionStatus.PAUSING_BETWEEN) {
@@ -481,9 +555,24 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     fun startAutoClick() {
         val state = _uiState.value
         if (state.isAutoClickRunning) return
+
+        val parsedTarget = state.clickTargetInput.trim().toIntOrNull()
+        if (parsedTarget == null || parsedTarget < 1) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.NO_TARGET,
+                    clickStatusMessage = "Enter a valid Click Target (1 to 10000)."
+                )
+            }
+            return
+        }
+        val safeTarget = parsedTarget.coerceIn(1, 10000)
+
         if (!state.isAuthorizedOwnSite) {
             _uiState.update {
                 it.copy(
+                    clickTarget = safeTarget,
+                    clickTargetInput = safeTarget.toString(),
                     clickStatus = ClickTestStatus.RESTRICTED,
                     clickStatusMessage = "Confirm this is your own website or authorized test page first."
                 )
@@ -493,23 +582,28 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         if (state.activeUrl == null || state.previewBlockedReason != null || state.status == TestSessionStatus.PAUSING_BETWEEN) {
             _uiState.update {
                 it.copy(
+                    clickTarget = safeTarget,
+                    clickTargetInput = safeTarget.toString(),
                     clickStatus = ClickTestStatus.RESTRICTED,
                     clickStatusMessage = "Start a test session so the website preview is loaded."
                 )
             }
             return
         }
-        val selector = state.clickSelector.trim()
-        if (selector.isEmpty()) {
+        if (state.clickCount >= safeTarget) {
             _uiState.update {
                 it.copy(
-                    clickStatus = ClickTestStatus.NO_TARGET,
-                    clickStatusMessage = "Select or enter a target button/link before starting Auto Click."
+                    clickTarget = safeTarget,
+                    clickTargetInput = safeTarget.toString(),
+                    clickStatus = ClickTestStatus.COMPLETED,
+                    clickStatusMessage = "Target ${state.clickCount}/$safeTarget already reached. Reset Counter or raise Click Target."
                 )
             }
             return
         }
-        if (isProhibitedAdSelector(selector)) {
+
+        val selector = state.clickSelector.trim()
+        if (selector.isNotEmpty() && isProhibitedAdSelector(selector)) {
             _uiState.update {
                 it.copy(
                     clickStatus = ClickTestStatus.BLOCKED_AD,
@@ -519,21 +613,51 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
             return
         }
 
+        if (selector.isEmpty()) {
+            autoClickJob?.cancel()
+            autoClickJob = null
+            _uiState.update {
+                it.copy(
+                    clickTarget = safeTarget,
+                    clickTargetInput = safeTarget.toString(),
+                    isAutoClickRunning = true,
+                    isManualClickListening = true,
+                    clickStatus = ClickTestStatus.RUNNING,
+                    clickStatusMessage = "Click Test active (${state.clickCount}/$safeTarget): Tap elements in preview or enter a selector for auto clicking."
+                )
+            }
+            return
+        }
+
         val intervalMs = state.clickIntervalSec.coerceIn(1, 60) * 1000L
-        val modeLabel = if (state.clickMode == ClickInteractionMode.TAP) "Auto Tap" else "Auto Click"
+        val modeLabel = if (state.clickMode == ClickInteractionMode.TAP) "Tap Test" else "Click Test"
         _uiState.update {
             it.copy(
+                clickTarget = safeTarget,
+                clickTargetInput = safeTarget.toString(),
                 isAutoClickRunning = true,
+                isManualClickListening = false,
                 clickStatus = ClickTestStatus.RUNNING,
-                clickStatusMessage = "$modeLabel active every ${state.clickIntervalSec}s"
+                clickStatusMessage = "$modeLabel active (${state.clickCount}/$safeTarget) every ${state.clickIntervalSec}s"
             )
         }
 
         autoClickJob?.cancel()
         autoClickJob = viewModelScope.launch {
-            while (_uiState.value.isAutoClickRunning) {
+            while (_uiState.value.isAutoClickRunning && !_uiState.value.isManualClickListening) {
                 val cur = _uiState.value
-                val activeLabel = if (cur.clickMode == ClickInteractionMode.TAP) "Auto Tap" else "Auto Click"
+                val activeLabel = if (cur.clickMode == ClickInteractionMode.TAP) "Tap Test" else "Click Test"
+                if (cur.clickCount >= cur.clickTarget) {
+                    _uiState.update {
+                        it.copy(
+                            isAutoClickRunning = false,
+                            isManualClickListening = false,
+                            clickStatus = ClickTestStatus.COMPLETED,
+                            clickStatusMessage = "Target reached (${cur.clickCount}/${cur.clickTarget}). $activeLabel stopped automatically."
+                        )
+                    }
+                    break
+                }
                 if (!cur.isAuthorizedOwnSite ||
                     cur.activeUrl == null ||
                     cur.previewBlockedReason != null
@@ -562,11 +686,75 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         autoClickJob?.cancel()
         autoClickJob = null
         _uiState.update {
-            val defaultMsg = if (it.clickMode == ClickInteractionMode.TAP) "Auto Tap stopped." else "Auto Click stopped."
+            val defaultMsg = if (it.clickMode == ClickInteractionMode.TAP) {
+                "Tap Test stopped (${it.clickCount}/${it.clickTarget})."
+            } else {
+                "Click Test stopped (${it.clickCount}/${it.clickTarget})."
+            }
             it.copy(
                 isAutoClickRunning = false,
+                isManualClickListening = false,
                 clickStatus = ClickTestStatus.STOPPED,
                 clickStatusMessage = reason ?: defaultMsg
+            )
+        }
+    }
+
+    fun onDirectPreviewClick(targetLabel: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastSingleTriggerAtMs < 280L) return
+
+        val state = _uiState.value
+        if (!state.isAuthorizedOwnSite) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.RESTRICTED,
+                    clickStatusMessage = "Enable 'Authorized Own Site / Test Page' to count preview clicks."
+                )
+            }
+            return
+        }
+        if (state.activeUrl == null || state.previewBlockedReason != null) return
+
+        if (state.isAutoClickRunning && state.clickCount >= state.clickTarget) {
+            autoClickJob?.cancel()
+            autoClickJob = null
+            _uiState.update {
+                it.copy(
+                    isAutoClickRunning = false,
+                    isManualClickListening = false,
+                    clickStatus = ClickTestStatus.COMPLETED,
+                    clickStatusMessage = "Target reached (${state.clickCount}/${state.clickTarget}). Click Test stopped automatically."
+                )
+            }
+            return
+        }
+
+        lastSingleTriggerAtMs = now
+        val safeLabel = targetLabel.ifBlank { "element" }
+        _uiState.update {
+            val nextCount = it.clickCount + 1
+            val target = it.clickTarget
+            val reachedTarget = it.isAutoClickRunning && nextCount >= target
+            if (reachedTarget) {
+                autoClickJob?.cancel()
+                autoClickJob = null
+            }
+            val actionWord = if (it.clickMode == ClickInteractionMode.TAP) "tap" else "click"
+            it.copy(
+                clickCount = nextCount,
+                isAutoClickRunning = if (reachedTarget) false else it.isAutoClickRunning,
+                isManualClickListening = if (reachedTarget) false else it.isManualClickListening,
+                clickStatus = when {
+                    reachedTarget -> ClickTestStatus.COMPLETED
+                    it.isAutoClickRunning -> ClickTestStatus.RUNNING
+                    else -> ClickTestStatus.IDLE
+                },
+                clickStatusMessage = if (reachedTarget) {
+                    "Target reached on \"$safeLabel\" ($nextCount/$target). Click Test stopped automatically."
+                } else {
+                    "Counted direct $actionWord on \"$safeLabel\" ($nextCount/$target)."
+                }
             )
         }
     }
@@ -575,11 +763,38 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         when (resultCode) {
             "SKIPPED" -> Unit
             "CLICKED" -> {
-                _uiState.update {
-                    it.copy(
-                        clickCount = it.clickCount + 1,
-                        clickStatus = if (it.isAutoClickRunning) ClickTestStatus.RUNNING else ClickTestStatus.IDLE,
-                        clickStatusMessage = detail ?: "Tested interaction (${it.clickCount + 1})."
+                _uiState.update { state ->
+                    if (state.isAutoClickRunning && state.clickCount >= state.clickTarget) {
+                        autoClickJob?.cancel()
+                        autoClickJob = null
+                        return@update state.copy(
+                            isAutoClickRunning = false,
+                            isManualClickListening = false,
+                            clickStatus = ClickTestStatus.COMPLETED,
+                            clickStatusMessage = "Target reached (${state.clickCount}/${state.clickTarget}). Click Test stopped automatically."
+                        )
+                    }
+                    val nextCount = state.clickCount + 1
+                    val target = state.clickTarget
+                    val reachedTarget = state.isAutoClickRunning && nextCount >= target
+                    if (reachedTarget) {
+                        autoClickJob?.cancel()
+                        autoClickJob = null
+                    }
+                    state.copy(
+                        clickCount = nextCount,
+                        isAutoClickRunning = if (reachedTarget) false else state.isAutoClickRunning,
+                        isManualClickListening = if (reachedTarget) false else state.isManualClickListening,
+                        clickStatus = when {
+                            reachedTarget -> ClickTestStatus.COMPLETED
+                            state.isAutoClickRunning -> ClickTestStatus.RUNNING
+                            else -> ClickTestStatus.IDLE
+                        },
+                        clickStatusMessage = if (reachedTarget) {
+                            "Target reached ($nextCount/$target). Click Test stopped automatically."
+                        } else {
+                            "${detail ?: "Tested interaction"} ($nextCount/$target)."
+                        }
                     )
                 }
             }
@@ -589,6 +804,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update {
                     it.copy(
                         isAutoClickRunning = false,
+                        isManualClickListening = false,
                         clickStatus = ClickTestStatus.BLOCKED_AD,
                         clickStatusMessage = "Blocked: Clicking ads or sponsored elements is strictly prohibited."
                     )
@@ -600,6 +816,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update {
                     it.copy(
                         isAutoClickRunning = false,
+                        isManualClickListening = false,
                         clickStatus = ClickTestStatus.NO_TARGET,
                         clickStatusMessage = "Selected button/link was not found on the current view."
                     )
@@ -611,6 +828,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update {
                     it.copy(
                         isAutoClickRunning = false,
+                        isManualClickListening = false,
                         clickStatus = ClickTestStatus.RESTRICTED,
                         clickStatusMessage = detail ?: "Click blocked by page security restrictions."
                     )
@@ -646,6 +864,9 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         val viewSec = state.viewDurationSec
         val pauseSec = state.pauseDurationSec
 
+        countedVisitToken = -1
+        countedFailToken = -1
+
         _uiState.update {
             it.copy(
                 urlInput = normalizedUrl,
@@ -654,12 +875,16 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 isRunning = true,
                 status = TestSessionStatus.LOADING,
                 activeUrl = normalizedUrl,
+                visitCount = 0,
+                failedCount = 0,
+                clickCount = 0,
                 currentRunNumber = 1,
                 activeTotalRuns = runs,
                 phaseRemainingSec = viewSec,
                 overallProgress = 0f,
                 isPreviewLoading = true,
                 previewBlockedReason = null,
+                lastLoadWasNetworkError = false,
                 canGoBack = false,
                 scrollStatus = when (it.scrollDirection) {
                     AutoScrollDirection.DOWN -> ScrollIndicatorState.SCROLLING_DOWN
@@ -697,14 +922,15 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                     activeTotalRuns = runs,
                     phaseRemainingSec = viewDurationSec,
                     isPreviewLoading = true,
-                    previewBlockedReason = null
+                    previewBlockedReason = null,
+                    lastLoadWasNetworkError = false
                 )
             }
 
             var loadGraceMs = 0
             while (_uiState.value.isPreviewLoading &&
                 _uiState.value.previewBlockedReason == null &&
-                loadGraceMs < 4000
+                loadGraceMs < 8000
             ) {
                 if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
                     stopTestForVpnLoss()
@@ -714,18 +940,63 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 loadGraceMs += 150
             }
 
-            if (_uiState.value.previewBlockedReason != null) {
-                _uiState.update {
-                    it.copy(
-                        isRunning = false,
-                        status = TestSessionStatus.BLOCKED,
-                        isPreviewLoading = false,
-                        scrollDirection = AutoScrollDirection.NONE,
-                        isScrollPaused = false,
-                        scrollStatus = ScrollIndicatorState.RESTRICTED
-                    )
+            val currentAfterWait = _uiState.value
+            val timedOut = currentAfterWait.isPreviewLoading && currentAfterWait.previewBlockedReason == null
+            if (timedOut) {
+                onPreviewBlockedOrError("Page load timed out before completing.", isNetworkError = false)
+            }
+
+            val stateAfterLoad = _uiState.value
+            if (stateAfterLoad.previewBlockedReason != null) {
+                val hardError = stateAfterLoad.lastLoadWasNetworkError
+                val canAdvance = !hardError && runIdx < runs && stateAfterLoad.autoNextEnabled
+                if (canAdvance) {
+                    _uiState.update {
+                        it.copy(
+                            status = TestSessionStatus.FAILED,
+                            isPreviewLoading = false,
+                            scrollDirection = AutoScrollDirection.NONE,
+                            isScrollPaused = false,
+                            scrollStatus = ScrollIndicatorState.RESTRICTED
+                        )
+                    }
+                    delay(1200)
+                    if (pauseDurationSec > 0) {
+                        _uiState.update {
+                            it.copy(
+                                status = TestSessionStatus.PAUSING_BETWEEN,
+                                activeUrl = null,
+                                phaseRemainingSec = pauseDurationSec,
+                                canGoBack = false
+                            )
+                        }
+                        for (pauseLeft in pauseDurationSec downTo 1) {
+                            if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
+                                stopTestForVpnLoss()
+                                return
+                            }
+                            _uiState.update { it.copy(phaseRemainingSec = pauseLeft) }
+                            delay(1000)
+                        }
+                    }
+                    continue
+                } else {
+                    autoClickJob?.cancel()
+                    autoClickJob = null
+                    _uiState.update {
+                        it.copy(
+                            isRunning = false,
+                            status = if (hardError) TestSessionStatus.ERROR else TestSessionStatus.FAILED,
+                            isPreviewLoading = false,
+                            isAutoClickRunning = false,
+                            isManualClickListening = false,
+                            scrollDirection = AutoScrollDirection.NONE,
+                            isScrollPaused = false,
+                            scrollStatus = ScrollIndicatorState.RESTRICTED
+                        )
+                    }
+                    return
                 }
-                return
             }
 
             _uiState.update {
@@ -752,10 +1023,15 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 delay(1000)
 
                 if (_uiState.value.previewBlockedReason != null) {
+                    val hardError = _uiState.value.lastLoadWasNetworkError
+                    autoClickJob?.cancel()
+                    autoClickJob = null
                     _uiState.update {
                         it.copy(
                             isRunning = false,
-                            status = TestSessionStatus.BLOCKED,
+                            status = if (hardError) TestSessionStatus.ERROR else TestSessionStatus.FAILED,
+                            isAutoClickRunning = false,
+                            isManualClickListening = false,
                             scrollDirection = AutoScrollDirection.NONE,
                             isScrollPaused = false,
                             scrollStatus = ScrollIndicatorState.RESTRICTED
@@ -794,22 +1070,22 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         autoClickJob = null
 
         _uiState.update {
+            val allFailed = it.visitCount == 0 && it.failedCount > 0
             it.copy(
                 isRunning = false,
-                status = TestSessionStatus.COMPLETED,
+                status = if (allFailed) TestSessionStatus.FAILED else TestSessionStatus.COMPLETED,
                 activeUrl = null,
                 phaseRemainingSec = 0,
-                overallProgress = 1f,
+                overallProgress = if (allFailed) it.overallProgress else 1f,
                 canGoBack = false,
                 scrollDirection = AutoScrollDirection.NONE,
                 isScrollPaused = false,
                 scrollPositionText = "0% • 0/0px",
                 scrollStatus = ScrollIndicatorState.IDLE,
                 isAutoClickRunning = false,
-                clickCount = 0,
+                isManualClickListening = false,
                 discoveredClickTargets = emptyList(),
-                clickStatus = ClickTestStatus.IDLE,
-                clickStatusMessage = null,
+                clickStatus = if (it.clickCount >= it.clickTarget && it.clickCount > 0) ClickTestStatus.COMPLETED else ClickTestStatus.IDLE,
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
             )
         }
@@ -820,23 +1096,29 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         queueJob = null
         autoClickJob?.cancel()
         autoClickJob = null
+        countedVisitToken = -1
+        countedFailToken = -1
 
         _uiState.update {
             it.copy(
                 isRunning = false,
                 status = TestSessionStatus.STOPPED,
                 activeUrl = null,
+                visitCount = 0,
+                failedCount = 0,
                 currentRunNumber = 0,
                 phaseRemainingSec = 0,
                 overallProgress = 0f,
                 isPreviewLoading = false,
                 previewBlockedReason = null,
+                lastLoadWasNetworkError = false,
                 canGoBack = false,
                 scrollDirection = AutoScrollDirection.NONE,
                 isScrollPaused = false,
                 scrollPositionText = "0% • 0/0px",
                 scrollStatus = ScrollIndicatorState.STOPPED,
                 isAutoClickRunning = false,
+                isManualClickListening = false,
                 clickCount = 0,
                 discoveredClickTargets = emptyList(),
                 clickStatus = ClickTestStatus.IDLE,
@@ -854,23 +1136,29 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         queueJob = null
         autoClickJob?.cancel()
         autoClickJob = null
+        countedVisitToken = -1
+        countedFailToken = -1
 
         _uiState.update {
             it.copy(
                 isRunning = false,
                 status = TestSessionStatus.STOPPED,
                 activeUrl = null,
+                visitCount = 0,
+                failedCount = 0,
                 currentRunNumber = 0,
                 phaseRemainingSec = 0,
                 overallProgress = 0f,
                 isPreviewLoading = false,
                 previewBlockedReason = null,
+                lastLoadWasNetworkError = false,
                 canGoBack = false,
                 scrollDirection = AutoScrollDirection.NONE,
                 isScrollPaused = false,
                 scrollPositionText = "0% • 0/0px",
                 scrollStatus = ScrollIndicatorState.STOPPED,
                 isAutoClickRunning = false,
+                isManualClickListening = false,
                 clickCount = 0,
                 discoveredClickTargets = emptyList(),
                 clickStatus = ClickTestStatus.IDLE,
@@ -897,6 +1185,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
             it.copy(
                 activeUrl = target,
                 previewBlockedReason = null,
+                lastLoadWasNetworkError = false,
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.HOME, target)
             )
         }
@@ -907,6 +1196,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         _uiState.update {
             it.copy(
                 previewBlockedReason = null,
+                lastLoadWasNetworkError = false,
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.RELOAD)
             )
         }
@@ -927,24 +1217,48 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun onPreviewPageFinished(canGoBack: Boolean) {
-        _uiState.update {
-            it.copy(
+        _uiState.update { state ->
+            val token = state.previewLoadToken
+            val shouldCountVisit = state.isRunning &&
+                state.status == TestSessionStatus.LOADING &&
+                state.previewBlockedReason == null &&
+                state.activeUrl != null &&
+                countedVisitToken != token &&
+                countedFailToken != token
+
+            if (shouldCountVisit) {
+                countedVisitToken = token
+            }
+
+            state.copy(
                 isPreviewLoading = false,
                 canGoBack = canGoBack,
-                status = if (it.isRunning && it.status == TestSessionStatus.LOADING) {
+                visitCount = if (shouldCountVisit) state.visitCount + 1 else state.visitCount,
+                status = if (state.isRunning && state.status == TestSessionStatus.LOADING && state.previewBlockedReason == null) {
                     TestSessionStatus.VIEWING
                 } else {
-                    it.status
+                    state.status
                 }
             )
         }
     }
 
-    fun onPreviewBlockedOrError(reason: String) {
-        _uiState.update {
-            it.copy(
+    fun onPreviewBlockedOrError(reason: String, isNetworkError: Boolean = false) {
+        _uiState.update { state ->
+            val token = state.previewLoadToken
+            val shouldCountFail = state.isRunning &&
+                countedFailToken != token &&
+                countedVisitToken != token
+
+            if (shouldCountFail) {
+                countedFailToken = token
+            }
+
+            state.copy(
                 isPreviewLoading = false,
                 previewBlockedReason = reason,
+                lastLoadWasNetworkError = isNetworkError,
+                failedCount = if (shouldCountFail) state.failedCount + 1 else state.failedCount,
                 scrollDirection = AutoScrollDirection.NONE,
                 isScrollPaused = false,
                 scrollStatus = ScrollIndicatorState.RESTRICTED

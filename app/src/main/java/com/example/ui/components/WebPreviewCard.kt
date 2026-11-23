@@ -3,8 +3,11 @@ package com.example.ui.components
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.http.SslError
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -115,15 +118,17 @@ fun WebPreviewCard(
     onPageFinished: (Boolean) -> Unit,
     onCanGoBackChanged: (Boolean) -> Unit,
     onScrollFeedback: (ScrollIndicatorState, String?) -> Unit,
-    onBlockedOrError: (String) -> Unit,
+    onBlockedOrError: (String, Boolean) -> Unit,
     onOpenExternal: (String) -> Unit,
     onTargetsScanned: (List<ClickTargetItem>, String?) -> Unit,
     onClickExecuted: (String, String?) -> Unit,
+    onDirectPreviewClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var webProgress by remember { mutableIntStateOf(0) }
     var lastLoadedToken by remember { mutableIntStateOf(-1) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     // Smooth independent Scroll Down / Scroll Up / Random Scroll with Pause, Position & Stuck detection
     LaunchedEffect(
@@ -420,6 +425,17 @@ fun WebPreviewCard(
                                 builtInZoomControls = true
                                 displayZoomControls = false
                             }
+                            addJavascriptInterface(
+                                object {
+                                    @JavascriptInterface
+                                    fun onDirectClick(label: String?) {
+                                        mainHandler.post {
+                                            onDirectPreviewClick(label.orEmpty())
+                                        }
+                                    }
+                                },
+                                "WebVisitBridge"
+                            )
                             webChromeClient = object : WebChromeClient() {
                                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                     webProgress = newProgress
@@ -431,10 +447,14 @@ fun WebPreviewCard(
                                     url: String?,
                                     favicon: Bitmap?
                                 ) {
-                                    onPageStarted()
+                                    if (!url.isNullOrBlank() && url != "about:blank") {
+                                        onPageStarted()
+                                    }
                                 }
 
                                 override fun onPageFinished(view: WebView?, url: String?) {
+                                    if (url.isNullOrBlank() || url == "about:blank") return
+                                    view?.evaluateJavascript(buildDirectClickObserverScript(), null)
                                     onPageFinished(view?.canGoBack() == true)
                                 }
 
@@ -454,7 +474,7 @@ fun WebPreviewCard(
                                     if (request?.isForMainFrame == true) {
                                         val desc = error?.description?.toString()
                                             ?: "Unable to load website inside embedded preview."
-                                        onBlockedOrError(desc)
+                                        onBlockedOrError(desc, true)
                                     }
                                 }
 
@@ -475,7 +495,7 @@ fun WebPreviewCard(
                                             } else {
                                                 "HTTP $code response received. Open directly in browser if needed."
                                             }
-                                            onBlockedOrError(msg)
+                                            onBlockedOrError(msg, false)
                                         }
                                     }
                                 }
@@ -486,7 +506,7 @@ fun WebPreviewCard(
                                     error: SslError?
                                 ) {
                                     handler?.cancel()
-                                    onBlockedOrError("SSL certificate verification failed. Open directly in your browser.")
+                                    onBlockedOrError("SSL certificate verification failed. Open directly in your browser.", true)
                                 }
                             }
                             webViewRef = this
@@ -638,6 +658,8 @@ fun WebPreviewCard(
                     Text(
                         text = when (status) {
                             TestSessionStatus.COMPLETED -> "Testing Completed"
+                            TestSessionStatus.FAILED -> "Testing Failed"
+                            TestSessionStatus.ERROR -> "Network / Connection Error"
                             TestSessionStatus.STOPPED -> "Session Stopped & Cleared"
                             else -> stringResource(R.string.empty_preview_title)
                         },
@@ -851,6 +873,43 @@ private const val AD_GUARD_JS = """
     return rect.width >= 2 && rect.height >= 2;
   }
 """
+
+private fun buildDirectClickObserverScript(): String {
+    return """
+        (function() {
+          try {
+            if (window.__wvDirectClickBound) return;
+            window.__wvDirectClickBound = true;
+            $AD_GUARD_JS
+            var lastEl = null;
+            var lastAt = 0;
+            document.addEventListener('click', function(ev) {
+              if (!ev.isTrusted) return;
+              var raw = ev.target && ev.target.closest
+                ? ev.target.closest('button, a[href], [role="button"], input[type="button"], input[type="submit"], [onclick]')
+                : null;
+              if (!raw) return;
+              var now = Date.now();
+              if (raw === lastEl && now - lastAt < 280) {
+                ev.preventDefault();
+                ev.stopImmediatePropagation();
+                return;
+              }
+              lastEl = raw;
+              lastAt = now;
+              if (isProhibitedAdElement(raw)) return;
+              var label = (raw.innerText || raw.value || raw.getAttribute('aria-label') || raw.tagName)
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 24);
+              if (window.WebVisitBridge && typeof window.WebVisitBridge.onDirectClick === 'function') {
+                window.WebVisitBridge.onDirectClick(label || raw.tagName.toLowerCase());
+              }
+            }, true);
+          } catch (e) {}
+        })();
+    """.trimIndent()
+}
 
 private fun buildScanClickablesScript(): String {
     return """

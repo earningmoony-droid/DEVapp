@@ -28,10 +28,11 @@
     <string name="btn_vpn_disconnect">Disconnect</string>
     <string name="btn_vpn_verify">Verify</string>
     <string name="label_click_module">Clicks &amp; Tap Automation</string>
-    <string name="btn_start_click">Start Click</string>
-    <string name="btn_stop_click">Stop Click</string>
-    <string name="btn_start_tap">Start Tap</string>
-    <string name="btn_stop_tap">Stop Tap</string>
+    <string name="btn_start_click">Start Click Test</string>
+    <string name="btn_stop_click">Stop Click Test</string>
+    <string name="btn_start_tap">Start Tap Test</string>
+    <string name="btn_stop_tap">Stop Tap Test</string>
+    <string name="btn_reset_click_counter">Reset Counter</string>
     <string name="btn_single_click">1x Click Test</string>
     <string name="btn_single_tap">1x Tap Test</string>
     <string name="btn_scan_targets">Scan Targets</string>
