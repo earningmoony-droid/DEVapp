@@ -1,0 +1,6 @@
+{
+  "name": "WebVisit Tester",
+  "description": "Mobile-first Liquid Glass website preview and session tester with configurable timers, queue progress, and local test history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,31 @@
+<resources>
+    <string name="app_name">WebVisit Tester</string>
+    <string name="tab_dashboard">Dashboard</string>
+    <string name="tab_history">History</string>
+    <string name="url_label">Website URL</string>
+    <string name="url_placeholder">https://example.com</string>
+    <string name="url_error_empty">Enter a website URL to start testing.</string>
+    <string name="url_error_scheme">URL must start with http:// or https://</string>
+    <string name="url_error_invalid">Enter a valid HTTP or HTTPS web address.</string>
+    <string name="btn_start">Start Test</string>
+    <string name="btn_pause">Pause</string>
+    <string name="btn_resume">Resume</string>
+    <string name="btn_stop">Stop</string>
+    <string name="btn_open_website">Open Website</string>
+    <string name="btn_clear_history">Clear History</string>
+    <string name="btn_export_html">index.html</string>
+    <string name="label_view_duration">Viewing Duration</string>
+    <string name="label_pause_duration">Pause Between Runs</string>
+    <string name="label_total_runs">Testing Runs</string>
+    <string name="label_completed_sessions">Completed</string>
+    <string name="label_remaining_tests">Remaining</string>
+    <string name="label_current_status">Status</string>
+    <string name="label_preview_title">Live Website Preview</string>
+    <string name="label_recent_history">Recent Test History</string>
+    <string name="empty_preview_title">Ready to Test Your Site</string>
+    <string name="empty_preview_subtitle">Enter an HTTP or HTTPS URL above and press Start Test to load the embedded preview.</string>
+    <string name="blocked_preview_title">Embedded Preview Restricted</string>
+    <string name="blocked_preview_subtitle">This website restricts embedded loading or failed to respond. Open it directly in your browser without bypassing site security.</string>
+    <string name="empty_history_title">No Test History Yet</string>
+    <string name="empty_history_subtitle">Completed, stopped, or browser-opened test sessions are saved locally on your device.</string>
+</resources>

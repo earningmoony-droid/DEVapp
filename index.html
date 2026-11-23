@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#06091A" />
+  <title>WebVisit Tester</title>
+  <style>
+    :root {
+      --bg-deep: #06091a;
+      --bg-navy: #0d1538;
+      --bg-violet: #1b1045;
+      --cyan: #38bdf8;
+      --indigo: #6366f1;
+      --purple: #a855f7;
+      --emerald: #34d399;
+      --amber: #fbbf24;
+      --coral: #fb7185;
+      --glass-bg: rgba(18, 26, 58, 0.62);
+      --glass-elevated: rgba(26, 36, 77, 0.72);
+      --glass-border: rgba(255, 255, 255, 0.16);
+      --glass-border-violet: rgba(139, 92, 246, 0.34);
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      min-height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Plus Jakarta Sans", sans-serif;
+      color: var(--text-primary);
+      background: linear-gradient(145deg, var(--bg-deep) 0%, var(--bg-navy) 45%, var(--bg-violet) 100%);
+      background-attachment: fixed;
+      line-height: 1.45;
+      overflow-x: hidden;
+    }
+
+    /* Ambient liquid glass glow orbs */
+    .ambient-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(75px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.45;
+      animation: floatOrb 12s ease-in-out infinite alternate;
+    }
+
+    .orb-cyan {
+      width: 280px;
+      height: 280px;
+      top: -60px;
+      left: -60px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.55), transparent 70%);
+    }
+
+    .orb-purple {
+      width: 320px;
+      height: 320px;
+      top: 30%;
+      right: -90px;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.5), transparent 70%);
+      animation-delay: -5s;
+    }
+
+    .orb-indigo {
+      width: 260px;
+      height: 260px;
+      bottom: -80px;
+      left: 20%;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.45), transparent 70%);
+      animation-delay: -9s;
+    }
+
+    @keyframes floatOrb {
+      from { transform: translate(0, 0) scale(1); }
+      to { transform: translate(24px, 18px) scale(1.08); }
+    }
+
+    .app-shell {
+      position: relative;
+      z-index: 1;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: calc(16px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .glass-panel {
+      background: linear-gradient(145deg, var(--glass-elevated), var(--glass-bg));
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 18px 42px rgba(3, 6, 20, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      transition: transform 0.22s ease, border-color 0.22s ease;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 13px;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.24), rgba(168, 85, 247, 0.28));
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: 1.12rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+    }
+
+    .dashboard-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .metric-tile {
+      background: rgba(11, 17, 40, 0.56);
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metric-label {
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .metric-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    @media (min-width: 860px) {
+      .layout-grid {
+        grid-template-columns: 400px 1fr;
+        align-items: start;
+      }
+    }
+
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .field-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .url-row {
+      display: flex;
+      align-items: center;
+      background: rgba(6, 9, 26, 0.65);
+      border: 1px solid var(--glass-border-violet);
+      border-radius: var(--radius-md);
+      padding: 4px 8px 4px 12px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .url-row:focus-within {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.16);
+    }
+
+    .url-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-size: 0.92rem;
+      padding: 10px 6px;
+      min-height: 44px;
+    }
+
+    .url-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .protocol-chips {
+      display: flex;
+      gap: 8px;
+    }
+
+    .chip-btn {
+      flex: 1;
+      min-height: 36px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(6, 9, 26, 0.48);
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .chip-btn.active {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: rgba(56, 189, 248, 0.55);
+      color: var(--cyan);
+    }
+
+    .chip-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .error-text {
+      font-size: 0.78rem;
+      color: var(--coral);
+      min-height: 18px;
+    }
+
+    .timer-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .num-box {
+      background: rgba(6, 9, 26, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-md);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .num-box label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .num-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+      color: var(--cyan);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 1.05rem;
+      font-weight: 700;
+      padding: 4px 0;
+      outline: none;
+    }
+
+    .controls-row {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btn {
+      min-height: 48px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 12px;
+      transition: transform 0.15s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .btn:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--cyan), var(--indigo), var(--purple));
+      box-shadow: 0 10px 24px rgba(99, 102, 241, 0.35);
+    }
+
+    .btn-pause {
+      background: rgba(251, 191, 36, 0.16);
+      border-color: rgba(251, 191, 36, 0.48);
+      color: #fde68a;
+    }
+
+    .btn-stop {
+      background: rgba(251, 113, 133, 0.16);
+      border-color: rgba(251, 113, 133, 0.48);
+      color: #fecdd3;
+    }
+
+    .btn-ghost {
+      min-height: 38px;
+      padding: 0 12px;
+      border-radius: 12px;
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.42);
+      color: var(--text-primary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .queue-box {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .queue-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(6, 9, 26, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--cyan), var(--indigo), var(--purple));
+      transition: width 0.35s ease;
+    }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .preview-url-tag {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .preview-stage {
+      position: relative;
+      width: 100%;
+      height: 360px;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: rgba(6, 9, 26, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .preview-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #ffffff;
+      display: none;
+    }
+
+    .preview-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      gap: 10px;
+      background: radial-gradient(circle at center, rgba(26, 36, 77, 0.52), rgba(6, 9, 26, 0.92));
+    }
+
+    .preview-overlay h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .preview-overlay p {
+      font-size: 0.84rem;
+      color: var(--text-secondary);
+      max-width: 340px;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+
+    .history-item {
+      background: rgba(6, 9, 26, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .history-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .history-url {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .badge-completed { background: rgba(52, 211, 153, 0.16); color: var(--emerald); border: 1px solid rgba(52, 211, 153, 0.4); }
+    .badge-stopped { background: rgba(251, 191, 36, 0.16); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.4); }
+    .badge-blocked { background: rgba(251, 113, 133, 0.16); color: var(--coral); border: 1px solid rgba(251, 113, 133, 0.4); }
+    .badge-opened { background: rgba(56, 189, 248, 0.16); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.4); }
+
+    .history-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .empty-history {
+      text-align: center;
+      padding: 24px 12px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-orb orb-cyan"></div>
+  <div class="ambient-orb orb-purple"></div>
+  <div class="ambient-orb orb-indigo"></div>
+
+  <main class="app-shell">
+    <header class="glass-panel topbar">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">WebVisit Tester</div>
+          <div class="brand-sub">Single-site sequential preview &amp; session timer</div>
+        </div>
+      </div>
+      <div class="status-pill" id="statusPill">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Ready</span>
+      </div>
+    </header>
+
+    <section class="dashboard-metrics" aria-label="Dashboard Summary">
+      <div class="metric-tile">
+        <span class="metric-label">Completed Sessions</span>
+        <span class="metric-value" id="metricCompleted">0</span>
+      </div>
+      <div class="metric-tile">
+        <span class="metric-label">Remaining Tests</span>
+        <span class="metric-value" id="metricRemaining">0</span>
+      </div>
+      <div class="metric-tile">
+        <span class="metric-label">Phase Timer</span>
+        <span class="metric-value" id="metricTimer">00:00</span>
+      </div>
+    </section>
+
+    <div class="layout-grid">
+      <section class="glass-panel" aria-label="Test Configuration and Controls">
+        <div class="section-title">
+          <span>Target Website &amp; Timer</span>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">
+            <label for="urlInput">Website URL (HTTP / HTTPS)</label>
+          </div>
+          <div class="url-row">
+            <input
+              id="urlInput"
+              class="url-input"
+              type="url"
+              inputmode="url"
+              autocomplete="url"
+              placeholder="https://example.com"
+              value="https://example.com"
+            />
+          </div>
+          <div class="protocol-chips">
+            <button type="button" class="chip-btn active" id="btnHttps">https://</button>
+            <button type="button" class="chip-btn" id="btnHttp">http://</button>
+          </div>
+          <div class="error-text" id="urlError" role="alert"></div>
+        </div>
+
+        <div class="timer-grid">
+          <div class="num-box">
+            <label for="viewSecInput">View (sec)</label>
+            <input id="viewSecInput" class="num-input" type="number" min="3" max="300" value="15" />
+          </div>
+          <div class="num-box">
+            <label for="pauseSecInput">Pause (sec)</label>
+            <input id="pauseSecInput" class="num-input" type="number" min="0" max="120" value="3" />
+          </div>
+          <div class="num-box">
+            <label for="runsInput">Runs</label>
+            <input id="runsInput" class="num-input" type="number" min="1" max="50" value="3" />
+          </div>
+        </div>
+
+        <div class="controls-row">
+          <button type="button" class="btn btn-primary" id="startBtn">Start Test</button>
+          <button type="button" class="btn btn-pause" id="pauseBtn" disabled>Pause</button>
+          <button type="button" class="btn btn-stop" id="stopBtn" disabled>Stop</button>
+        </div>
+
+        <div class="queue-box">
+          <div class="queue-meta">
+            <span id="queueRunLabel">Run 0 of 0</span>
+            <span id="queuePercentLabel">0%</span>
+          </div>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressTrack">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass-panel" aria-label="Website Preview">
+        <div class="preview-header">
+          <div style="min-width: 0; flex: 1;">
+            <div style="font-size: 0.95rem; font-weight: 700;">Website Preview</div>
+            <div class="preview-url-tag" id="previewUrlLabel">Ready for URL</div>
+          </div>
+          <a
+            id="headerOpenBtn"
+            class="btn btn-ghost"
+            href="https://example.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Open Website</a>
+        </div>
+
+        <div class="preview-stage">
+          <iframe
+            id="previewFrame"
+            class="preview-iframe"
+            title="Embedded website preview"
+            sandbox="allow-scripts allow-forms allow-same-origin"
+          ></iframe>
+
+          <div class="preview-overlay" id="previewOverlay">
+            <h3 id="overlayTitle">Ready to Test Your Site</h3>
+            <p id="overlayDesc">Enter your HTTP or HTTPS website URL and press Start Test to run sequential embedded previews.</p>
+            <a
+              id="overlayOpenBtn"
+              class="btn btn-primary"
+              href="https://example.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="display: none; text-decoration: none; padding: 0 18px;"
+            >Open Website</a>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="glass-panel" aria-label="Test History">
+      <div class="section-title">
+        <span>Test History (Saved Locally)</span>
+        <button type="button" class="btn btn-ghost" id="clearHistoryBtn">Clear</button>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const STORAGE_HISTORY_KEY = "webvisit_tester_history_v1";
+      const STORAGE_SETTINGS_KEY = "webvisit_tester_settings_v1";
+      const STORAGE_TOTAL_COMPLETED_KEY = "webvisit_tester_total_completed_v1";
+
+      const urlInput = document.getElementById("urlInput");
+      const urlError = document.getElementById("urlError");
+      const btnHttps = document.getElementById("btnHttps");
+      const btnHttp = document.getElementById("btnHttp");
+      const viewSecInput = document.getElementById("viewSecInput");
+      const pauseSecInput = document.getElementById("pauseSecInput");
+      const runsInput = document.getElementById("runsInput");
+      const startBtn = document.getElementById("startBtn");
+      const pauseBtn = document.getElementById("pauseBtn");
+      const stopBtn = document.getElementById("stopBtn");
+
+      const statusText = document.getElementById("statusText");
+      const statusDot = document.getElementById("statusDot");
+      const metricCompleted = document.getElementById("metricCompleted");
+      const metricRemaining = document.getElementById("metricRemaining");
+      const metricTimer = document.getElementById("metricTimer");
+      const queueRunLabel = document.getElementById("queueRunLabel");
+      const queuePercentLabel = document.getElementById("queuePercentLabel");
+      const progressFill = document.getElementById("progressFill");
+      const progressTrack = document.getElementById("progressTrack");
+
+      const previewFrame = document.getElementById("previewFrame");
+      const previewOverlay = document.getElementById("previewOverlay");
+      const overlayTitle = document.getElementById("overlayTitle");
+      const overlayDesc = document.getElementById("overlayDesc");
+      const overlayOpenBtn = document.getElementById("overlayOpenBtn");
+      const headerOpenBtn = document.getElementById("headerOpenBtn");
+      const previewUrlLabel = document.getElementById("previewUrlLabel");
+      const historyList = document.getElementById("historyList");
+      const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+
+      let state = {
+        running: false,
+        paused: false,
+        currentRun: 0,
+        totalRuns: 3,
+        completedInBatch: 0,
+        viewSec: 15,
+        pauseSec: 3,
+        phase: "idle", // idle | loading | viewing | cooldown | blocked | completed | stopped
+        phaseRemaining: 0,
+        timerId: null,
+        loadTimeoutId: null,
+        activeUrl: ""
+      };
+
+      function validateUrl(raw) {
+        const trimmed = (raw || "").trim();
+        if (!trimmed) return { valid: false, error: "Enter a website URL to start testing." };
+        if (/\s/.test(trimmed)) return { valid: false, error: "URL cannot contain spaces." };
+        if (!/^https?:\/\//i.test(trimmed)) {
+          return { valid: false, error: "URL must start with http:// or https://" };
+        }
+        try {
+          const parsed = new URL(trimmed);
+          if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            return { valid: false, error: "Only HTTP and HTTPS protocols are allowed." };
+          }
+          if (!parsed.hostname) {
+            return { valid: false, error: "Enter a valid website host." };
+          }
+          return { valid: true, url: parsed.toString() };
+        } catch {
+          return { valid: false, error: "Enter a valid HTTP or HTTPS web address." };
+        }
+      }
+
+      function formatSeconds(sec) {
+        const s = Math.max(0, Math.floor(sec));
+        const m = String(Math.floor(s / 60)).padStart(2, "0");
+        const r = String(s % 60).padStart(2, "0");
+        return `${m}:${r}`;
+      }
+
+      function loadSettings() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || "null");
+          if (saved) {
+            if (saved.url) urlInput.value = saved.url;
+            if (saved.viewSec) viewSecInput.value = saved.viewSec;
+            if (saved.pauseSec !== undefined) pauseSecInput.value = saved.pauseSec;
+            if (saved.runs) runsInput.value = saved.runs;
+          }
+        } catch {}
+        syncProtocolChips();
+        syncExternalLinks(urlInput.value.trim());
+      }
+
+      function saveSettings() {
+        try {
+          localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify({
+            url: urlInput.value.trim(),
+            viewSec: clampInt(viewSecInput.value, 3, 300, 15),
+            pauseSec: clampInt(pauseSecInput.value, 0, 120, 3),
+            runs: clampInt(runsInput.value, 1, 50, 3)
+          }));
+        } catch {}
+      }
+
+      function clampInt(val, min, max, fallback) {
+        const n = parseInt(val, 10);
+        if (Number.isNaN(n)) return fallback;
+        return Math.min(max, Math.max(min, n));
+      }
+
+      function getTotalCompleted() {
+        return parseInt(localStorage.getItem(STORAGE_TOTAL_COMPLETED_KEY) || "0", 10) || 0;
+      }
+
+      function addHistory(url, statusLabel, badgeClass, completedRuns, totalRuns) {
+        let history = [];
+        try {
+          history = JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]");
+        } catch {
+          history = [];
+        }
+        history.unshift({
+          timestamp: new Date().toISOString(),
+          url,
+          statusLabel,
+          badgeClass,
+          completedRuns,
+          totalRuns
+        });
+        history = history.slice(0, 100);
+        localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(history));
+        if (completedRuns > 0) {
+          localStorage.setItem(STORAGE_TOTAL_COMPLETED_KEY, String(getTotalCompleted() + completedRuns));
+        }
+        renderHistory();
+        updateUI();
+      }
+
+      function renderHistory() {
+        let history = [];
+        try {
+          history = JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]");
+        } catch {
+          history = [];
+        }
+        if (!history.length) {
+          historyList.innerHTML = `<div class="empty-history">No test history yet. Completed and stopped runs are saved locally in your browser.</div>`;
+          return;
+        }
+        historyList.innerHTML = history.map((item) => {
+          const dt = new Date(item.timestamp);
+          const formattedDate = dt.toLocaleString();
+          return `
+            <div class="history-item">
+              <div class="history-top">
+                <span class="history-url">${escapeHtml(item.url)}</span>
+                <span class="badge ${escapeHtml(item.badgeClass)}">${escapeHtml(item.statusLabel)}</span>
+              </div>
+              <div class="history-meta">
+                <span>${escapeHtml(formattedDate)}</span>
+                <span>${item.completedRuns} / ${item.totalRuns} runs</span>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function syncProtocolChips() {
+        const lower = urlInput.value.trim().toLowerCase();
+        btnHttps.classList.toggle("active", !lower.startsWith("http://"));
+        btnHttp.classList.toggle("active", lower.startsWith("http://"));
+      }
+
+      function syncExternalLinks(url) {
+        const check = validateUrl(url);
+        const safeHref = check.valid ? check.url : "https://example.com";
+        headerOpenBtn.href = safeHref;
+        overlayOpenBtn.href = safeHref;
+      }
+
+      function showOverlay(title, desc, showOpenBtn = false) {
+        previewFrame.style.display = "none";
+        previewOverlay.style.display = "flex";
+        overlayTitle.textContent = title;
+        overlayDesc.textContent = desc;
+        overlayOpenBtn.style.display = showOpenBtn ? "inline-flex" : "none";
+      }
+
+      function showIframe() {
+        previewOverlay.style.display = "none";
+        previewFrame.style.display = "block";
+      }
+
+      function updateUI() {
+        metricCompleted.textContent = String(getTotalCompleted());
+        const remaining = state.running
+          ? Math.max(0, state.totalRuns - state.completedInBatch)
+          : 0;
+        metricRemaining.textContent = String(remaining);
+        metricTimer.textContent = formatSeconds(state.phaseRemaining);
+
+        const labelMap = {
+          idle: ["Ready", "#38bdf8"],
+          loading: ["Loading Site", "#38bdf8"],
+          viewing: ["Viewing Site", "#34d399"],
+          cooldown: ["Cooldown Pause", "#fbbf24"],
+          paused: ["Paused", "#fbbf24"],
+          blocked: ["Preview Restricted", "#fb7185"],
+          completed: ["Completed", "#34d399"],
+          stopped: ["Stopped", "#fbbf24"]
+        };
+
+        const activeKey = state.paused ? "paused" : state.phase;
+        const [label, color] = labelMap[activeKey] || ["Ready", "#38bdf8"];
+        statusText.textContent = label;
+        statusDot.style.background = color;
+        statusDot.style.boxShadow = `0 0 10px ${color}`;
+
+        const progressPct = state.totalRuns > 0 && (state.running || state.phase === "completed")
+          ? Math.round((state.completedInBatch / state.totalRuns) * 100)
+          : 0;
+
+        queueRunLabel.textContent = state.running
+          ? `Run ${state.currentRun} of ${state.totalRuns}`
+          : (state.phase === "completed" ? `Completed ${state.totalRuns} of ${state.totalRuns}` : "Run 0 of 0");
+        queuePercentLabel.textContent = `${progressPct}%`;
+        progressFill.style.width = `${progressPct}%`;
+        progressTrack.setAttribute("aria-valuenow", String(progressPct));
+
+        urlInput.disabled = state.running;
+        btnHttps.disabled = state.running;
+        btnHttp.disabled = state.running;
+        viewSecInput.disabled = state.running;
+        pauseSecInput.disabled = state.running;
+        runsInput.disabled = state.running;
+
+        startBtn.disabled = state.running;
+        pauseBtn.disabled = !state.running;
+        pauseBtn.textContent = state.paused ? "Resume" : "Pause";
+        stopBtn.disabled = !state.running;
+      }
+
+      function clearTimers() {
+        if (state.timerId) {
+          clearInterval(state.timerId);
+          state.timerId = null;
+        }
+        if (state.loadTimeoutId) {
+          clearTimeout(state.loadTimeoutId);
+          state.loadTimeoutId = null;
+        }
+      }
+
+      function beginRun(runNumber) {
+        state.currentRun = runNumber;
+        state.phase = "loading";
+        state.phaseRemaining = state.viewSec;
+        previewUrlLabel.textContent = state.activeUrl;
+        syncExternalLinks(state.activeUrl);
+        updateUI();
+
+        showOverlay("Loading Embedded Preview...", `Run ${runNumber} of ${state.totalRuns} • Respecting site embedding headers`, false);
+
+        // Cache-bust query or clean URL reload; keep exact URL intact without spoofing
+        previewFrame.src = "about:blank";
+        setTimeout(() => {
+          if (!state.running) return;
+          previewFrame.src = state.activeUrl;
+        }, 60);
+
+        let iframeResponded = false;
+        previewFrame.onload = () => {
+          if (!state.running || previewFrame.src === "about:blank") return;
+          iframeResponded = true;
+          clearTimeout(state.loadTimeoutId);
+
+          // Check if iframe blocked via X-Frame-Options/CSP (browsers often render an opaque cross-origin document or blank frame)
+          // Note: Cross-origin access throws SecurityError when embedded successfully, which is normal for allowed cross-origin iframes!
+          // We rely on explicit error or user-visible Open Website fallback if blank/blocked.
+          state.phase = "viewing";
+          showIframe();
+          updateUI();
+        };
+
+        previewFrame.onerror = () => {
+          handleBlockedPreview("The website refused embedded iframe access or failed to load.");
+        };
+
+        state.loadTimeoutId = setTimeout(() => {
+          if (!iframeResponded && state.running) {
+            state.phase = "viewing";
+            showIframe();
+            updateUI();
+          }
+        }, 4500);
+      }
+
+      function handleBlockedPreview(reason) {
+        clearTimers();
+        state.running = false;
+        state.paused = false;
+        state.phase = "blocked";
+        previewFrame.src = "about:blank";
+        showOverlay(
+          "Embedded Preview Restricted",
+          reason + " Use Open Website to test directly in a new tab without bypassing site security.",
+          true
+        );
+        addHistory(state.activeUrl, "Preview Blocked", "badge-blocked", state.completedInBatch, state.totalRuns);
+        updateUI();
+      }
+
+      function tick() {
+        if (!state.running || state.paused) return;
+
+        if (state.phase === "loading" || state.phase === "viewing") {
+          if (state.phaseRemaining > 1) {
+            state.phaseRemaining -= 1;
+            updateUI();
+          } else {
+            state.completedInBatch = state.currentRun;
+            if (state.currentRun >= state.totalRuns) {
+              clearTimers();
+              state.running = false;
+              state.phase = "completed";
+              state.phaseRemaining = 0;
+              previewFrame.src = "about:blank";
+              showOverlay("All Test Runs Completed", `Finished ${state.totalRuns} sequential session(s) for ${state.activeUrl}.`, true);
+              addHistory(state.activeUrl, "Completed", "badge-completed", state.completedInBatch, state.totalRuns);
+              updateUI();
+            } else if (state.pauseSec > 0) {
+              state.phase = "cooldown";
+              state.phaseRemaining = state.pauseSec;
+              previewFrame.src = "about:blank";
+              showOverlay("Pause Between Sessions", `Waiting ${state.pauseSec}s before Run ${state.currentRun + 1}...`, false);
+              updateUI();
+            } else {
+              beginRun(state.currentRun + 1);
+            }
+          }
+        } else if (state.phase === "cooldown") {
+          if (state.phaseRemaining > 1) {
+            state.phaseRemaining -= 1;
+            overlayDesc.textContent = `Waiting ${state.phaseRemaining}s before Run ${state.currentRun + 1}...`;
+            updateUI();
+          } else {
+            beginRun(state.currentRun + 1);
+          }
+        }
+      }
+
+      urlInput.addEventListener("input", () => {
+        syncProtocolChips();
+        const check = validateUrl(urlInput.value);
+        urlError.textContent = urlInput.value.trim() && !check.valid ? check.error : "";
+        syncExternalLinks(urlInput.value);
+      });
+
+      btnHttps.addEventListener("click", () => {
+        const clean = urlInput.value.trim().replace(/^https?:\/\//i, "");
+        urlInput.value = "https://" + clean;
+        urlInput.dispatchEvent(new Event("input"));
+      });
+
+      btnHttp.addEventListener("click", () => {
+        const clean = urlInput.value.trim().replace(/^https?:\/\//i, "");
+        urlInput.value = "http://" + clean;
+        urlInput.dispatchEvent(new Event("input"));
+      });
+
+      startBtn.addEventListener("click", () => {
+        const check = validateUrl(urlInput.value);
+        if (!check.valid) {
+          urlError.textContent = check.error;
+          return;
+        }
+        urlError.textContent = "";
+        urlInput.value = check.url;
+
+        state.viewSec = clampInt(viewSecInput.value, 3, 300, 15);
+        state.pauseSec = clampInt(pauseSecInput.value, 0, 120, 3);
+        state.totalRuns = clampInt(runsInput.value, 1, 50, 3);
+        viewSecInput.value = state.viewSec;
+        pauseSecInput.value = state.pauseSec;
+        runsInput.value = state.totalRuns;
+        saveSettings();
+
+        clearTimers();
+        state.running = true;
+        state.paused = false;
+        state.completedInBatch = 0;
+        state.activeUrl = check.url;
+        beginRun(1);
+        state.timerId = setInterval(tick, 1000);
+      });
+
+      pauseBtn.addEventListener("click", () => {
+        if (!state.running) return;
+        state.paused = !state.paused;
+        updateUI();
+      });
+
+      stopBtn.addEventListener("click", () => {
+        if (!state.running) return;
+        clearTimers();
+        const completed = state.completedInBatch;
+        const total = state.totalRuns;
+        const url = state.activeUrl;
+        state.running = false;
+        state.paused = false;
+        state.phase = "stopped";
+        state.phaseRemaining = 0;
+        previewFrame.src = "about:blank";
+        showOverlay("Testing Stopped", "The active test queue was stopped by user control.", true);
+        addHistory(url, "Stopped", "badge-stopped", completed, total);
+        updateUI();
+      });
+
+      headerOpenBtn.addEventListener("click", () => {
+        const check = validateUrl(urlInput.value);
+        if (check.valid) {
+          addHistory(check.url, "Opened Website", "badge-opened", 1, clampInt(runsInput.value, 1, 50, 1));
+        }
+      });
+
+      overlayOpenBtn.addEventListener("click", () => {
+        const check = validateUrl(urlInput.value);
+        if (check.valid) {
+          addHistory(check.url, "Opened Website", "badge-opened", 1, clampInt(runsInput.value, 1, 50, 1));
+        }
+      });
+
+      clearHistoryBtn.addEventListener("click", () => {
+        localStorage.removeItem(STORAGE_HISTORY_KEY);
+        localStorage.setItem(STORAGE_TOTAL_COMPLETED_KEY, "0");
+        renderHistory();
+        updateUI();
+      });
+
+      loadSettings();
+      renderHistory();
+      updateUI();
+    })();
+  </script>
+</body>
+</html>
