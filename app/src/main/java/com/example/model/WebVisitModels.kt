@@ -105,6 +105,15 @@ enum class RandomInteractionStatus(val label: String) {
     RESTRICTED("Restricted")
 }
 
+enum class DiagnosticResultStatus(val label: String) {
+    IDLE("Idle"),
+    RUNNING("Running"),
+    PASSED("Passed"),
+    FAILED("Failed"),
+    BLOCKED("Blocked"),
+    STOPPED("Stopped")
+}
+
 enum class WebCommandType {
     BACK,
     HOME,
@@ -113,7 +122,10 @@ enum class WebCommandType {
     SCAN_CLICK_TARGETS,
     EXECUTE_SINGLE_CLICK,
     EXECUTE_RANDOM_TAP,
-    RANDOM_SCROLL_STEP
+    RANDOM_SCROLL_STEP,
+    DIAG_VERIFY_LISTENER,
+    DIAG_TEST_BUTTON,
+    DIAG_TEST_LINK
 }
 
 data class WebCommandEvent(

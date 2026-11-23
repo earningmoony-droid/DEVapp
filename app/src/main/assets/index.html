@@ -921,6 +921,65 @@
       color: var(--emerald);
       white-space: nowrap;
     }
+
+    .diag-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .diag-cell {
+      background: rgba(6, 9, 26, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: 12px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .diag-cell-title {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .diag-cell-val {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      word-break: break-word;
+    }
+
+    .diag-note-box {
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 12px;
+      padding: 9px 11px;
+      margin-bottom: 10px;
+      font-size: 0.74rem;
+      line-height: 1.4;
+      color: var(--text-secondary);
+    }
+
+    .diag-checks-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .btn-diag-sub {
+      background: rgba(15, 23, 56, 0.72);
+      border-color: rgba(255, 255, 255, 0.16);
+      color: var(--text-primary);
+      min-height: 44px;
+      font-size: 0.74rem;
+      padding: 0 8px;
+    }
   </style>
 </head>
 <body>
@@ -1223,6 +1282,79 @@
           </div>
         </section>
 
+        <section class="glass-panel" aria-label="Impression and Click Diagnostic">
+          <div class="vpn-header">
+            <div class="vpn-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+              <span>Impression &amp; Click Diagnostic</span>
+            </div>
+            <span class="click-badge" id="diagResultBadge">Result: Idle</span>
+          </div>
+
+          <div class="diag-grid-2" aria-label="Impression vs Click Comparison">
+            <div class="diag-cell">
+              <span class="diag-cell-title">Impression Test</span>
+              <span class="diag-cell-val" id="diagImpressionVal" style="color: var(--cyan);">0 Loads</span>
+              <span class="toggle-sub" id="diagImpressionSub">Page load completions only</span>
+            </div>
+            <div class="diag-cell">
+              <span class="diag-cell-title">Click Test</span>
+              <span class="diag-cell-val" id="diagClickVal" style="color: var(--purple);">0 Events</span>
+              <span class="toggle-sub" id="diagClickSub">Real UI clicks/taps only</span>
+            </div>
+          </div>
+
+          <div class="diag-note-box">
+            <strong>Impression vs Click:</strong> Impression Count tracks completed page loads; Click Count tracks real button/link click events received by the DOM listener. Page loads never create fake clicks, and ads are strictly excluded.
+          </div>
+
+          <div class="diag-grid-2">
+            <div class="diag-cell">
+              <span class="diag-cell-title">Page Load Status</span>
+              <span class="diag-cell-val" id="diagPageLoadStatus">Idle</span>
+            </div>
+            <div class="diag-cell">
+              <span class="diag-cell-title">Click Tracking Status</span>
+              <span class="diag-cell-val" id="diagTrackingStatus">Idle</span>
+            </div>
+            <div class="diag-cell">
+              <span class="diag-cell-title">Click Event Detection</span>
+              <span class="diag-cell-val" id="diagDetectionStatus">Click Event Not Received</span>
+            </div>
+            <div class="diag-cell">
+              <span class="diag-cell-title">Click Event Listener</span>
+              <span class="diag-cell-val" id="diagListenerStatus">Not Checked</span>
+            </div>
+            <div class="diag-cell">
+              <span class="diag-cell-title">Test Button Check</span>
+              <span class="diag-cell-val" id="diagButtonStatus">Pending</span>
+            </div>
+            <div class="diag-cell">
+              <span class="diag-cell-title">Test Link Navigation</span>
+              <span class="diag-cell-val" id="diagLinkStatus">Pending</span>
+            </div>
+          </div>
+
+          <div class="click-actions-row">
+            <button type="button" class="btn btn-click-start" id="startDiagBtn">Start Diagnostic</button>
+            <button type="button" class="btn btn-click-stop" id="stopDiagBtn" disabled>Stop Diagnostic</button>
+          </div>
+
+          <div class="diag-checks-row">
+            <button type="button" class="btn btn-diag-sub" id="diagCheckListenerBtn">Verify Listener</button>
+            <button type="button" class="btn btn-diag-sub" id="diagTestButtonBtn">Test Button</button>
+            <button type="button" class="btn btn-diag-sub" id="diagTestLinkBtn">Test Link</button>
+          </div>
+
+          <div class="vpn-info-box" style="margin-bottom: 0;">
+            <div class="toggle-sub" id="diagStatusMsg">
+              Load your Demo Test Page or same-origin Test Page, then tap Start Diagnostic to verify listener, button click event, and link navigation.
+            </div>
+          </div>
+        </section>
+
         <section class="glass-panel" aria-label="VPN Testing Module">
           <div class="vpn-header">
             <div class="vpn-title">
@@ -1377,6 +1509,24 @@
       const resetRandomBtn = document.getElementById("resetRandomBtn");
       const randomStatusMsg = document.getElementById("randomStatusMsg");
 
+      const diagResultBadge = document.getElementById("diagResultBadge");
+      const diagImpressionVal = document.getElementById("diagImpressionVal");
+      const diagImpressionSub = document.getElementById("diagImpressionSub");
+      const diagClickVal = document.getElementById("diagClickVal");
+      const diagClickSub = document.getElementById("diagClickSub");
+      const diagPageLoadStatus = document.getElementById("diagPageLoadStatus");
+      const diagTrackingStatus = document.getElementById("diagTrackingStatus");
+      const diagDetectionStatus = document.getElementById("diagDetectionStatus");
+      const diagListenerStatus = document.getElementById("diagListenerStatus");
+      const diagButtonStatus = document.getElementById("diagButtonStatus");
+      const diagLinkStatus = document.getElementById("diagLinkStatus");
+      const startDiagBtn = document.getElementById("startDiagBtn");
+      const stopDiagBtn = document.getElementById("stopDiagBtn");
+      const diagCheckListenerBtn = document.getElementById("diagCheckListenerBtn");
+      const diagTestButtonBtn = document.getElementById("diagTestButtonBtn");
+      const diagTestLinkBtn = document.getElementById("diagTestLinkBtn");
+      const diagStatusMsg = document.getElementById("diagStatusMsg");
+
       const startBtn = document.getElementById("startBtn");
       const stopBtn = document.getElementById("stopBtn");
       const backBtn = document.getElementById("backBtn");
@@ -1470,8 +1620,9 @@
 </body>
 </html>`;
 
-      // Track same-origin iframe documents once so listeners are never duplicated across loads
-      const guardedDocs = new WeakSet();
+      // Manage a single AbortController per iframe document so duplicate event listeners are impossible
+      let previewBoundDoc = null;
+      let previewDocAbort = null;
 
       const session = {
         running: false,
@@ -1519,6 +1670,20 @@
         randomTimerId: null,
         randomCycleSeq: 0,
         randomStatusLabel: "Idle",
+        diagRunning: false,
+        diagRunSeq: 0,
+        diagTimerId: null,
+        diagListenerActive: false,
+        diagPageLoadText: "Idle",
+        diagTrackingText: "Idle",
+        diagDetectionText: "Click Event Not Received",
+        diagListenerText: "Not Checked",
+        diagButtonText: "Pending",
+        diagLinkText: "Pending",
+        diagResultLabel: "Idle",
+        diagResultColor: "#38bdf8",
+        diagMessage: "Load your Demo Test Page or same-origin Test Page, then tap Start Diagnostic to verify listener, button click event, and link navigation.",
+        diagMsgClass: "toggle-sub",
         isDemoLoaded: false,
         phase: "idle", // idle | loading | viewing | cooldown | blocked | failed | error | completed | stopped
         phaseRemaining: 0,
@@ -1710,11 +1875,30 @@
         }
       }
 
-      // Attach a single debounced touch/click guard inside same-origin preview so mobile taps never double-fire
-      function attachSameOriginPreviewHandlers(access) {
-        if (!access || !access.doc || guardedDocs.has(access.doc)) return;
+      function detachPreviewHandlers() {
+        if (previewDocAbort) {
+          try { previewDocAbort.abort(); } catch {}
+          previewDocAbort = null;
+        }
+        previewBoundDoc = null;
+        session.diagListenerActive = false;
+      }
+
+      // Attach a single debounced touch/click guard inside same-origin preview using AbortController so duplicate listeners cannot accumulate
+      function attachSameOriginPreviewHandlers(access, forceRebind = false) {
+        if (!access || !access.doc) return false;
         const { doc, win } = access;
-        guardedDocs.add(doc);
+        if (!forceRebind && previewBoundDoc === doc && doc.__wvClickObserverActive === 1) {
+          session.diagListenerActive = true;
+          return true;
+        }
+
+        detachPreviewHandlers();
+        previewDocAbort = new AbortController();
+        previewBoundDoc = doc;
+        const signal = previewDocAbort.signal;
+        doc.__wvClickObserverActive = 1;
+        session.diagListenerActive = true;
 
         try {
           if (!doc.getElementById("__webvisit_touch_css") && doc.head) {
@@ -1732,6 +1916,11 @@
         let scrollReportTick = 0;
 
         doc.addEventListener("click", (ev) => {
+          doc.__wvLastCapturedEvent = {
+            isTrusted: Boolean(ev.isTrusted),
+            timestamp: Date.now(),
+            tagName: ev.target && ev.target.tagName ? ev.target.tagName.toLowerCase() : ""
+          };
           if (!ev.isTrusted) return;
           const rawTarget = ev.target && ev.target.closest
             ? ev.target.closest('button, a[href], [role="button"], input[type="button"], input[type="submit"], [onclick]')
@@ -1740,6 +1929,9 @@
 
           if (!authorizedSiteToggle.checked && !session.isDemoLoaded) {
             setClickFeedback("Restricted", "#fb7185", "Enable 'Authorized Own Site / Test Page' to count preview clicks.", "vpn-info-err");
+            session.diagTrackingText = "Blocked (Unconfirmed)";
+            session.diagDetectionText = "Click Event Not Received";
+            renderDiagnosticUI();
             return;
           }
 
@@ -1767,31 +1959,13 @@
           }
           spawnIframeTapRipple(doc, win, tapX, tapY, session.interactionMode === "tap" ? "#A855F7" : "#38BDF8");
 
-          if (session.autoClickRunning && session.clickCount >= session.clickTarget) {
-            completeClickTargetReached();
-            return;
-          }
-
-          session.clickCount += 1;
-          session.lastInteractionAt = now;
           const label = (rawTarget.innerText || rawTarget.value || rawTarget.getAttribute("aria-label") || rawTarget.tagName)
             .replace(/\s+/g, " ")
             .trim()
-            .slice(0, 24);
-          if (session.autoClickRunning && session.clickCount >= session.clickTarget) {
-            completeClickTargetReached(`Target reached on "${label || rawTarget.tagName.toLowerCase()}" (${session.clickCount}/${session.clickTarget}). Click Test stopped automatically.`);
-            return;
-          }
-          const runningLabel = session.clickTestMode === "manual"
-            ? "Listening"
-            : (session.interactionMode === "tap" ? "Auto Tapping" : "Auto Clicking");
-          setClickFeedback(
-            session.autoClickRunning ? runningLabel : "Active",
-            session.autoClickRunning ? "#34d399" : "#38bdf8",
-            `Counted direct tap on "${label || rawTarget.tagName.toLowerCase()}" (${session.clickCount}/${session.clickTarget}).`,
-            "vpn-info-ok"
-          );
-        }, true);
+            .slice(0, 24) || rawTarget.tagName.toLowerCase();
+
+          recordVerifiedClickEvent(label, "direct");
+        }, { capture: true, signal });
 
         doc.addEventListener("scroll", () => {
           const now = performance.now();
@@ -1801,7 +1975,9 @@
           if (target) {
             setScrollPosition(target.getTop(), target.maxScroll);
           }
-        }, { passive: true, capture: true });
+        }, { passive: true, capture: true, signal });
+
+        return true;
       }
 
       // Accurately detect the scrollable container (window/root or inner overflow-y container)
@@ -2365,6 +2541,54 @@
         }
       }
 
+      function recordVerifiedClickEvent(label, sourceType = "auto") {
+        const safeLabel = label || "UI element";
+        if (session.autoClickRunning && session.clickCount >= session.clickTarget) {
+          completeClickTargetReached();
+          return false;
+        }
+
+        session.clickCount += 1;
+        session.lastInteractionAt = performance.now();
+        session.diagDetectionText = "Click Event Received";
+        session.diagTrackingText = "Active";
+        session.diagListenerText = "Active (0 Duplicates)";
+
+        if (session.autoClickRunning && session.clickCount >= session.clickTarget) {
+          completeClickTargetReached(
+            `Target reached on "${safeLabel}" (${session.clickCount}/${session.clickTarget}). Click Test stopped automatically.`
+          );
+          renderDiagnosticUI();
+          return true;
+        }
+
+        if (sourceType === "direct") {
+          const runningLabel = session.clickTestMode === "manual"
+            ? "Listening"
+            : (session.interactionMode === "tap" ? "Auto Tapping" : "Auto Clicking");
+          setClickFeedback(
+            session.autoClickRunning ? runningLabel : "Active",
+            session.autoClickRunning ? "#34d399" : "#38bdf8",
+            `Counted direct tap on "${safeLabel}" (${session.clickCount}/${session.clickTarget}).`,
+            "vpn-info-ok"
+          );
+        } else if (sourceType === "auto") {
+          const actionWord = session.interactionMode === "tap" ? "tap" : "click";
+          const nextLabel = session.autoClickRunning ? (session.interactionMode === "tap" ? "Auto Tapping" : "Auto Clicking") : "Idle";
+          const nextColor = session.autoClickRunning ? "#34d399" : "#38bdf8";
+          setClickFeedback(
+            nextLabel,
+            nextColor,
+            `Tested ${actionWord} on "${safeLabel}" (${session.clickCount}/${session.clickTarget}).`,
+            "vpn-info-ok"
+          );
+        } else {
+          updateUI();
+        }
+        renderDiagnosticUI();
+        return true;
+      }
+
       function executeSafeClickOnce() {
         const now = performance.now();
         if (session.actionLock || now - session.lastInteractionAt < MIN_ACTION_COOLDOWN_MS) {
@@ -2376,7 +2600,7 @@
         }
         session.actionLock = true;
         try {
-          if (!authorizedSiteToggle.checked) {
+          if (!authorizedSiteToggle.checked && !session.isDemoLoaded) {
             stopAutoClick("Confirm this is your own website or authorized test page first.", "#fb7185", "Restricted");
             return false;
           }
@@ -2423,25 +2647,8 @@
           setTimeout(() => { try { el.style.outline = prevOutline; } catch {} }, 320);
 
           dispatchSingleActivation(el, access.win, access.doc, mode);
-          session.lastInteractionAt = performance.now();
-          session.clickCount += 1;
-
           const label = (el.innerText || el.value || el.getAttribute("aria-label") || el.tagName).replace(/\s+/g, " ").trim().slice(0, 24);
-          if (session.autoClickRunning && session.clickCount >= session.clickTarget) {
-            completeClickTargetReached(`Completed ${session.clickCount}/${session.clickTarget} on "${label || el.tagName.toLowerCase()}". Click Test stopped automatically.`);
-            return true;
-          }
-
-          const actionWord = mode === "tap" ? "tap" : "click";
-          const nextLabel = session.autoClickRunning ? (mode === "tap" ? "Auto Tapping" : "Auto Clicking") : "Idle";
-          const nextColor = session.autoClickRunning ? "#34d399" : "#38bdf8";
-          setClickFeedback(
-            nextLabel,
-            nextColor,
-            `Tested ${actionWord} on "${label || el.tagName.toLowerCase()}" (${session.clickCount}/${session.clickTarget}).`,
-            "vpn-info-ok"
-          );
-          return true;
+          return recordVerifiedClickEvent(label || el.tagName.toLowerCase(), "auto");
         } catch (err) {
           stopAutoClick(`Interaction blocked (${err && err.message ? err.message : "Restricted"}).`, "#fb7185", "Restricted");
           return false;
@@ -2580,12 +2787,94 @@
         renderRandomInteractionUI();
       }
 
+      function renderDiagnosticUI() {
+        diagImpressionVal.textContent = `${session.visitCount} ${session.visitCount === 1 ? "Load" : "Loads"}`;
+        diagImpressionSub.textContent = session.visitCount > 0
+          ? (session.isDemoLoaded ? "Demo page load verified" : "Verified page load(s)")
+          : (session.failedCount > 0 ? "Load failed (not counted)" : "Page load completions only");
+        diagClickVal.textContent = `${session.clickCount} ${session.clickCount === 1 ? "Event" : "Events"}`;
+        diagClickSub.textContent = session.clickCount > 0
+          ? "Real non-ad click events received"
+          : "Real UI clicks/taps only";
+
+        diagPageLoadStatus.textContent = session.diagPageLoadText;
+        diagTrackingStatus.textContent = session.diagTrackingText;
+        diagDetectionStatus.textContent = session.diagDetectionText;
+        diagListenerStatus.textContent = session.diagListenerText;
+        diagButtonStatus.textContent = session.diagButtonText;
+        diagLinkStatus.textContent = session.diagLinkText;
+
+        diagDetectionStatus.style.color = session.diagDetectionText === "Click Event Received"
+          ? "#34d399"
+          : (session.diagDetectionText.includes("Not Received") || session.diagDetectionText.includes("Blocked") ? "#fbbf24" : "#f8fafc");
+        diagButtonStatus.style.color = session.diagButtonText.startsWith("Verified")
+          ? "#34d399"
+          : (session.diagButtonText.includes("Not") || session.diagButtonText.includes("Failed") || session.diagButtonText.includes("Blocked") ? "#fb7185" : "#f8fafc");
+        diagLinkStatus.style.color = session.diagLinkText.startsWith("Verified")
+          ? "#34d399"
+          : (session.diagLinkText.includes("Not") || session.diagLinkText.includes("Failed") || session.diagLinkText.includes("Blocked") ? "#fb7185" : "#f8fafc");
+
+        diagResultBadge.textContent = `Result: ${session.diagResultLabel}`;
+        diagResultBadge.style.color = session.diagResultColor;
+        diagResultBadge.style.borderColor = session.diagResultColor;
+
+        diagStatusMsg.className = session.diagMsgClass;
+        diagStatusMsg.textContent = session.diagMessage;
+
+        startDiagBtn.disabled = session.diagRunning;
+        stopDiagBtn.disabled = !session.diagRunning;
+        diagCheckListenerBtn.disabled = session.diagRunning;
+        diagTestButtonBtn.disabled = session.diagRunning;
+        diagTestLinkBtn.disabled = session.diagRunning;
+      }
+
+      function setDiagnosticFeedback(resultLabel, color, msg, msgClass) {
+        session.diagResultLabel = resultLabel;
+        session.diagResultColor = color;
+        session.diagMessage = msg;
+        session.diagMsgClass = msgClass;
+        renderDiagnosticUI();
+      }
+
+      function syncDiagnosticPageLoadState() {
+        if (session.phase === "loading") {
+          session.diagPageLoadText = "Loading";
+          session.diagTrackingText = "Waiting for Load";
+        } else if (session.phase === "failed" || session.phase === "error" || session.phase === "blocked") {
+          session.diagPageLoadText = session.phase === "error" ? "Network Error" : "Load Failed";
+          session.diagTrackingText = "Unavailable";
+          session.diagDetectionText = "Click Event Not Received";
+        } else if (session.isDemoLoaded && previewFrame.style.display === "block") {
+          session.diagPageLoadText = "Loaded (Demo Page)";
+          session.diagTrackingText = session.diagListenerActive ? "Listening" : "Ready";
+        } else if (previewFrame.style.display === "block" && session.activeUrl) {
+          const access = getAccessibleIframeDocument();
+          if (access) {
+            session.diagPageLoadText = "Loaded (Same-Origin)";
+            session.diagTrackingText = session.diagListenerActive ? "Listening" : "Ready";
+          } else {
+            session.diagPageLoadText = "Loaded (Cross-Origin)";
+            session.diagTrackingText = "Cross-Origin Blocked";
+            session.diagDetectionText = "Click Event Not Received";
+            session.diagListenerText = "Blocked by Iframe Policy";
+          }
+        } else if (session.phase === "stopped") {
+          session.diagPageLoadText = "Stopped";
+          session.diagTrackingText = "Stopped";
+        } else {
+          session.diagPageLoadText = "Idle";
+          session.diagTrackingText = "Idle";
+        }
+        renderDiagnosticUI();
+      }
+
       function clearPendingNetworkAndTimers() {
         if (session.timerId) clearInterval(session.timerId);
         if (session.loadTimeoutId) clearTimeout(session.loadTimeoutId);
         if (session.loadStepTimeoutId) clearTimeout(session.loadStepTimeoutId);
         if (session.autoClickTimerId) clearInterval(session.autoClickTimerId);
         if (session.randomTimerId) clearTimeout(session.randomTimerId);
+        if (session.diagTimerId) clearTimeout(session.diagTimerId);
         if (session.activeAbortController) {
           try { session.activeAbortController.abort(); } catch {}
         }
@@ -2594,18 +2883,22 @@
         session.loadStepTimeoutId = null;
         session.autoClickTimerId = null;
         session.randomTimerId = null;
+        session.diagTimerId = null;
         session.activeAbortController = null;
       }
 
       function clearTemporarySession(nextPhase, resetCounters = true) {
         session.loadSeq += 1;
         session.randomCycleSeq += 1;
+        session.diagRunSeq += 1;
         clearPendingNetworkAndTimers();
+        detachPreviewHandlers();
         session.autoClickRunning = false;
         session.clickTestMode = "none";
         session.randomRunning = false;
         session.randomArmedOnLoad = false;
         session.randomPhase = "idle";
+        session.diagRunning = false;
         session.isDemoLoaded = false;
         session.actionLock = false;
         session.discoveredTargets = [];
@@ -2615,6 +2908,17 @@
         clickStatusMsg.className = "toggle-sub";
         clickStatusMsg.textContent = "Works on your own loaded preview page (same-origin iframe). Never used for ad clicking or artificial CTR.";
         renderTargetChips();
+
+        session.diagPageLoadText = nextPhase === "stopped" ? "Stopped" : "Idle";
+        session.diagTrackingText = nextPhase === "stopped" ? "Stopped" : "Idle";
+        session.diagDetectionText = "Click Event Not Received";
+        session.diagListenerText = "Not Checked";
+        session.diagButtonText = "Pending";
+        session.diagLinkText = "Pending";
+        session.diagResultLabel = nextPhase === "stopped" ? "Stopped" : "Idle";
+        session.diagResultColor = nextPhase === "stopped" ? "#fbbf24" : "#38bdf8";
+        session.diagMessage = "Load your Demo Test Page or same-origin Test Page, then tap Start Diagnostic to verify listener, button click event, and link navigation.";
+        session.diagMsgClass = "toggle-sub";
 
         if (resetCounters) {
           session.visitCount = 0;
@@ -2636,6 +2940,7 @@
         previewFrame.src = "about:blank";
         syncExternalLinks(urlInput.value);
         setRandomFeedback("Idle", "#34d399", "Starts after verified page load. Performs safe random UI taps with scroll down/up cycles. Own Test Page & Demo Environment only; ads are blocked.", "toggle-sub");
+        renderDiagnosticUI();
         updateUI();
       }
 
@@ -2729,6 +3034,10 @@
         if (session.randomRunning || session.randomArmedOnLoad) {
           stopRandomInteraction(`Stopped: Page load failed (${reason})`, "Load Failed", "#fb7185", "vpn-info-err");
         }
+        syncDiagnosticPageLoadState();
+        if (session.diagRunning) {
+          stopDiagnosticRun("Failed", "#fb7185", `Diagnostic Failed: Page load failed (${reason})`, "vpn-info-err");
+        }
 
         const canContinueQueue = nextPhase !== "error" &&
           session.autoNext &&
@@ -2771,7 +3080,7 @@
 
         let access = getAccessibleIframeDocument();
         if (access) {
-          attachSameOriginPreviewHandlers(access);
+          attachSameOriginPreviewHandlers(access, true);
           if (access.doc.readyState === "loading") {
             await new Promise((res) => {
               const done = () => res();
@@ -2812,6 +3121,7 @@
             setScrollPosition(0, 0);
           }
         }
+        syncDiagnosticPageLoadState();
         if (session.scrollDirection !== "none" && !session.scrollPaused && !session.randomRunning) {
           startScrolling(session.scrollDirection);
         }
@@ -2831,12 +3141,13 @@
         if (!hasSrcdoc && (!attrSrc || attrSrc === "about:blank")) return;
         const access = getAccessibleIframeDocument();
         if (access) {
-          attachSameOriginPreviewHandlers(access);
+          attachSameOriginPreviewHandlers(access, true);
           if (session.isDemoLoaded && session.phase === "viewing") {
             const t = detectScrollTarget(access.doc, access.win, "down");
             if (t) setScrollPosition(t.getTop(), t.maxScroll);
           }
         }
+        syncDiagnosticPageLoadState();
         if (session.running && session.phase === "loading") {
           onPreviewLoadedForSeq(session.loadSeq, currentReachabilityPromise);
         }
@@ -3164,7 +3475,7 @@
         const intervalSec = clampInt(clickIntervalInput.value, 1, 60, 2);
         clickIntervalInput.value = String(intervalSec);
 
-        if (!authorizedSiteToggle.checked) {
+        if (!authorizedSiteToggle.checked && !session.isDemoLoaded) {
           setClickFeedback("Restricted", "#fb7185", "Confirm this is your own website or authorized test page first.", "vpn-info-err");
           return;
         }
@@ -3467,18 +3778,311 @@
         }
       }
 
+      // --- Impression & Click Tracking Diagnostic Engine ---
+
+      function verifyDiagnosticAccess(requireAuthForExternal = true) {
+        if (session.phase === "failed" || session.phase === "error" || session.phase === "blocked") {
+          session.diagPageLoadText = session.phase === "error" ? "Network Error" : "Load Failed";
+          session.diagTrackingText = "Unavailable";
+          session.diagDetectionText = "Click Event Not Received";
+          return { ok: false, result: "Failed", color: "#fb7185", reason: "Page failed to load in preview. Resolve page load failure first." };
+        }
+        if (previewFrame.style.display !== "block" || !session.activeUrl) {
+          session.diagPageLoadText = "Not Loaded";
+          session.diagTrackingText = "Idle";
+          session.diagDetectionText = "Click Event Not Received";
+          return { ok: false, result: "Failed", color: "#fb7185", reason: "Preview is not loaded. Load the Demo Test Page or start a URL test first." };
+        }
+        const access = getAccessibleIframeDocument();
+        if (!access) {
+          session.diagPageLoadText = "Loaded (Cross-Origin)";
+          session.diagTrackingText = "Cross-Origin Blocked";
+          session.diagDetectionText = "Click Event Not Received";
+          session.diagListenerText = "Blocked by Iframe Policy";
+          session.diagButtonText = "Blocked";
+          session.diagLinkText = "Blocked";
+          return {
+            ok: false,
+            result: "Blocked",
+            color: "#fbbf24",
+            reason: "Cross-origin iframe restriction: External site DOM cannot be inspected in browser HTML. Load your Demo Test Page, same-origin site, or use Native Android."
+          };
+        }
+        if (requireAuthForExternal && !session.isDemoLoaded && !authorizedSiteToggle.checked) {
+          session.diagTrackingText = "Blocked (Unconfirmed)";
+          session.diagDetectionText = "Click Event Not Received";
+          return {
+            ok: false,
+            result: "Blocked",
+            color: "#fbbf24",
+            reason: "Authorization required: Check 'Authorized Own Site / Test Page' or load the Demo Test Page."
+          };
+        }
+        session.diagPageLoadText = session.isDemoLoaded ? "Loaded (Demo Page)" : "Loaded (Same-Origin)";
+        return { ok: true, access };
+      }
+
+      function verifyClickListenerOnce(access) {
+        const bound = attachSameOriginPreviewHandlers(access, true);
+        if (!bound) {
+          session.diagTrackingText = "Listener Failed";
+          session.diagListenerText = "Failed";
+          return false;
+        }
+        let probeReceived = false;
+        const probeEl = access.doc.createElement("button");
+        probeEl.type = "button";
+        probeEl.setAttribute("aria-hidden", "true");
+        probeEl.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+        const onProbe = () => { probeReceived = true; };
+        probeEl.addEventListener("click", onProbe, { once: true });
+        (access.doc.body || access.doc.documentElement).appendChild(probeEl);
+        try {
+          probeEl.click();
+        } finally {
+          try { probeEl.remove(); } catch {}
+        }
+        session.diagListenerText = probeReceived ? "Active (0 Duplicates)" : "Not Responding";
+        session.diagTrackingText = probeReceived ? "Listening" : "Listener Failed";
+        return probeReceived;
+      }
+
+      function verifyTestButtonClick(access) {
+        const { doc, win } = access;
+        const preferred = doc.getElementById("demoOverviewBtn");
+        let btnEl = (preferred && isElementInteractable(preferred, win) && !isProhibitedAdElement(preferred)) ? preferred : null;
+        if (!btnEl) {
+          const btns = doc.querySelectorAll('button, input[type="button"], input[type="submit"], [role="button"]');
+          for (let i = 0; i < btns.length; i += 1) {
+            if (isElementInteractable(btns[i], win) && !isProhibitedAdElement(btns[i])) {
+              btnEl = btns[i];
+              break;
+            }
+          }
+        }
+        if (!btnEl) {
+          session.diagButtonText = "No Safe Button";
+          session.diagDetectionText = "Click Event Not Received";
+          return { ok: false, reason: "No safe non-ad button found on preview page." };
+        }
+
+        let domClickFired = false;
+        const oneShot = (ev) => {
+          if (ev.target === btnEl || btnEl.contains(ev.target)) {
+            domClickFired = true;
+          }
+        };
+        doc.addEventListener("click", oneShot, { capture: true, once: true });
+        dispatchSingleActivation(btnEl, win, doc, session.interactionMode, "#38BDF8");
+        doc.removeEventListener("click", oneShot, true);
+
+        const label = (btnEl.innerText || btnEl.value || btnEl.getAttribute("aria-label") || "Test Button")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 22);
+
+        if (domClickFired) {
+          session.diagButtonText = `Verified (${label})`;
+          session.diagDetectionText = "Click Event Received";
+          recordVerifiedClickEvent(label, "diag");
+          return { ok: true, label };
+        }
+        session.diagButtonText = "Not Received";
+        session.diagDetectionText = "Click Event Not Received";
+        return { ok: false, reason: `Test button "${label}" did not emit a DOM click event.` };
+      }
+
+      function verifyTestLinkNavigation(access) {
+        const { doc, win } = access;
+        const curOrigin = (doc.location && doc.location.origin && doc.location.origin !== "null") ? doc.location.origin : "";
+        const links = doc.querySelectorAll("a[href]");
+        let linkEl = null;
+        for (let i = 0; i < links.length; i += 1) {
+          const a = links[i];
+          if (!isElementInteractable(a, win) || isProhibitedAdElement(a)) continue;
+          const hrefAttr = a.getAttribute("href") || "";
+          if (/^javascript:/i.test(hrefAttr)) continue;
+          if (/^https?:\/\//i.test(hrefAttr) && curOrigin) {
+            try {
+              const u = new URL(hrefAttr, doc.location.href);
+              if (u.origin !== curOrigin) continue;
+            } catch {
+              continue;
+            }
+          }
+          linkEl = a;
+          break;
+        }
+        if (!linkEl) {
+          session.diagLinkText = "No Safe Link";
+          return { ok: false, reason: "No safe same-origin test link found on preview page." };
+        }
+
+        const beforeHref = doc.location ? doc.location.href : "";
+        const beforeHash = doc.location ? doc.location.hash : "";
+        const hrefAttr = linkEl.getAttribute("href") || "";
+        let linkClickFired = false;
+        const oneShot = (ev) => {
+          if (ev.target === linkEl || linkEl.contains(ev.target)) {
+            linkClickFired = true;
+          }
+        };
+        doc.addEventListener("click", oneShot, { capture: true, once: true });
+        dispatchSingleActivation(linkEl, win, doc, "click", "#A855F7");
+        doc.removeEventListener("click", oneShot, true);
+
+        const afterHref = doc.location ? doc.location.href : "";
+        const afterHash = doc.location ? doc.location.hash : "";
+        const navigated = (afterHref !== beforeHref) ||
+          (afterHash !== beforeHash) ||
+          (hrefAttr.startsWith("#") && afterHash === hrefAttr);
+        const label = (linkEl.innerText || hrefAttr || "Test Link").replace(/\s+/g, " ").trim().slice(0, 22);
+
+        if (linkClickFired && navigated) {
+          session.diagLinkText = `Verified (${afterHash || label})`;
+          session.diagDetectionText = "Click Event Received";
+          recordVerifiedClickEvent(label, "diag");
+          return { ok: true, label, navigated: true };
+        }
+        if (linkClickFired) {
+          session.diagLinkText = "Click Only (No Nav)";
+          session.diagDetectionText = "Click Event Received";
+          recordVerifiedClickEvent(label, "diag");
+          return { ok: false, reason: `Link "${label}" emitted click but target navigation did not change URL/hash.` };
+        }
+        session.diagLinkText = "Not Received";
+        session.diagDetectionText = "Click Event Not Received";
+        return { ok: false, reason: `Test link "${label}" did not emit click or navigate.` };
+      }
+
+      function stopDiagnosticRun(resultLabel = "Stopped", color = "#fbbf24", msg = "Diagnostic test stopped.", msgClass = "vpn-info-warn") {
+        session.diagRunSeq += 1;
+        if (session.diagTimerId) {
+          clearTimeout(session.diagTimerId);
+          session.diagTimerId = null;
+        }
+        session.diagRunning = false;
+        setDiagnosticFeedback(resultLabel, color, msg, msgClass);
+      }
+
+      async function runFullDiagnostic() {
+        if (session.diagRunning) return;
+        session.diagRunSeq += 1;
+        const seq = session.diagRunSeq;
+        session.diagRunning = true;
+        session.diagButtonText = "Testing...";
+        session.diagLinkText = "Waiting...";
+        setDiagnosticFeedback("Running", "#38bdf8", "Checking page load & verifying click event listener...", "vpn-info-ok");
+
+        const check = verifyDiagnosticAccess(true);
+        if (!check.ok) {
+          stopDiagnosticRun(check.result, check.color, check.reason, check.result === "Blocked" ? "vpn-info-warn" : "vpn-info-err");
+          return;
+        }
+
+        const listenerOk = verifyClickListenerOnce(check.access);
+        if (!listenerOk) {
+          stopDiagnosticRun("Failed", "#fb7185", "Diagnostic Failed: Click Event Listener did not respond.", "vpn-info-err");
+          return;
+        }
+        renderDiagnosticUI();
+
+        await new Promise((r) => { session.diagTimerId = setTimeout(r, 320); });
+        if (!session.diagRunning || seq !== session.diagRunSeq) return;
+
+        const btnRes = verifyTestButtonClick(check.access);
+        if (!btnRes.ok) {
+          stopDiagnosticRun("Failed", "#fb7185", `Diagnostic Failed: ${btnRes.reason}`, "vpn-info-err");
+          return;
+        }
+        setDiagnosticFeedback("Running", "#38bdf8", `Test Button verified ("${btnRes.label}"). Testing Link navigation...`, "vpn-info-ok");
+
+        await new Promise((r) => { session.diagTimerId = setTimeout(r, 420); });
+        if (!session.diagRunning || seq !== session.diagRunSeq) return;
+
+        const linkRes = verifyTestLinkNavigation(check.access);
+        if (!linkRes.ok) {
+          stopDiagnosticRun("Failed", "#fb7185", `Diagnostic Failed: ${linkRes.reason}`, "vpn-info-err");
+          return;
+        }
+
+        stopDiagnosticRun(
+          "Passed",
+          "#34d399",
+          `Diagnostic Passed: Impression=${session.visitCount}, Click=${session.clickCount}. Listener active (0 duplicates), Test Button & Test Link navigation verified.`,
+          "vpn-info-ok"
+        );
+      }
+
+      startDiagBtn.addEventListener("click", () => {
+        runFullDiagnostic();
+      });
+
+      stopDiagBtn.addEventListener("click", () => {
+        stopDiagnosticRun("Stopped", "#fbbf24", "Click Tracking Diagnostic stopped.", "vpn-info-warn");
+      });
+
+      diagCheckListenerBtn.addEventListener("click", () => {
+        const check = verifyDiagnosticAccess(false);
+        if (!check.ok) {
+          setDiagnosticFeedback(check.result, check.color, check.reason, check.result === "Blocked" ? "vpn-info-warn" : "vpn-info-err");
+          return;
+        }
+        const ok = verifyClickListenerOnce(check.access);
+        setDiagnosticFeedback(
+          ok ? "Listening" : "Failed",
+          ok ? "#34d399" : "#fb7185",
+          ok ? "Click Event Listener verified active (0 duplicate listeners)." : "Click Event Listener verification failed.",
+          ok ? "vpn-info-ok" : "vpn-info-err"
+        );
+      });
+
+      diagTestButtonBtn.addEventListener("click", () => {
+        const check = verifyDiagnosticAccess(true);
+        if (!check.ok) {
+          setDiagnosticFeedback(check.result, check.color, check.reason, check.result === "Blocked" ? "vpn-info-warn" : "vpn-info-err");
+          return;
+        }
+        verifyClickListenerOnce(check.access);
+        const res = verifyTestButtonClick(check.access);
+        setDiagnosticFeedback(
+          res.ok ? "Passed" : "Failed",
+          res.ok ? "#34d399" : "#fb7185",
+          res.ok ? `Click Event Received from Test Button ("${res.label}").` : `Click Event Not Received: ${res.reason}`,
+          res.ok ? "vpn-info-ok" : "vpn-info-err"
+        );
+      });
+
+      diagTestLinkBtn.addEventListener("click", () => {
+        const check = verifyDiagnosticAccess(true);
+        if (!check.ok) {
+          setDiagnosticFeedback(check.result, check.color, check.reason, check.result === "Blocked" ? "vpn-info-warn" : "vpn-info-err");
+          return;
+        }
+        verifyClickListenerOnce(check.access);
+        const res = verifyTestLinkNavigation(check.access);
+        setDiagnosticFeedback(
+          res.ok ? "Passed" : "Failed",
+          res.ok ? "#34d399" : "#fb7185",
+          res.ok ? `Test Link click & navigation verified ("${res.label}").` : `Test Link check failed: ${res.reason}`,
+          res.ok ? "vpn-info-ok" : "vpn-info-err"
+        );
+      });
+
       loadDemoPageBtn.addEventListener("click", () => {
-        if (session.running || session.randomRunning) return;
+        if (session.running || session.randomRunning || session.diagRunning) return;
         clearTemporarySession("viewing", false);
         session.isDemoLoaded = true;
         session.activeUrl = DEMO_TEST_URL;
         session.phase = "viewing";
+        session.visitCount += 1;
         previewFrame.srcdoc = DEMO_TEST_HTML;
         showIframe();
+        syncDiagnosticPageLoadState();
         setRandomFeedback(
           "Demo Ready",
           "#34d399",
-          "Demo Test Environment loaded. Tap 'Start Random Test' to run Random Tap & Scroll Down/Up testing.",
+          "Demo Test Environment loaded (1 verified Impression). Tap 'Start Random Test' or 'Start Diagnostic'.",
           "vpn-info-ok"
         );
         updateUI();
@@ -3681,6 +4285,7 @@
       });
 
       renderRandomInteractionUI();
+      renderDiagnosticUI();
       updateUI();
     })();
   </script>

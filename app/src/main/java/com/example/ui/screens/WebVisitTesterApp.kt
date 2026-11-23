@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -101,6 +102,7 @@ import com.example.model.AutoScrollDirection
 import com.example.model.ClickInteractionMode
 import com.example.model.ClickTargetItem
 import com.example.model.ClickTestStatus
+import com.example.model.DiagnosticResultStatus
 import com.example.model.RandomInteractionStatus
 import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
@@ -252,6 +254,15 @@ fun WebVisitTesterApp(
                                     onResetRandomCounter = viewModel::resetRandomInteractionCounter
                                 )
 
+                                DiagnosticPanel(
+                                    uiState = uiState,
+                                    onStartDiagnostic = viewModel::startDiagnostic,
+                                    onStopDiagnostic = { viewModel.stopDiagnostic() },
+                                    onVerifyListener = viewModel::verifyDiagListenerOnly,
+                                    onTestButton = viewModel::runDiagButtonTestOnly,
+                                    onTestLink = viewModel::runDiagLinkTestOnly
+                                )
+
                                 VpnTestingPanel(
                                     uiState = uiState,
                                     onSelectProvider = viewModel::selectVpnProvider,
@@ -289,6 +300,7 @@ fun WebVisitTesterApp(
                                 onDirectPreviewClick = viewModel::onDirectPreviewClick,
                                 onRandomTapExecuted = viewModel::onRandomTapExecuted,
                                 onRandomScrollFinished = viewModel::onRandomScrollFinished,
+                                onDiagCommandResult = viewModel::onDiagCommandResult,
                                 modifier = Modifier.weight(1.05f)
                             )
                         }
@@ -337,6 +349,15 @@ fun WebVisitTesterApp(
                             onResetRandomCounter = viewModel::resetRandomInteractionCounter
                         )
 
+                        DiagnosticPanel(
+                            uiState = uiState,
+                            onStartDiagnostic = viewModel::startDiagnostic,
+                            onStopDiagnostic = { viewModel.stopDiagnostic() },
+                            onVerifyListener = viewModel::verifyDiagListenerOnly,
+                            onTestButton = viewModel::runDiagButtonTestOnly,
+                            onTestLink = viewModel::runDiagLinkTestOnly
+                        )
+
                         VpnTestingPanel(
                             uiState = uiState,
                             onSelectProvider = viewModel::selectVpnProvider,
@@ -372,7 +393,8 @@ fun WebVisitTesterApp(
                             onClickExecuted = viewModel::onSingleClickExecuted,
                             onDirectPreviewClick = viewModel::onDirectPreviewClick,
                             onRandomTapExecuted = viewModel::onRandomTapExecuted,
-                            onRandomScrollFinished = viewModel::onRandomScrollFinished
+                            onRandomScrollFinished = viewModel::onRandomScrollFinished,
+                            onDiagCommandResult = viewModel::onDiagCommandResult
                         )
                     }
                 }
@@ -1906,6 +1928,291 @@ private fun RandomInteractionPanel(
                 }
             )
         }
+    }
+}
+
+@Composable
+private fun DiagnosticPanel(
+    uiState: WebVisitUiState,
+    onStartDiagnostic: () -> Unit,
+    onStopDiagnostic: () -> Unit,
+    onVerifyListener: () -> Unit,
+    onTestButton: () -> Unit,
+    onTestLink: () -> Unit
+) {
+    val resultColor = when (uiState.diagResultStatus) {
+        DiagnosticResultStatus.PASSED -> EmeraldSuccess
+        DiagnosticResultStatus.RUNNING, DiagnosticResultStatus.IDLE -> ElectricCyan
+        DiagnosticResultStatus.BLOCKED, DiagnosticResultStatus.STOPPED -> AmberWarning
+        DiagnosticResultStatus.FAILED -> CoralDanger
+    }
+
+    LiquidGlassPanel(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.VerifiedUser,
+                    contentDescription = null,
+                    tint = ElectricCyan,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = stringResource(R.string.label_diag_module),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = resultColor.copy(alpha = 0.14f),
+                border = BorderStroke(1.dp, resultColor.copy(alpha = 0.45f)),
+                modifier = Modifier.testTag("diag_result_badge")
+            ) {
+                Text(
+                    text = "Result: ${uiState.diagResultStatus.label}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = resultColor,
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            LiveCounterPill(
+                label = "Impression Test",
+                value = "${uiState.visitCount} ${if (uiState.visitCount == 1) "Load" else "Loads"}",
+                accentColor = ElectricCyan,
+                testTag = "diag_impression_stat",
+                modifier = Modifier.weight(1f)
+            )
+            LiveCounterPill(
+                label = "Click Test",
+                value = "${uiState.clickCount} ${if (uiState.clickCount == 1) "Event" else "Events"}",
+                accentColor = LuminousPurple,
+                testTag = "diag_click_stat",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(ElectricCyan.copy(alpha = 0.08f))
+                .border(1.dp, ElectricCyan.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = "Impression vs Click: Impression Count tracks completed page loads; Click Count tracks real button/link click events received by the DOM listener. Page loads never create fake clicks, and ads are strictly excluded.",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DiagnosticStatusCell(
+                    title = "Page Load Status",
+                    value = uiState.diagPageLoadText,
+                    accent = TextPrimary,
+                    testTag = "diag_page_load_cell",
+                    modifier = Modifier.weight(1f)
+                )
+                DiagnosticStatusCell(
+                    title = "Click Tracking Status",
+                    value = uiState.diagTrackingText,
+                    accent = TextPrimary,
+                    testTag = "diag_tracking_cell",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val detectionAccent = if (uiState.diagDetectionText == "Click Event Received") {
+                    EmeraldSuccess
+                } else {
+                    AmberWarning
+                }
+                DiagnosticStatusCell(
+                    title = "Click Event Detection",
+                    value = uiState.diagDetectionText,
+                    accent = detectionAccent,
+                    testTag = "diag_detection_cell",
+                    modifier = Modifier.weight(1f)
+                )
+                DiagnosticStatusCell(
+                    title = "Click Event Listener",
+                    value = uiState.diagListenerText,
+                    accent = if (uiState.diagListenerText.startsWith("Active")) EmeraldSuccess else TextPrimary,
+                    testTag = "diag_listener_cell",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val btnAccent = when {
+                    uiState.diagButtonText.startsWith("Verified") -> EmeraldSuccess
+                    uiState.diagButtonText.contains("Not") || uiState.diagButtonText.contains("Blocked") -> CoralDanger
+                    else -> TextPrimary
+                }
+                val linkAccent = when {
+                    uiState.diagLinkText.startsWith("Verified") -> EmeraldSuccess
+                    uiState.diagLinkText.contains("Not") || uiState.diagLinkText.contains("Blocked") || uiState.diagLinkText.contains("Only") -> CoralDanger
+                    else -> TextPrimary
+                }
+                DiagnosticStatusCell(
+                    title = "Test Button Check",
+                    value = uiState.diagButtonText,
+                    accent = btnAccent,
+                    testTag = "diag_button_cell",
+                    modifier = Modifier.weight(1f)
+                )
+                DiagnosticStatusCell(
+                    title = "Test Link Navigation",
+                    value = uiState.diagLinkText,
+                    accent = linkAccent,
+                    testTag = "diag_link_cell",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            GlassActionButton(
+                text = stringResource(R.string.btn_start_diag),
+                icon = Icons.Rounded.PlayArrow,
+                onClick = onStartDiagnostic,
+                enabled = !uiState.isDiagRunning,
+                accentColor = EmeraldSuccess,
+                testTag = "start_diag_button",
+                modifier = Modifier.weight(1f)
+            )
+            GlassActionButton(
+                text = stringResource(R.string.btn_stop_diag),
+                icon = Icons.Rounded.Stop,
+                onClick = onStopDiagnostic,
+                enabled = uiState.isDiagRunning,
+                accentColor = CoralDanger,
+                testTag = "stop_diag_button",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            listOf(
+                Triple(stringResource(R.string.btn_diag_listener), "diag_check_listener_btn", onVerifyListener),
+                Triple(stringResource(R.string.btn_diag_button), "diag_test_button_btn", onTestButton),
+                Triple(stringResource(R.string.btn_diag_link), "diag_test_link_btn", onTestLink)
+            ).forEach { (label, tag, action) ->
+                val shape = RoundedCornerShape(10.dp)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                        .clip(shape)
+                        .background(MidnightDeep.copy(alpha = 0.6f))
+                        .border(1.dp, GlassStrokeSubtle, shape)
+                        .clickable(enabled = !uiState.isDiagRunning, onClick = action)
+                        .padding(horizontal = 6.dp, vertical = 10.dp)
+                        .testTag(tag),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = if (!uiState.isDiagRunning) TextPrimary else TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = uiState.diagStatusMessage,
+            style = MaterialTheme.typography.labelSmall,
+            color = when (uiState.diagResultStatus) {
+                DiagnosticResultStatus.PASSED -> EmeraldSuccess
+                DiagnosticResultStatus.FAILED -> CoralDanger
+                DiagnosticResultStatus.BLOCKED, DiagnosticResultStatus.STOPPED -> AmberWarning
+                DiagnosticResultStatus.RUNNING, DiagnosticResultStatus.IDLE -> TextSecondary
+            },
+            modifier = Modifier.testTag("diag_status_msg")
+        )
+    }
+}
+
+@Composable
+private fun DiagnosticStatusCell(
+    title: String,
+    value: String,
+    accent: androidx.compose.ui.graphics.Color,
+    testTag: String,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(MidnightDeep.copy(alpha = 0.58f))
+            .border(1.dp, GlassStrokeSubtle, shape)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .testTag(testTag),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = title.uppercase(Locale.US),
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = accent,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

@@ -129,6 +129,7 @@ fun WebPreviewCard(
     onDirectPreviewClick: (String) -> Unit,
     onRandomTapExecuted: (String, String?, String?) -> Unit,
     onRandomScrollFinished: (Boolean, String?) -> Unit,
+    onDiagCommandResult: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var webProgress by remember { mutableIntStateOf(0) }
@@ -384,6 +385,36 @@ fun WebPreviewCard(
                             delay(18)
                         }
                         onRandomScrollFinished(movedAny, latestPos)
+                    }
+                }
+            }
+            WebCommandType.DIAG_VERIFY_LISTENER -> {
+                if (wv == null) {
+                    onDiagCommandResult("""{"ok":false,"status":"FAILED","listenerText":"Not Ready","reason":"Preview WebView is not ready."}""")
+                } else {
+                    wv.evaluateJavascript(buildDiagVerifyListenerScript()) { raw ->
+                        val decoded = decodeJsString(raw)
+                        onDiagCommandResult(decoded.ifBlank { """{"ok":false,"status":"FAILED","listenerText":"Not Responding","reason":"No response from WebView DOM."}""" })
+                    }
+                }
+            }
+            WebCommandType.DIAG_TEST_BUTTON -> {
+                if (wv == null) {
+                    onDiagCommandResult("""{"ok":false,"status":"FAILED","clicked":false,"reason":"Preview WebView is not ready."}""")
+                } else {
+                    wv.evaluateJavascript(buildDiagTestButtonScript(cmd.interactionMode)) { raw ->
+                        val decoded = decodeJsString(raw)
+                        onDiagCommandResult(decoded.ifBlank { """{"ok":false,"status":"FAILED","clicked":false,"reason":"Button probe returned empty result."}""" })
+                    }
+                }
+            }
+            WebCommandType.DIAG_TEST_LINK -> {
+                if (wv == null) {
+                    onDiagCommandResult("""{"ok":false,"status":"FAILED","clicked":false,"reason":"Preview WebView is not ready."}""")
+                } else {
+                    wv.evaluateJavascript(buildDiagTestLinkScript()) { raw ->
+                        val decoded = decodeJsString(raw)
+                        onDiagCommandResult(decoded.ifBlank { """{"ok":false,"status":"FAILED","clicked":false,"reason":"Link navigation probe returned empty result."}""" })
                     }
                 }
             }
@@ -1031,13 +1062,24 @@ private fun buildDirectClickObserverScript(): String {
     return """
         (function() {
           try {
-            if (window.__wvDirectClickBound) return;
+            if (window.__wvClickAbort) {
+              try { window.__wvClickAbort.abort(); } catch (e0) {}
+              window.__wvClickAbort = null;
+            }
+            var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+            if (ctrl) {
+              window.__wvClickAbort = ctrl;
+            } else if (window.__wvDirectClickBound) {
+              window.__wvClickListenerCount = 1;
+              return;
+            }
             window.__wvDirectClickBound = true;
+            window.__wvClickListenerCount = 1;
             $AD_GUARD_JS
             $TAP_RIPPLE_JS
             var lastEl = null;
             var lastAt = 0;
-            document.addEventListener('click', function(ev) {
+            var onDirectClickEvent = function(ev) {
               if (!ev.isTrusted) return;
               var raw = ev.target && ev.target.closest
                 ? ev.target.closest('button, a[href], [role="button"], input[type="button"], input[type="submit"], [onclick]')
@@ -1068,8 +1110,193 @@ private fun buildDirectClickObserverScript(): String {
               if (window.WebVisitBridge && typeof window.WebVisitBridge.onDirectClick === 'function') {
                 window.WebVisitBridge.onDirectClick(label || raw.tagName.toLowerCase());
               }
-            }, true);
+            };
+            document.addEventListener('click', onDirectClickEvent, ctrl ? { capture: true, signal: ctrl.signal } : true);
           } catch (e) {}
+        })();
+    """.trimIndent()
+}
+
+private fun buildDiagVerifyListenerScript(): String {
+    val observer = buildDirectClickObserverScript()
+    return """
+        (function() {
+          try {
+            $observer
+            var root = document.body || document.documentElement;
+            if (!root) {
+              return JSON.stringify({ ok: false, status: 'FAILED', listenerText: 'Not Responding', reason: 'Document body not ready.' });
+            }
+            var probeReceived = false;
+            var probeEl = document.createElement('button');
+            probeEl.type = 'button';
+            probeEl.setAttribute('aria-hidden', 'true');
+            probeEl.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+            probeEl.addEventListener('click', function() { probeReceived = true; }, { once: true });
+            root.appendChild(probeEl);
+            try {
+              probeEl.click();
+            } finally {
+              try { if (probeEl.parentNode) probeEl.parentNode.removeChild(probeEl); } catch (_) {}
+            }
+            var count = window.__wvClickListenerCount || (window.__wvDirectClickBound ? 1 : 0);
+            if (probeReceived && count === 1) {
+              return JSON.stringify({ ok: true, status: 'OK', listenerText: 'Active (0 Duplicates)', reason: '' });
+            }
+            return JSON.stringify({ ok: false, status: 'FAILED', listenerText: 'Not Responding', reason: 'DOM click probe failed to fire.' });
+          } catch (e) {
+            return JSON.stringify({ ok: false, status: 'BLOCKED', listenerText: 'Blocked', reason: (e && e.message) ? e.message : 'Listener verification blocked.' });
+          }
+        })();
+    """.trimIndent()
+}
+
+private fun buildDiagTestButtonScript(mode: ClickInteractionMode): String {
+    val isTap = mode == ClickInteractionMode.TAP
+    return """
+        (function() {
+          try {
+            $AD_GUARD_JS
+            $TAP_RIPPLE_JS
+            var preferred = document.getElementById('demoOverviewBtn');
+            var btnEl = (preferred && isInteractable(preferred) && !isProhibitedAdElement(preferred)) ? preferred : null;
+            if (!btnEl) {
+              var btns = document.querySelectorAll('button, input[type="button"], input[type="submit"], [role="button"]');
+              for (var i = 0; i < btns.length; i++) {
+                if (isInteractable(btns[i]) && !isProhibitedAdElement(btns[i])) {
+                  btnEl = btns[i];
+                  break;
+                }
+              }
+            }
+            if (!btnEl) {
+              return JSON.stringify({ ok: false, status: 'FAILED', clicked: false, label: '', cellText: 'No Safe Button', reason: 'No safe non-ad button found on preview page.' });
+            }
+            var domClickFired = false;
+            var onCheck = function(ev) {
+              if (ev.target === btnEl || btnEl.contains(ev.target)) {
+                domClickFired = true;
+              }
+            };
+            document.addEventListener('click', onCheck, { capture: true, once: true });
+            if (btnEl.scrollIntoView) {
+              btnEl.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+            }
+            var rect = btnEl.getBoundingClientRect();
+            var cx = rect.left + rect.width / 2;
+            var cy = rect.top + rect.height / 2;
+            spawnTapRipple(cx, cy, $isTap ? '#A855F7' : '#38BDF8');
+            var prevOutline = btnEl.style.outline;
+            btnEl.style.outline = '2px solid #38BDF8';
+            setTimeout(function() { try { btnEl.style.outline = prevOutline; } catch (_) {} }, 320);
+            if (btnEl.focus) { try { btnEl.focus({ preventScroll: true }); } catch (_) {} }
+            btnEl.click();
+            document.removeEventListener('click', onCheck, true);
+
+            var label = (btnEl.innerText || btnEl.value || btnEl.getAttribute('aria-label') || 'Test Button')
+              .replace(/\s+/g, ' ').trim().slice(0, 22);
+            if (domClickFired) {
+              return JSON.stringify({ ok: true, status: 'OK', clicked: true, label: label, cellText: 'Verified (' + label + ')', reason: '' });
+            }
+            return JSON.stringify({ ok: false, status: 'FAILED', clicked: false, label: label, cellText: 'Not Received', reason: 'Test button "' + label + '" did not emit a DOM click event.' });
+          } catch (e) {
+            return JSON.stringify({ ok: false, status: 'BLOCKED', clicked: false, label: '', cellText: 'Blocked', reason: (e && e.message) ? e.message : 'Button test blocked.' });
+          }
+        })();
+    """.trimIndent()
+}
+
+private fun buildDiagTestLinkScript(): String {
+    return """
+        (function() {
+          try {
+            $AD_GUARD_JS
+            $TAP_RIPPLE_JS
+            var curOrigin = (window.location && window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
+            var links = document.querySelectorAll('a[href]');
+            var linkEl = null;
+            for (var i = 0; i < links.length; i++) {
+              var a = links[i];
+              if (!isInteractable(a) || isProhibitedAdElement(a)) continue;
+              var hrefAttr = a.getAttribute('href') || '';
+              if (/^javascript:/i.test(hrefAttr)) continue;
+              if (/^https?:\/\//i.test(hrefAttr) && curOrigin) {
+                try {
+                  var u = new URL(hrefAttr, window.location.href);
+                  if (u.origin !== curOrigin) continue;
+                } catch (eUrl) { continue; }
+              }
+              linkEl = a;
+              break;
+            }
+            if (!linkEl) {
+              return JSON.stringify({ ok: false, status: 'FAILED', clicked: false, label: '', cellText: 'No Safe Link', reason: 'No safe same-origin test link found on preview page.' });
+            }
+            var beforeHref = window.location ? window.location.href : '';
+            var beforeHash = window.location ? window.location.hash : '';
+            var hrefVal = linkEl.getAttribute('href') || '';
+            var linkClickFired = false;
+            var onCheck = function(ev) {
+              if (ev.target === linkEl || linkEl.contains(ev.target)) {
+                linkClickFired = true;
+              }
+            };
+            document.addEventListener('click', onCheck, { capture: true, once: true });
+            if (linkEl.scrollIntoView) {
+              linkEl.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+            }
+            var rect = linkEl.getBoundingClientRect();
+            var cx = rect.left + rect.width / 2;
+            var cy = rect.top + rect.height / 2;
+            spawnTapRipple(cx, cy, '#A855F7');
+            var prevOutline = linkEl.style.outline;
+            linkEl.style.outline = '2px solid #A855F7';
+            setTimeout(function() { try { linkEl.style.outline = prevOutline; } catch (_) {} }, 320);
+            if (linkEl.focus) { try { linkEl.focus({ preventScroll: true }); } catch (_) {} }
+            linkEl.click();
+            document.removeEventListener('click', onCheck, true);
+
+            var afterHref = window.location ? window.location.href : '';
+            var afterHash = window.location ? window.location.hash : '';
+            var navigated = (afterHref !== beforeHref) ||
+              (afterHash !== beforeHash) ||
+              (hrefVal.indexOf('#') === 0 && afterHash === hrefVal);
+            var label = (linkEl.innerText || hrefVal || 'Test Link').replace(/\s+/g, ' ').trim().slice(0, 22);
+
+            if (linkClickFired && navigated) {
+              return JSON.stringify({
+                ok: true,
+                status: 'OK',
+                clicked: true,
+                navigated: true,
+                label: label,
+                cellText: 'Verified (' + (afterHash || label) + ')',
+                reason: ''
+              });
+            }
+            if (linkClickFired) {
+              return JSON.stringify({
+                ok: false,
+                status: 'FAILED',
+                clicked: true,
+                navigated: false,
+                label: label,
+                cellText: 'Click Only (No Nav)',
+                reason: 'Link "' + label + '" emitted click but target navigation did not change URL/hash.'
+              });
+            }
+            return JSON.stringify({
+              ok: false,
+              status: 'FAILED',
+              clicked: false,
+              navigated: false,
+              label: label,
+              cellText: 'Not Received',
+              reason: 'Test link "' + label + '" did not emit click or navigate.'
+            });
+          } catch (e) {
+            return JSON.stringify({ ok: false, status: 'BLOCKED', clicked: false, label: '', cellText: 'Blocked', reason: (e && e.message) ? e.message : 'Link test blocked.' });
+          }
         })();
     """.trimIndent()
 }

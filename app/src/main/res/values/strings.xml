@@ -42,6 +42,12 @@
     <string name="btn_start_random">Start Random Test</string>
     <string name="btn_stop_random">Stop</string>
     <string name="btn_reset_random">Reset Random Counter</string>
+    <string name="label_diag_module">Impression &amp; Click Diagnostic</string>
+    <string name="btn_start_diag">Start Diagnostic</string>
+    <string name="btn_stop_diag">Stop</string>
+    <string name="btn_diag_listener">Verify Listener</string>
+    <string name="btn_diag_button">Test Button</string>
+    <string name="btn_diag_link">Test Link</string>
     <string name="nav_back">Back</string>
     <string name="nav_home">Home</string>
     <string name="nav_reload">Reload</string>

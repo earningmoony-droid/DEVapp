@@ -8,6 +8,7 @@ import com.example.model.ClickInteractionMode
 import com.example.model.ClickTargetItem
 import com.example.model.ClickTestStatus
 import com.example.model.DEMO_ENV_URL
+import com.example.model.DiagnosticResultStatus
 import com.example.model.RandomInteractionStatus
 import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 
 data class WebVisitUiState(
     val urlInput: String = "",
@@ -80,6 +82,17 @@ data class WebVisitUiState(
     val randomStatus: RandomInteractionStatus = RandomInteractionStatus.IDLE,
     val randomStatusMessage: String? = "Starts after verified page load. Performs safe random UI taps with scroll down/up cycles. Own Test Page & Demo Environment only; ads are blocked.",
 
+    // Impression & Click Tracking Diagnostic (temporary in-memory state only)
+    val isDiagRunning: Boolean = false,
+    val diagResultStatus: DiagnosticResultStatus = DiagnosticResultStatus.IDLE,
+    val diagPageLoadText: String = "Idle",
+    val diagTrackingText: String = "Idle",
+    val diagDetectionText: String = "Click Event Not Received",
+    val diagListenerText: String = "Not Checked",
+    val diagButtonText: String = "Pending",
+    val diagLinkText: String = "Pending",
+    val diagStatusMessage: String = "Load your Demo Test Page or Test Page URL, then tap Start Diagnostic to verify listener, button click event, and link navigation.",
+
     // Temporary active session state only
     val isRunning: Boolean = false,
     val status: TestSessionStatus = TestSessionStatus.IDLE,
@@ -109,6 +122,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     private var queueJob: Job? = null
     private var autoClickJob: Job? = null
     private var randomJob: Job? = null
+    private var diagJob: Job? = null
     private var commandSeq: Long = 0L
     private var wasVpnActive: Boolean = false
     private var lastSingleTriggerAtMs: Long = 0L
@@ -117,6 +131,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     private var randomLastSelector: String = ""
     private var pendingRandomTapDeferred: CompletableDeferred<Triple<String, String?, String?>>? = null
     private var pendingRandomScrollDeferred: CompletableDeferred<Pair<Boolean, String?>>? = null
+    private var pendingDiagDeferred: CompletableDeferred<String>? = null
 
     init {
         refreshInstalledProviders()
@@ -527,7 +542,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         if (now - lastSingleTriggerAtMs < 320L) return
 
         val state = _uiState.value
-        if (!state.isAuthorizedOwnSite) {
+        if (!state.isAuthorizedOwnSite && !state.isDemoEnvironment) {
             _uiState.update {
                 it.copy(
                     clickStatus = ClickTestStatus.RESTRICTED,
@@ -595,7 +610,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         }
         val safeTarget = parsedTarget.coerceIn(1, 10000)
 
-        if (!state.isAuthorizedOwnSite) {
+        if (!state.isAuthorizedOwnSite && !state.isDemoEnvironment) {
             _uiState.update {
                 it.copy(
                     clickTarget = safeTarget,
@@ -685,7 +700,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                     }
                     break
                 }
-                if (!cur.isAuthorizedOwnSite ||
+                if ((!cur.isAuthorizedOwnSite && !cur.isDemoEnvironment) ||
                     cur.activeUrl == null ||
                     cur.previewBlockedReason != null
                 ) {
@@ -770,6 +785,9 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
             val actionWord = if (it.clickMode == ClickInteractionMode.TAP) "tap" else "click"
             it.copy(
                 clickCount = nextCount,
+                diagDetectionText = "Click Event Received",
+                diagTrackingText = "Active",
+                diagListenerText = "Active (0 Duplicates)",
                 isAutoClickRunning = if (reachedTarget) false else it.isAutoClickRunning,
                 isManualClickListening = if (reachedTarget) false else it.isManualClickListening,
                 clickStatus = when {
@@ -810,6 +828,9 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                     }
                     state.copy(
                         clickCount = nextCount,
+                        diagDetectionText = "Click Event Received",
+                        diagTrackingText = "Active",
+                        diagListenerText = "Active (0 Duplicates)",
                         isAutoClickRunning = if (reachedTarget) false else state.isAutoClickRunning,
                         isManualClickListening = if (reachedTarget) false else state.isManualClickListening,
                         clickStatus = when {
@@ -868,13 +889,14 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
 
     fun loadDemoTestEnvironment() {
         val cur = _uiState.value
-        if (cur.isRunning || cur.isRandomInteractionRunning) return
+        if (cur.isRunning || cur.isRandomInteractionRunning || cur.isDiagRunning) return
 
         queueJob?.cancel()
         queueJob = null
         autoClickJob?.cancel()
         autoClickJob = null
         cancelRandomJobsAndDeferreds()
+        cancelDiagJobsAndDeferreds()
         countedVisitToken = -1
         countedFailToken = -1
         randomLastSelector = ""
@@ -885,6 +907,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 status = TestSessionStatus.VIEWING,
                 activeUrl = DEMO_ENV_URL,
                 previewLoadToken = it.previewLoadToken + 1,
+                visitCount = it.visitCount + 1,
                 isPreviewLoading = false,
                 previewBlockedReason = null,
                 lastLoadWasNetworkError = false,
@@ -900,7 +923,16 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 isRandomInteractionRunning = false,
                 isRandomArmedOnLoad = false,
                 randomStatus = RandomInteractionStatus.IDLE,
-                randomStatusMessage = "Demo Test Environment loaded. Tap 'Start Random Test' to run Random Tap & Scroll Down/Up testing."
+                randomStatusMessage = "Demo Test Environment loaded (1 verified Impression). Tap 'Start Random Test' or 'Start Diagnostic'.",
+                isDiagRunning = false,
+                diagResultStatus = DiagnosticResultStatus.IDLE,
+                diagPageLoadText = "Loaded (Demo Page)",
+                diagTrackingText = "Ready",
+                diagDetectionText = "Click Event Not Received",
+                diagListenerText = "Not Checked",
+                diagButtonText = "Pending",
+                diagLinkText = "Pending",
+                diagStatusMessage = "Demo Test Page loaded (1 verified Impression). Tap Start Diagnostic to verify listener, test button, and link navigation."
             )
         }
     }
@@ -1234,6 +1266,364 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    // --- Impression & Click Tracking Diagnostic Engine ---
+
+    fun onDiagCommandResult(jsonResult: String) {
+        pendingDiagDeferred?.complete(jsonResult)
+    }
+
+    private fun cancelDiagJobsAndDeferreds() {
+        diagJob?.cancel()
+        diagJob = null
+        pendingDiagDeferred?.cancel()
+        pendingDiagDeferred = null
+    }
+
+    private suspend fun dispatchDiagCommand(type: WebCommandType): JSONObject? {
+        val deferred = CompletableDeferred<String>()
+        pendingDiagDeferred = deferred
+        _uiState.update {
+            it.copy(
+                webCommand = WebCommandEvent(
+                    id = ++commandSeq,
+                    type = type,
+                    interactionMode = it.clickMode
+                )
+            )
+        }
+        val raw = withTimeoutOrNull(3500L) { deferred.await() }
+        pendingDiagDeferred = null
+        return raw?.let { runCatching { JSONObject(it) }.getOrNull() }
+    }
+
+    private fun validateDiagnosticPrecheck(requireAuthForExternal: Boolean): Boolean {
+        val s = _uiState.value
+        if (s.previewBlockedReason != null ||
+            s.status == TestSessionStatus.FAILED ||
+            s.status == TestSessionStatus.ERROR ||
+            s.status == TestSessionStatus.BLOCKED
+        ) {
+            _uiState.update {
+                it.copy(
+                    isDiagRunning = false,
+                    diagResultStatus = DiagnosticResultStatus.FAILED,
+                    diagPageLoadText = if (s.lastLoadWasNetworkError) "Network Error" else "Load Failed",
+                    diagTrackingText = "Unavailable",
+                    diagDetectionText = "Click Event Not Received",
+                    diagStatusMessage = "Page failed to load (${s.previewBlockedReason ?: "Error"}). Resolve page load failure first."
+                )
+            }
+            return false
+        }
+        if (s.activeUrl == null || s.status == TestSessionStatus.PAUSING_BETWEEN) {
+            _uiState.update {
+                it.copy(
+                    isDiagRunning = false,
+                    diagResultStatus = DiagnosticResultStatus.FAILED,
+                    diagPageLoadText = "Not Loaded",
+                    diagTrackingText = "Idle",
+                    diagDetectionText = "Click Event Not Received",
+                    diagStatusMessage = "Preview is not loaded. Load the Demo Test Environment or start a URL test first."
+                )
+            }
+            return false
+        }
+        if (requireAuthForExternal && !s.isDemoEnvironment && !s.isAuthorizedOwnSite) {
+            _uiState.update {
+                it.copy(
+                    isDiagRunning = false,
+                    diagResultStatus = DiagnosticResultStatus.BLOCKED,
+                    diagTrackingText = "Blocked (Unconfirmed)",
+                    diagDetectionText = "Click Event Not Received",
+                    diagStatusMessage = "Authorization required: Enable 'Authorized Own Site / Test Page' or load the Demo Test Environment."
+                )
+            }
+            return false
+        }
+        _uiState.update {
+            it.copy(
+                diagPageLoadText = if (s.isDemoEnvironment) "Loaded (Demo Page)" else "Loaded (WebView DOM)"
+            )
+        }
+        return true
+    }
+
+    fun startDiagnostic() {
+        val state = _uiState.value
+        if (state.isDiagRunning) return
+        if (!validateDiagnosticPrecheck(requireAuthForExternal = true)) return
+
+        cancelDiagJobsAndDeferreds()
+        _uiState.update {
+            it.copy(
+                isDiagRunning = true,
+                diagResultStatus = DiagnosticResultStatus.RUNNING,
+                diagButtonText = "Testing...",
+                diagLinkText = "Waiting...",
+                diagStatusMessage = "Checking page load & verifying click event listener..."
+            )
+        }
+
+        diagJob = viewModelScope.launch {
+            val listenerObj = dispatchDiagCommand(WebCommandType.DIAG_VERIFY_LISTENER)
+            if (!_uiState.value.isDiagRunning) return@launch
+            val listenerOk = listenerObj?.optBoolean("ok", false) == true
+            val listenerStatus = listenerObj?.optString("listenerText")
+                ?.takeIf { it.isNotBlank() } ?: if (listenerOk) "Active (0 Duplicates)" else "Not Responding"
+            val listenerResultType = listenerObj?.optString("status").orEmpty()
+
+            if (!listenerOk) {
+                val blocked = listenerResultType == "BLOCKED"
+                _uiState.update {
+                    it.copy(
+                        isDiagRunning = false,
+                        diagResultStatus = if (blocked) DiagnosticResultStatus.BLOCKED else DiagnosticResultStatus.FAILED,
+                        diagListenerText = listenerStatus,
+                        diagTrackingText = if (blocked) "Restricted" else "Listener Failed",
+                        diagDetectionText = "Click Event Not Received",
+                        diagStatusMessage = listenerObj?.optString("reason")
+                            ?.takeIf { r -> r.isNotBlank() }
+                            ?: "Diagnostic Failed: Click Event Listener did not respond."
+                    )
+                }
+                return@launch
+            }
+
+            _uiState.update {
+                it.copy(
+                    diagListenerText = listenerStatus,
+                    diagTrackingText = "Listening"
+                )
+            }
+
+            delay(300L)
+            if (!_uiState.value.isDiagRunning) return@launch
+
+            val btnObj = dispatchDiagCommand(WebCommandType.DIAG_TEST_BUTTON)
+            if (!_uiState.value.isDiagRunning) return@launch
+            val btnOk = btnObj?.optBoolean("ok", false) == true
+            val btnLabel = btnObj?.optString("label")?.takeIf { it.isNotBlank() } ?: "Test Button"
+            val btnClicked = btnObj?.optBoolean("clicked", false) == true
+
+            if (btnClicked) {
+                incrementDiagnosticVerifiedClick()
+            }
+
+            if (!btnOk) {
+                val blocked = btnObj?.optString("status") == "BLOCKED"
+                _uiState.update {
+                    it.copy(
+                        isDiagRunning = false,
+                        diagResultStatus = if (blocked) DiagnosticResultStatus.BLOCKED else DiagnosticResultStatus.FAILED,
+                        diagButtonText = btnObj?.optString("cellText")?.takeIf { t -> t.isNotBlank() } ?: "Not Received",
+                        diagDetectionText = if (btnClicked) "Click Event Received" else "Click Event Not Received",
+                        diagStatusMessage = "Diagnostic Failed: ${btnObj?.optString("reason") ?: "Test button click event not received."}"
+                    )
+                }
+                return@launch
+            }
+
+            _uiState.update {
+                it.copy(
+                    diagButtonText = "Verified ($btnLabel)",
+                    diagDetectionText = "Click Event Received",
+                    diagTrackingText = "Active",
+                    diagStatusMessage = "Test Button verified (\"$btnLabel\"). Testing Link navigation..."
+                )
+            }
+
+            delay(400L)
+            if (!_uiState.value.isDiagRunning) return@launch
+
+            val linkObj = dispatchDiagCommand(WebCommandType.DIAG_TEST_LINK)
+            if (!_uiState.value.isDiagRunning) return@launch
+            val linkOk = linkObj?.optBoolean("ok", false) == true
+            val linkClicked = linkObj?.optBoolean("clicked", false) == true
+            val linkCell = linkObj?.optString("cellText")?.takeIf { it.isNotBlank() }
+                ?: if (linkOk) "Verified" else "Failed"
+
+            if (linkClicked) {
+                incrementDiagnosticVerifiedClick()
+            }
+
+            if (!linkOk) {
+                val blocked = linkObj?.optString("status") == "BLOCKED"
+                _uiState.update {
+                    it.copy(
+                        isDiagRunning = false,
+                        diagResultStatus = if (blocked) DiagnosticResultStatus.BLOCKED else DiagnosticResultStatus.FAILED,
+                        diagLinkText = linkCell,
+                        diagDetectionText = if (linkClicked) "Click Event Received" else "Click Event Not Received",
+                        diagStatusMessage = "Diagnostic Failed: ${linkObj?.optString("reason") ?: "Test link navigation check failed."}"
+                    )
+                }
+                return@launch
+            }
+
+            _uiState.update {
+                it.copy(
+                    isDiagRunning = false,
+                    diagResultStatus = DiagnosticResultStatus.PASSED,
+                    diagLinkText = linkCell,
+                    diagDetectionText = "Click Event Received",
+                    diagTrackingText = "Active",
+                    diagStatusMessage = "Diagnostic Passed: Impression=${it.visitCount}, Click=${it.clickCount}. Listener active (0 duplicates), Test Button & Test Link navigation verified."
+                )
+            }
+        }
+    }
+
+    fun stopDiagnostic(reason: String? = null) {
+        cancelDiagJobsAndDeferreds()
+        _uiState.update {
+            it.copy(
+                isDiagRunning = false,
+                diagResultStatus = DiagnosticResultStatus.STOPPED,
+                diagStatusMessage = reason ?: "Click Tracking Diagnostic stopped."
+            )
+        }
+    }
+
+    fun verifyDiagListenerOnly() {
+        if (_uiState.value.isDiagRunning) return
+        if (!validateDiagnosticPrecheck(requireAuthForExternal = false)) return
+        cancelDiagJobsAndDeferreds()
+        _uiState.update {
+            it.copy(
+                isDiagRunning = true,
+                diagResultStatus = DiagnosticResultStatus.RUNNING,
+                diagStatusMessage = "Verifying DOM click event listener..."
+            )
+        }
+        diagJob = viewModelScope.launch {
+            val res = dispatchDiagCommand(WebCommandType.DIAG_VERIFY_LISTENER)
+            val ok = res?.optBoolean("ok", false) == true
+            val blocked = res?.optString("status") == "BLOCKED"
+            _uiState.update {
+                it.copy(
+                    isDiagRunning = false,
+                    diagResultStatus = when {
+                        blocked -> DiagnosticResultStatus.BLOCKED
+                        ok -> DiagnosticResultStatus.PASSED
+                        else -> DiagnosticResultStatus.FAILED
+                    },
+                    diagListenerText = res?.optString("listenerText")?.takeIf { t -> t.isNotBlank() }
+                        ?: if (ok) "Active (0 Duplicates)" else "Not Responding",
+                    diagTrackingText = if (ok) "Listening" else "Listener Failed",
+                    diagStatusMessage = if (ok) {
+                        "Click Event Listener verified active (0 duplicate listeners)."
+                    } else {
+                        res?.optString("reason") ?: "Click Event Listener verification failed."
+                    }
+                )
+            }
+        }
+    }
+
+    fun runDiagButtonTestOnly() {
+        if (_uiState.value.isDiagRunning) return
+        if (!validateDiagnosticPrecheck(requireAuthForExternal = true)) return
+        cancelDiagJobsAndDeferreds()
+        _uiState.update {
+            it.copy(
+                isDiagRunning = true,
+                diagResultStatus = DiagnosticResultStatus.RUNNING,
+                diagButtonText = "Testing...",
+                diagStatusMessage = "Testing button click event receipt..."
+            )
+        }
+        diagJob = viewModelScope.launch {
+            dispatchDiagCommand(WebCommandType.DIAG_VERIFY_LISTENER)
+            val res = dispatchDiagCommand(WebCommandType.DIAG_TEST_BUTTON)
+            val ok = res?.optBoolean("ok", false) == true
+            val blocked = res?.optString("status") == "BLOCKED"
+            val clicked = res?.optBoolean("clicked", false) == true
+            val label = res?.optString("label")?.takeIf { it.isNotBlank() } ?: "Test Button"
+            if (clicked) incrementDiagnosticVerifiedClick()
+            _uiState.update {
+                it.copy(
+                    isDiagRunning = false,
+                    diagResultStatus = when {
+                        blocked -> DiagnosticResultStatus.BLOCKED
+                        ok -> DiagnosticResultStatus.PASSED
+                        else -> DiagnosticResultStatus.FAILED
+                    },
+                    diagListenerText = "Active (0 Duplicates)",
+                    diagTrackingText = if (ok) "Active" else it.diagTrackingText,
+                    diagDetectionText = if (clicked) "Click Event Received" else "Click Event Not Received",
+                    diagButtonText = if (ok) "Verified ($label)" else (res?.optString("cellText") ?: "Not Received"),
+                    diagStatusMessage = if (ok) {
+                        "Click Event Received from Test Button (\"$label\")."
+                    } else {
+                        "Click Event Not Received: ${res?.optString("reason") ?: "Test button did not emit click."}"
+                    }
+                )
+            }
+        }
+    }
+
+    fun runDiagLinkTestOnly() {
+        if (_uiState.value.isDiagRunning) return
+        if (!validateDiagnosticPrecheck(requireAuthForExternal = true)) return
+        cancelDiagJobsAndDeferreds()
+        _uiState.update {
+            it.copy(
+                isDiagRunning = true,
+                diagResultStatus = DiagnosticResultStatus.RUNNING,
+                diagLinkText = "Testing...",
+                diagStatusMessage = "Testing link click & navigation..."
+            )
+        }
+        diagJob = viewModelScope.launch {
+            dispatchDiagCommand(WebCommandType.DIAG_VERIFY_LISTENER)
+            val res = dispatchDiagCommand(WebCommandType.DIAG_TEST_LINK)
+            val ok = res?.optBoolean("ok", false) == true
+            val blocked = res?.optString("status") == "BLOCKED"
+            val clicked = res?.optBoolean("clicked", false) == true
+            val label = res?.optString("label")?.takeIf { it.isNotBlank() } ?: "Test Link"
+            if (clicked) incrementDiagnosticVerifiedClick()
+            _uiState.update {
+                it.copy(
+                    isDiagRunning = false,
+                    diagResultStatus = when {
+                        blocked -> DiagnosticResultStatus.BLOCKED
+                        ok -> DiagnosticResultStatus.PASSED
+                        else -> DiagnosticResultStatus.FAILED
+                    },
+                    diagListenerText = "Active (0 Duplicates)",
+                    diagTrackingText = if (ok) "Active" else it.diagTrackingText,
+                    diagDetectionText = if (clicked) "Click Event Received" else "Click Event Not Received",
+                    diagLinkText = res?.optString("cellText")?.takeIf { t -> t.isNotBlank() }
+                        ?: if (ok) "Verified ($label)" else "Failed",
+                    diagStatusMessage = if (ok) {
+                        "Test Link click & navigation verified (\"$label\")."
+                    } else {
+                        "Test Link check failed: ${res?.optString("reason") ?: "Link did not navigate."}"
+                    }
+                )
+            }
+        }
+    }
+
+    private fun incrementDiagnosticVerifiedClick() {
+        _uiState.update { state ->
+            val nextCount = state.clickCount + 1
+            val reachedTarget = state.isAutoClickRunning && nextCount >= state.clickTarget
+            if (reachedTarget) {
+                autoClickJob?.cancel()
+                autoClickJob = null
+            }
+            state.copy(
+                clickCount = nextCount,
+                diagDetectionText = "Click Event Received",
+                diagTrackingText = "Active",
+                isAutoClickRunning = if (reachedTarget) false else state.isAutoClickRunning,
+                isManualClickListening = if (reachedTarget) false else state.isManualClickListening,
+                clickStatus = if (reachedTarget) ClickTestStatus.COMPLETED else state.clickStatus
+            )
+        }
+    }
+
     fun startTest() {
         startTestInternal(preserveRandomArmed = false)
     }
@@ -1267,6 +1657,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         val pauseSec = state.pauseDurationSec
 
         cancelRandomJobsAndDeferreds()
+        cancelDiagJobsAndDeferreds()
         countedVisitToken = -1
         countedFailToken = -1
         randomLastSelector = ""
@@ -1279,6 +1670,15 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 isDemoEnvironment = false,
                 isRandomInteractionRunning = false,
                 isRandomArmedOnLoad = preserveRandomArmed,
+                isDiagRunning = false,
+                diagResultStatus = DiagnosticResultStatus.IDLE,
+                diagPageLoadText = "Loading",
+                diagTrackingText = "Waiting for Load",
+                diagDetectionText = "Click Event Not Received",
+                diagListenerText = "Not Checked",
+                diagButtonText = "Pending",
+                diagLinkText = "Pending",
+                diagStatusMessage = "Waiting for website load to finish before running Impression & Click Diagnostic.",
                 isRunning = true,
                 status = TestSessionStatus.LOADING,
                 activeUrl = normalizedUrl,
@@ -1506,6 +1906,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         autoClickJob?.cancel()
         autoClickJob = null
         cancelRandomJobsAndDeferreds()
+        cancelDiagJobsAndDeferreds()
 
         _uiState.update {
             val allFailed = it.visitCount == 0 && it.failedCount > 0
@@ -1525,6 +1926,9 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 isRandomInteractionRunning = false,
                 isRandomArmedOnLoad = false,
                 isDemoEnvironment = false,
+                isDiagRunning = false,
+                diagPageLoadText = if (allFailed) "Load Failed" else "Completed",
+                diagTrackingText = "Idle",
                 discoveredClickTargets = emptyList(),
                 clickStatus = if (it.clickCount >= it.clickTarget && it.clickCount > 0) ClickTestStatus.COMPLETED else ClickTestStatus.IDLE,
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
@@ -1538,6 +1942,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         autoClickJob?.cancel()
         autoClickJob = null
         cancelRandomJobsAndDeferreds()
+        cancelDiagJobsAndDeferreds()
         countedVisitToken = -1
         countedFailToken = -1
 
@@ -1564,6 +1969,15 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 isRandomInteractionRunning = false,
                 isRandomArmedOnLoad = false,
                 isDemoEnvironment = false,
+                isDiagRunning = false,
+                diagResultStatus = DiagnosticResultStatus.STOPPED,
+                diagPageLoadText = "Stopped",
+                diagTrackingText = "Stopped",
+                diagDetectionText = "Click Event Not Received",
+                diagListenerText = "Not Checked",
+                diagButtonText = "Pending",
+                diagLinkText = "Pending",
+                diagStatusMessage = "Stopped: VPN connectivity was lost.",
                 randomStatus = RandomInteractionStatus.STOPPED,
                 randomStatusMessage = "Stopped: VPN connectivity was lost.",
                 clickCount = 0,
@@ -1584,6 +1998,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         autoClickJob?.cancel()
         autoClickJob = null
         cancelRandomJobsAndDeferreds()
+        cancelDiagJobsAndDeferreds()
         countedVisitToken = -1
         countedFailToken = -1
 
@@ -1610,6 +2025,15 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 isRandomInteractionRunning = false,
                 isRandomArmedOnLoad = false,
                 isDemoEnvironment = false,
+                isDiagRunning = false,
+                diagResultStatus = DiagnosticResultStatus.STOPPED,
+                diagPageLoadText = "Stopped",
+                diagTrackingText = "Stopped",
+                diagDetectionText = "Click Event Not Received",
+                diagListenerText = "Not Checked",
+                diagButtonText = "Pending",
+                diagLinkText = "Pending",
+                diagStatusMessage = "Load your Demo Test Page or Test Page URL, then tap Start Diagnostic to verify listener, button click event, and link navigation.",
                 randomTapCount = 0,
                 randomStatus = RandomInteractionStatus.STOPPED,
                 randomStatusMessage = "Session stopped & cleared.",
@@ -1672,7 +2096,13 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun onPreviewPageStarted() {
-        _uiState.update { it.copy(isPreviewLoading = true) }
+        _uiState.update {
+            it.copy(
+                isPreviewLoading = true,
+                diagPageLoadText = "Loading",
+                diagTrackingText = "Waiting for Load"
+            )
+        }
     }
 
     fun onPreviewPageFinished(canGoBack: Boolean) {
@@ -1698,6 +2128,12 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 isPreviewLoading = false,
                 canGoBack = canGoBack,
                 visitCount = if (shouldCountVisit) state.visitCount + 1 else state.visitCount,
+                diagPageLoadText = if (state.previewBlockedReason == null) {
+                    if (state.isDemoEnvironment) "Loaded (Demo Page)" else "Loaded (WebView DOM)"
+                } else {
+                    state.diagPageLoadText
+                },
+                diagTrackingText = if (state.previewBlockedReason == null) "Listening" else state.diagTrackingText,
                 status = if (state.isRunning && state.status == TestSessionStatus.LOADING && state.previewBlockedReason == null) {
                     TestSessionStatus.VIEWING
                 } else {
@@ -1714,6 +2150,10 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         val hadRandom = _uiState.value.isRandomInteractionRunning || _uiState.value.isRandomArmedOnLoad
         if (hadRandom) {
             cancelRandomJobsAndDeferreds()
+        }
+        val hadDiag = _uiState.value.isDiagRunning
+        if (hadDiag) {
+            cancelDiagJobsAndDeferreds()
         }
         _uiState.update { state ->
             val token = state.previewLoadToken
@@ -1736,7 +2176,13 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 isRandomInteractionRunning = if (hadRandom) false else state.isRandomInteractionRunning,
                 isRandomArmedOnLoad = if (hadRandom) false else state.isRandomArmedOnLoad,
                 randomStatus = if (hadRandom) RandomInteractionStatus.FAILED else state.randomStatus,
-                randomStatusMessage = if (hadRandom) "Stopped: Page load failed ($reason)" else state.randomStatusMessage
+                randomStatusMessage = if (hadRandom) "Stopped: Page load failed ($reason)" else state.randomStatusMessage,
+                isDiagRunning = false,
+                diagPageLoadText = if (isNetworkError) "Network Error" else "Load Failed",
+                diagTrackingText = "Unavailable",
+                diagDetectionText = "Click Event Not Received",
+                diagResultStatus = if (hadDiag) DiagnosticResultStatus.FAILED else state.diagResultStatus,
+                diagStatusMessage = if (hadDiag) "Diagnostic Failed: $reason" else state.diagStatusMessage
             )
         }
     }
@@ -1746,6 +2192,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         queueJob?.cancel()
         autoClickJob?.cancel()
         cancelRandomJobsAndDeferreds()
+        cancelDiagJobsAndDeferreds()
         vpnMonitor.release()
     }
 }
