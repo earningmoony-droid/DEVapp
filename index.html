@@ -25,7 +25,6 @@
       --text-muted: #94a3b8;
       --radius-lg: 24px;
       --radius-md: 16px;
-      --radius-sm: 12px;
     }
 
     * {
@@ -45,7 +44,6 @@
       overflow-x: hidden;
     }
 
-    /* Ambient liquid glass glow orbs */
     .ambient-orb {
       position: fixed;
       border-radius: 50%;
@@ -53,7 +51,6 @@
       pointer-events: none;
       z-index: 0;
       opacity: 0.45;
-      animation: floatOrb 12s ease-in-out infinite alternate;
     }
 
     .orb-cyan {
@@ -70,32 +67,17 @@
       top: 30%;
       right: -90px;
       background: radial-gradient(circle, rgba(168, 85, 247, 0.5), transparent 70%);
-      animation-delay: -5s;
-    }
-
-    .orb-indigo {
-      width: 260px;
-      height: 260px;
-      bottom: -80px;
-      left: 20%;
-      background: radial-gradient(circle, rgba(99, 102, 241, 0.45), transparent 70%);
-      animation-delay: -9s;
-    }
-
-    @keyframes floatOrb {
-      from { transform: translate(0, 0) scale(1); }
-      to { transform: translate(24px, 18px) scale(1.08); }
     }
 
     .app-shell {
       position: relative;
       z-index: 1;
-      max-width: 1080px;
+      max-width: 1060px;
       margin: 0 auto;
-      padding: calc(16px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));
+      padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
 
     .glass-panel {
@@ -105,8 +87,7 @@
       border: 1px solid var(--glass-border);
       box-shadow: 0 18px 42px rgba(3, 6, 20, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.14);
       border-radius: var(--radius-lg);
-      padding: 18px;
-      transition: transform 0.22s ease, border-color 0.22s ease;
+      padding: 16px;
     }
 
     .topbar {
@@ -120,30 +101,23 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
-      min-width: 0;
+      gap: 10px;
     }
 
     .brand-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 13px;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
       background: linear-gradient(135deg, rgba(56, 189, 248, 0.24), rgba(168, 85, 247, 0.28));
       border: 1px solid rgba(255, 255, 255, 0.24);
       display: grid;
       place-items: center;
-      flex-shrink: 0;
     }
 
     .brand-title {
-      font-size: 1.12rem;
+      font-size: 1.08rem;
       font-weight: 700;
       letter-spacing: -0.02em;
-    }
-
-    .brand-sub {
-      font-size: 0.75rem;
-      color: var(--text-muted);
     }
 
     .status-pill {
@@ -157,6 +131,7 @@
       background: rgba(56, 189, 248, 0.14);
       border: 1px solid rgba(56, 189, 248, 0.35);
       color: var(--text-primary);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       white-space: nowrap;
     }
 
@@ -168,75 +143,24 @@
       box-shadow: 0 0 10px var(--cyan);
     }
 
-    .dashboard-metrics {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    .metric-tile {
-      background: rgba(11, 17, 40, 0.56);
-      border: 1px solid rgba(255, 255, 255, 0.11);
-      border-radius: var(--radius-md);
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .metric-label {
-      font-size: 0.73rem;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-
-    .metric-value {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: var(--text-primary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
     .layout-grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 16px;
+      gap: 14px;
     }
 
     @media (min-width: 860px) {
       .layout-grid {
-        grid-template-columns: 400px 1fr;
+        grid-template-columns: 390px 1fr;
         align-items: start;
       }
-    }
-
-    .section-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
     }
 
     .field-group {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      margin-bottom: 14px;
-    }
-
-    .field-label {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--text-secondary);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      margin-bottom: 12px;
     }
 
     .url-row {
@@ -245,8 +169,7 @@
       background: rgba(6, 9, 26, 0.65);
       border: 1px solid var(--glass-border-violet);
       border-radius: var(--radius-md);
-      padding: 4px 8px 4px 12px;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      padding: 2px 10px;
     }
 
     .url-row:focus-within {
@@ -261,15 +184,13 @@
       outline: none;
       color: var(--text-primary);
       font-size: 0.92rem;
-      padding: 10px 6px;
+      padding: 11px 4px;
       min-height: 44px;
     }
 
-    .url-input::placeholder {
-      color: var(--text-muted);
-    }
+    .url-input::placeholder { color: var(--text-muted); }
 
-    .protocol-chips {
+    .chip-row {
       display: flex;
       gap: 8px;
     }
@@ -284,7 +205,6 @@
       font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.18s ease;
     }
 
     .chip-btn.active {
@@ -293,22 +213,81 @@
       color: var(--cyan);
     }
 
-    .chip-btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
+    .chip-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
     .error-text {
       font-size: 0.78rem;
       color: var(--coral);
-      min-height: 18px;
+      min-height: 16px;
+    }
+
+    .controls-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .btn {
+      min-height: 48px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 12px;
+      text-decoration: none;
+    }
+
+    .btn:disabled { opacity: 0.42; cursor: not-allowed; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--cyan), var(--indigo), var(--purple));
+      box-shadow: 0 10px 24px rgba(99, 102, 241, 0.35);
+    }
+
+    .btn-stop {
+      background: rgba(251, 113, 133, 0.16);
+      border-color: rgba(251, 113, 133, 0.48);
+      color: #fecdd3;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      margin-bottom: 6px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(6, 9, 26, 0.75);
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--cyan), var(--indigo), var(--purple));
+      transition: width 0.3s ease;
     }
 
     .timer-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 16px;
+      gap: 8px;
+      margin-bottom: 14px;
     }
 
     .num-box {
@@ -318,7 +297,7 @@
       padding: 10px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
     }
 
     .num-box label {
@@ -334,62 +313,106 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.14);
       color: var(--cyan);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 1.05rem;
+      font-size: 1rem;
       font-weight: 700;
       padding: 4px 0;
       outline: none;
     }
 
-    .controls-row {
-      display: grid;
-      grid-template-columns: 1.2fr 1fr 1fr;
-      gap: 10px;
-    }
-
-    .btn {
-      min-height: 48px;
-      border-radius: var(--radius-md);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      font-size: 0.88rem;
-      font-weight: 700;
-      color: var(--text-primary);
-      cursor: pointer;
-      display: inline-flex;
+    .toggle-row {
+      display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .toggle-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .toggle-sub {
+      font-size: 0.73rem;
+      color: var(--text-muted);
+    }
+
+    .switch {
+      position: relative;
+      width: 48px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: rgba(6, 9, 26, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .slider::before {
+      content: "";
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      left: 3px;
+      top: 3px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: 0.2s;
+    }
+
+    .switch input:checked + .slider {
+      background: rgba(56, 189, 248, 0.28);
+      border-color: var(--cyan);
+    }
+
+    .switch input:checked + .slider::before {
+      transform: translateX(20px);
+      background: var(--cyan);
+    }
+
+    .preview-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .nav-actions {
+      display: flex;
       gap: 6px;
-      padding: 0 12px;
-      transition: transform 0.15s ease, opacity 0.2s ease, box-shadow 0.2s ease;
     }
 
-    .btn:active:not(:disabled) {
-      transform: scale(0.97);
+    .icon-btn {
+      min-width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(6, 9, 26, 0.55);
+      color: var(--text-primary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0 10px;
+      cursor: pointer;
     }
 
-    .btn:disabled {
-      opacity: 0.42;
-      cursor: not-allowed;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--cyan), var(--indigo), var(--purple));
-      box-shadow: 0 10px 24px rgba(99, 102, 241, 0.35);
-    }
-
-    .btn-pause {
-      background: rgba(251, 191, 36, 0.16);
-      border-color: rgba(251, 191, 36, 0.48);
-      color: #fde68a;
-    }
-
-    .btn-stop {
-      background: rgba(251, 113, 133, 0.16);
-      border-color: rgba(251, 113, 133, 0.48);
-      color: #fecdd3;
-    }
+    .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .btn-ghost {
-      min-height: 38px;
+      min-height: 40px;
       padding: 0 12px;
       border-radius: 12px;
       background: rgba(56, 189, 248, 0.14);
@@ -398,58 +421,8 @@
       font-size: 0.8rem;
       font-weight: 600;
       text-decoration: none;
-    }
-
-    .queue-box {
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .queue-meta {
-      display: flex;
-      justify-content: space-between;
+      display: inline-flex;
       align-items: center;
-      font-size: 0.82rem;
-      color: var(--text-secondary);
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }
-
-    .progress-track {
-      width: 100%;
-      height: 10px;
-      border-radius: 999px;
-      background: rgba(6, 9, 26, 0.72);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      width: 0%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, var(--cyan), var(--indigo), var(--purple));
-      transition: width 0.35s ease;
-    }
-
-    .preview-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    .preview-url-tag {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.74rem;
-      color: var(--text-muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
     .preview-stage {
@@ -483,156 +456,72 @@
       background: radial-gradient(circle at center, rgba(26, 36, 77, 0.52), rgba(6, 9, 26, 0.92));
     }
 
-    .preview-overlay h3 {
-      font-size: 1.05rem;
-      font-weight: 700;
-    }
-
-    .preview-overlay p {
-      font-size: 0.84rem;
-      color: var(--text-secondary);
-      max-width: 340px;
-    }
-
-    .history-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      max-height: 340px;
-      overflow-y: auto;
-    }
-
-    .history-item {
-      background: rgba(6, 9, 26, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: var(--radius-md);
-      padding: 12px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .history-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .history-url {
-      font-size: 0.86rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 4px 9px;
-      border-radius: 999px;
-      white-space: nowrap;
-    }
-
-    .badge-completed { background: rgba(52, 211, 153, 0.16); color: var(--emerald); border: 1px solid rgba(52, 211, 153, 0.4); }
-    .badge-stopped { background: rgba(251, 191, 36, 0.16); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.4); }
-    .badge-blocked { background: rgba(251, 113, 133, 0.16); color: var(--coral); border: 1px solid rgba(251, 113, 133, 0.4); }
-    .badge-opened { background: rgba(56, 189, 248, 0.16); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.4); }
-
-    .history-meta {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.74rem;
-      color: var(--text-muted);
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }
-
-    .empty-history {
-      text-align: center;
-      padding: 24px 12px;
-      color: var(--text-muted);
-      font-size: 0.85rem;
-    }
+    .preview-overlay h3 { font-size: 1.02rem; font-weight: 700; }
+    .preview-overlay p { font-size: 0.84rem; color: var(--text-secondary); max-width: 340px; }
   </style>
 </head>
 <body>
   <div class="ambient-orb orb-cyan"></div>
   <div class="ambient-orb orb-purple"></div>
-  <div class="ambient-orb orb-indigo"></div>
 
   <main class="app-shell">
     <header class="glass-panel topbar">
       <div class="brand">
         <div class="brand-icon" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="2" y1="12" x2="22" y2="12"></line>
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
           </svg>
         </div>
-        <div>
-          <div class="brand-title">WebVisit Tester</div>
-          <div class="brand-sub">Single-site sequential preview &amp; session timer</div>
-        </div>
+        <div class="brand-title">WebVisit Tester</div>
       </div>
-      <div class="status-pill" id="statusPill">
+      <div class="status-pill">
         <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">Ready</span>
+        <span id="statusText">Idle</span>
       </div>
     </header>
 
-    <section class="dashboard-metrics" aria-label="Dashboard Summary">
-      <div class="metric-tile">
-        <span class="metric-label">Completed Sessions</span>
-        <span class="metric-value" id="metricCompleted">0</span>
-      </div>
-      <div class="metric-tile">
-        <span class="metric-label">Remaining Tests</span>
-        <span class="metric-value" id="metricRemaining">0</span>
-      </div>
-      <div class="metric-tile">
-        <span class="metric-label">Phase Timer</span>
-        <span class="metric-value" id="metricTimer">00:00</span>
-      </div>
-    </section>
-
     <div class="layout-grid">
-      <section class="glass-panel" aria-label="Test Configuration and Controls">
-        <div class="section-title">
-          <span>Target Website &amp; Timer</span>
-        </div>
-
+      <section class="glass-panel" aria-label="Minimal Testing Controls">
         <div class="field-group">
-          <div class="field-label">
-            <label for="urlInput">Website URL (HTTP / HTTPS)</label>
-          </div>
           <div class="url-row">
             <input
               id="urlInput"
               class="url-input"
               type="url"
               inputmode="url"
-              autocomplete="url"
+              autocomplete="off"
               placeholder="https://example.com"
-              value="https://example.com"
             />
           </div>
-          <div class="protocol-chips">
+          <div class="chip-row">
             <button type="button" class="chip-btn active" id="btnHttps">https://</button>
             <button type="button" class="chip-btn" id="btnHttp">http://</button>
           </div>
           <div class="error-text" id="urlError" role="alert"></div>
         </div>
 
+        <div class="controls-row">
+          <button type="button" class="btn btn-primary" id="startBtn">Start</button>
+          <button type="button" class="btn btn-stop" id="stopBtn" disabled>Stop</button>
+        </div>
+
+        <div class="progress-meta">
+          <span id="liveStatusLabel">Live Status: Idle</span>
+          <span id="progressPercentLabel">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+
         <div class="timer-grid">
           <div class="num-box">
-            <label for="viewSecInput">View (sec)</label>
+            <label for="viewSecInput">Viewing (s)</label>
             <input id="viewSecInput" class="num-input" type="number" min="3" max="300" value="15" />
           </div>
           <div class="num-box">
-            <label for="pauseSecInput">Pause (sec)</label>
+            <label for="pauseSecInput">Pause (s)</label>
             <input id="pauseSecInput" class="num-input" type="number" min="0" max="120" value="3" />
           </div>
           <div class="num-box">
@@ -641,33 +530,46 @@
           </div>
         </div>
 
-        <div class="controls-row">
-          <button type="button" class="btn btn-primary" id="startBtn">Start Test</button>
-          <button type="button" class="btn btn-pause" id="pauseBtn" disabled>Pause</button>
-          <button type="button" class="btn btn-stop" id="stopBtn" disabled>Stop</button>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Auto Scroll</div>
+            <div class="toggle-sub">Scroll Speed</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="autoScrollToggle" checked />
+            <span class="slider"></span>
+          </label>
         </div>
 
-        <div class="queue-box">
-          <div class="queue-meta">
-            <span id="queueRunLabel">Run 0 of 0</span>
-            <span id="queuePercentLabel">0%</span>
+        <div class="chip-row" id="scrollSpeedRow" style="margin-bottom: 12px;">
+          <button type="button" class="chip-btn" data-speed="slow">Slow</button>
+          <button type="button" class="chip-btn active" data-speed="medium">Medium</button>
+          <button type="button" class="chip-btn" data-speed="fast">Fast</button>
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Auto Next</div>
+            <div class="toggle-sub">Automatically advance queued runs</div>
           </div>
-          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressTrack">
-            <div class="progress-fill" id="progressFill"></div>
-          </div>
+          <label class="switch">
+            <input type="checkbox" id="autoNextToggle" checked />
+            <span class="slider"></span>
+          </label>
         </div>
       </section>
 
       <section class="glass-panel" aria-label="Website Preview">
-        <div class="preview-header">
-          <div style="min-width: 0; flex: 1;">
-            <div style="font-size: 0.95rem; font-weight: 700;">Website Preview</div>
-            <div class="preview-url-tag" id="previewUrlLabel">Ready for URL</div>
+        <div class="preview-toolbar">
+          <div class="nav-actions">
+            <button type="button" class="icon-btn" id="backBtn" disabled>Back</button>
+            <button type="button" class="icon-btn" id="homeBtn" disabled>Home</button>
+            <button type="button" class="icon-btn" id="reloadBtn" disabled>Reload</button>
           </div>
           <a
             id="headerOpenBtn"
-            class="btn btn-ghost"
-            href="https://example.com"
+            class="btn-ghost"
+            href="about:blank"
             target="_blank"
             rel="noopener noreferrer"
           >Open Website</a>
@@ -682,36 +584,25 @@
           ></iframe>
 
           <div class="preview-overlay" id="previewOverlay">
-            <h3 id="overlayTitle">Ready to Test Your Site</h3>
-            <p id="overlayDesc">Enter your HTTP or HTTPS website URL and press Start Test to run sequential embedded previews.</p>
+            <h3 id="overlayTitle">Ready to Test</h3>
+            <p id="overlayDesc">Enter an HTTP or HTTPS URL and tap Start.</p>
             <a
               id="overlayOpenBtn"
               class="btn btn-primary"
-              href="https://example.com"
+              href="about:blank"
               target="_blank"
               rel="noopener noreferrer"
-              style="display: none; text-decoration: none; padding: 0 18px;"
+              style="display: none; padding: 0 18px;"
             >Open Website</a>
           </div>
         </div>
       </section>
     </div>
-
-    <section class="glass-panel" aria-label="Test History">
-      <div class="section-title">
-        <span>Test History (Saved Locally)</span>
-        <button type="button" class="btn btn-ghost" id="clearHistoryBtn">Clear</button>
-      </div>
-      <div class="history-list" id="historyList"></div>
-    </section>
   </main>
 
   <script>
     (() => {
-      const STORAGE_HISTORY_KEY = "webvisit_tester_history_v1";
-      const STORAGE_SETTINGS_KEY = "webvisit_tester_settings_v1";
-      const STORAGE_TOTAL_COMPLETED_KEY = "webvisit_tester_total_completed_v1";
-
+      // Strictly temporary in-memory session state only. No localStorage, IndexedDB, or history logs.
       const urlInput = document.getElementById("urlInput");
       const urlError = document.getElementById("urlError");
       const btnHttps = document.getElementById("btnHttps");
@@ -719,19 +610,21 @@
       const viewSecInput = document.getElementById("viewSecInput");
       const pauseSecInput = document.getElementById("pauseSecInput");
       const runsInput = document.getElementById("runsInput");
+      const autoScrollToggle = document.getElementById("autoScrollToggle");
+      const scrollSpeedRow = document.getElementById("scrollSpeedRow");
+      const autoNextToggle = document.getElementById("autoNextToggle");
+
       const startBtn = document.getElementById("startBtn");
-      const pauseBtn = document.getElementById("pauseBtn");
       const stopBtn = document.getElementById("stopBtn");
+      const backBtn = document.getElementById("backBtn");
+      const homeBtn = document.getElementById("homeBtn");
+      const reloadBtn = document.getElementById("reloadBtn");
 
       const statusText = document.getElementById("statusText");
       const statusDot = document.getElementById("statusDot");
-      const metricCompleted = document.getElementById("metricCompleted");
-      const metricRemaining = document.getElementById("metricRemaining");
-      const metricTimer = document.getElementById("metricTimer");
-      const queueRunLabel = document.getElementById("queueRunLabel");
-      const queuePercentLabel = document.getElementById("queuePercentLabel");
+      const liveStatusLabel = document.getElementById("liveStatusLabel");
+      const progressPercentLabel = document.getElementById("progressPercentLabel");
       const progressFill = document.getElementById("progressFill");
-      const progressTrack = document.getElementById("progressTrack");
 
       const previewFrame = document.getElementById("previewFrame");
       const previewOverlay = document.getElementById("previewOverlay");
@@ -739,23 +632,24 @@
       const overlayDesc = document.getElementById("overlayDesc");
       const overlayOpenBtn = document.getElementById("overlayOpenBtn");
       const headerOpenBtn = document.getElementById("headerOpenBtn");
-      const previewUrlLabel = document.getElementById("previewUrlLabel");
-      const historyList = document.getElementById("historyList");
-      const clearHistoryBtn = document.getElementById("clearHistoryBtn");
 
-      let state = {
+      const SPEED_PX = { slow: 1, medium: 3, fast: 6 };
+
+      let session = {
         running: false,
-        paused: false,
         currentRun: 0,
         totalRuns: 3,
-        completedInBatch: 0,
         viewSec: 15,
         pauseSec: 3,
+        autoScroll: true,
+        scrollSpeed: "medium",
+        autoNext: true,
         phase: "idle", // idle | loading | viewing | cooldown | blocked | completed | stopped
         phaseRemaining: 0,
+        activeUrl: "",
         timerId: null,
         loadTimeoutId: null,
-        activeUrl: ""
+        scrollTimerId: null
       };
 
       function validateUrl(raw) {
@@ -768,47 +662,13 @@
         try {
           const parsed = new URL(trimmed);
           if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-            return { valid: false, error: "Only HTTP and HTTPS protocols are allowed." };
+            return { valid: false, error: "Only HTTP and HTTPS protocols are supported." };
           }
-          if (!parsed.hostname) {
-            return { valid: false, error: "Enter a valid website host." };
-          }
+          if (!parsed.hostname) return { valid: false, error: "Enter a valid website host." };
           return { valid: true, url: parsed.toString() };
         } catch {
           return { valid: false, error: "Enter a valid HTTP or HTTPS web address." };
         }
-      }
-
-      function formatSeconds(sec) {
-        const s = Math.max(0, Math.floor(sec));
-        const m = String(Math.floor(s / 60)).padStart(2, "0");
-        const r = String(s % 60).padStart(2, "0");
-        return `${m}:${r}`;
-      }
-
-      function loadSettings() {
-        try {
-          const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || "null");
-          if (saved) {
-            if (saved.url) urlInput.value = saved.url;
-            if (saved.viewSec) viewSecInput.value = saved.viewSec;
-            if (saved.pauseSec !== undefined) pauseSecInput.value = saved.pauseSec;
-            if (saved.runs) runsInput.value = saved.runs;
-          }
-        } catch {}
-        syncProtocolChips();
-        syncExternalLinks(urlInput.value.trim());
-      }
-
-      function saveSettings() {
-        try {
-          localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify({
-            url: urlInput.value.trim(),
-            viewSec: clampInt(viewSecInput.value, 3, 300, 15),
-            pauseSec: clampInt(pauseSecInput.value, 0, 120, 3),
-            runs: clampInt(runsInput.value, 1, 50, 3)
-          }));
-        } catch {}
       }
 
       function clampInt(val, min, max, fallback) {
@@ -817,90 +677,17 @@
         return Math.min(max, Math.max(min, n));
       }
 
-      function getTotalCompleted() {
-        return parseInt(localStorage.getItem(STORAGE_TOTAL_COMPLETED_KEY) || "0", 10) || 0;
+      function formatTimer(sec) {
+        const s = Math.max(0, Math.floor(sec));
+        return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
       }
 
-      function addHistory(url, statusLabel, badgeClass, completedRuns, totalRuns) {
-        let history = [];
-        try {
-          history = JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]");
-        } catch {
-          history = [];
-        }
-        history.unshift({
-          timestamp: new Date().toISOString(),
-          url,
-          statusLabel,
-          badgeClass,
-          completedRuns,
-          totalRuns
-        });
-        history = history.slice(0, 100);
-        localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(history));
-        if (completedRuns > 0) {
-          localStorage.setItem(STORAGE_TOTAL_COMPLETED_KEY, String(getTotalCompleted() + completedRuns));
-        }
-        renderHistory();
-        updateUI();
-      }
-
-      function renderHistory() {
-        let history = [];
-        try {
-          history = JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]");
-        } catch {
-          history = [];
-        }
-        if (!history.length) {
-          historyList.innerHTML = `<div class="empty-history">No test history yet. Completed and stopped runs are saved locally in your browser.</div>`;
-          return;
-        }
-        historyList.innerHTML = history.map((item) => {
-          const dt = new Date(item.timestamp);
-          const formattedDate = dt.toLocaleString();
-          return `
-            <div class="history-item">
-              <div class="history-top">
-                <span class="history-url">${escapeHtml(item.url)}</span>
-                <span class="badge ${escapeHtml(item.badgeClass)}">${escapeHtml(item.statusLabel)}</span>
-              </div>
-              <div class="history-meta">
-                <span>${escapeHtml(formattedDate)}</span>
-                <span>${item.completedRuns} / ${item.totalRuns} runs</span>
-              </div>
-            </div>
-          `;
-        }).join("");
-      }
-
-      function escapeHtml(str) {
-        return String(str)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;");
-      }
-
-      function syncProtocolChips() {
-        const lower = urlInput.value.trim().toLowerCase();
-        btnHttps.classList.toggle("active", !lower.startsWith("http://"));
-        btnHttp.classList.toggle("active", lower.startsWith("http://"));
-      }
-
-      function syncExternalLinks(url) {
-        const check = validateUrl(url);
-        const safeHref = check.valid ? check.url : "https://example.com";
-        headerOpenBtn.href = safeHref;
-        overlayOpenBtn.href = safeHref;
-      }
-
-      function showOverlay(title, desc, showOpenBtn = false) {
+      function showOverlay(title, desc, showOpen = false) {
         previewFrame.style.display = "none";
         previewOverlay.style.display = "flex";
         overlayTitle.textContent = title;
         overlayDesc.textContent = desc;
-        overlayOpenBtn.style.display = showOpenBtn ? "inline-flex" : "none";
+        overlayOpenBtn.style.display = showOpen ? "inline-flex" : "none";
       }
 
       function showIframe() {
@@ -908,181 +695,205 @@
         previewFrame.style.display = "block";
       }
 
-      function updateUI() {
-        metricCompleted.textContent = String(getTotalCompleted());
-        const remaining = state.running
-          ? Math.max(0, state.totalRuns - state.completedInBatch)
-          : 0;
-        metricRemaining.textContent = String(remaining);
-        metricTimer.textContent = formatSeconds(state.phaseRemaining);
+      function syncExternalLinks(url) {
+        const check = validateUrl(url);
+        const safeHref = check.valid ? check.url : "about:blank";
+        headerOpenBtn.href = safeHref;
+        overlayOpenBtn.href = safeHref;
+      }
 
-        const labelMap = {
-          idle: ["Ready", "#38bdf8"],
-          loading: ["Loading Site", "#38bdf8"],
-          viewing: ["Viewing Site", "#34d399"],
-          cooldown: ["Cooldown Pause", "#fbbf24"],
-          paused: ["Paused", "#fbbf24"],
-          blocked: ["Preview Restricted", "#fb7185"],
+      function updateUI() {
+        const labels = {
+          idle: ["Idle", "#38bdf8"],
+          loading: ["Loading", "#38bdf8"],
+          viewing: ["Viewing", "#34d399"],
+          cooldown: ["Pausing", "#fbbf24"],
+          blocked: ["Restricted", "#fb7185"],
           completed: ["Completed", "#34d399"],
           stopped: ["Stopped", "#fbbf24"]
         };
-
-        const activeKey = state.paused ? "paused" : state.phase;
-        const [label, color] = labelMap[activeKey] || ["Ready", "#38bdf8"];
-        statusText.textContent = label;
+        const [label, color] = labels[session.phase] || ["Idle", "#38bdf8"];
+        statusText.textContent = session.running ? `${label} • ${formatTimer(session.phaseRemaining)}` : label;
         statusDot.style.background = color;
         statusDot.style.boxShadow = `0 0 10px ${color}`;
 
-        const progressPct = state.totalRuns > 0 && (state.running || state.phase === "completed")
-          ? Math.round((state.completedInBatch / state.totalRuns) * 100)
-          : 0;
+        liveStatusLabel.textContent = session.running
+          ? `${label} • Run ${session.currentRun}/${session.totalRuns}`
+          : `Live Status: ${label}`;
 
-        queueRunLabel.textContent = state.running
-          ? `Run ${state.currentRun} of ${state.totalRuns}`
-          : (state.phase === "completed" ? `Completed ${state.totalRuns} of ${state.totalRuns}` : "Run 0 of 0");
-        queuePercentLabel.textContent = `${progressPct}%`;
-        progressFill.style.width = `${progressPct}%`;
-        progressTrack.setAttribute("aria-valuenow", String(progressPct));
+        const pct = session.phase === "completed"
+          ? 100
+          : (session.running && session.totalRuns > 0
+            ? Math.round(((session.currentRun - 1) / session.totalRuns) * 100)
+            : 0);
+        progressPercentLabel.textContent = `${pct}%`;
+        progressFill.style.width = `${pct}%`;
 
-        urlInput.disabled = state.running;
-        btnHttps.disabled = state.running;
-        btnHttp.disabled = state.running;
-        viewSecInput.disabled = state.running;
-        pauseSecInput.disabled = state.running;
-        runsInput.disabled = state.running;
+        urlInput.disabled = session.running;
+        btnHttps.disabled = session.running;
+        btnHttp.disabled = session.running;
+        viewSecInput.disabled = session.running;
+        pauseSecInput.disabled = session.running;
+        runsInput.disabled = session.running || !session.autoNext;
+        autoNextToggle.disabled = session.running;
+        startBtn.disabled = session.running;
+        stopBtn.disabled = !session.running;
 
-        startBtn.disabled = state.running;
-        pauseBtn.disabled = !state.running;
-        pauseBtn.textContent = state.paused ? "Resume" : "Pause";
-        stopBtn.disabled = !state.running;
+        const hasActive = Boolean(session.activeUrl) && session.phase !== "blocked";
+        backBtn.disabled = !hasActive;
+        homeBtn.disabled = !session.activeUrl;
+        reloadBtn.disabled = !hasActive;
+        scrollSpeedRow.style.display = session.autoScroll ? "flex" : "none";
       }
 
-      function clearTimers() {
-        if (state.timerId) {
-          clearInterval(state.timerId);
-          state.timerId = null;
+      function stopAutoScrollLoop() {
+        if (session.scrollTimerId) {
+          clearInterval(session.scrollTimerId);
+          session.scrollTimerId = null;
         }
-        if (state.loadTimeoutId) {
-          clearTimeout(state.loadTimeoutId);
-          state.loadTimeoutId = null;
-        }
+      }
+
+      function startAutoScrollLoop() {
+        stopAutoScrollLoop();
+        if (!session.autoScroll || session.phase !== "viewing") return;
+        session.scrollTimerId = setInterval(() => {
+          if (!session.running || !session.autoScroll || session.phase !== "viewing") return;
+          try {
+            const win = previewFrame.contentWindow;
+            if (win) win.scrollBy(0, SPEED_PX[session.scrollSpeed] || 3);
+          } catch {}
+        }, 50);
+      }
+
+      function clearTemporarySession(nextPhase) {
+        if (session.timerId) clearInterval(session.timerId);
+        if (session.loadTimeoutId) clearTimeout(session.loadTimeoutId);
+        stopAutoScrollLoop();
+        session.timerId = null;
+        session.loadTimeoutId = null;
+        session.running = false;
+        session.currentRun = 0;
+        session.phaseRemaining = 0;
+        session.activeUrl = "";
+        session.phase = nextPhase;
+        previewFrame.src = "about:blank";
+        syncExternalLinks(urlInput.value);
+        updateUI();
       }
 
       function beginRun(runNumber) {
-        state.currentRun = runNumber;
-        state.phase = "loading";
-        state.phaseRemaining = state.viewSec;
-        previewUrlLabel.textContent = state.activeUrl;
-        syncExternalLinks(state.activeUrl);
+        session.currentRun = runNumber;
+        session.phase = "loading";
+        session.phaseRemaining = session.viewSec;
+        syncExternalLinks(session.activeUrl);
         updateUI();
+        showOverlay("Loading Embedded Preview...", `Run ${runNumber} of ${session.totalRuns}`, false);
 
-        showOverlay("Loading Embedded Preview...", `Run ${runNumber} of ${state.totalRuns} • Respecting site embedding headers`, false);
-
-        // Cache-bust query or clean URL reload; keep exact URL intact without spoofing
         previewFrame.src = "about:blank";
         setTimeout(() => {
-          if (!state.running) return;
-          previewFrame.src = state.activeUrl;
-        }, 60);
+          if (!session.running) return;
+          previewFrame.src = session.activeUrl;
+        }, 50);
 
-        let iframeResponded = false;
+        let loaded = false;
         previewFrame.onload = () => {
-          if (!state.running || previewFrame.src === "about:blank") return;
-          iframeResponded = true;
-          clearTimeout(state.loadTimeoutId);
-
-          // Check if iframe blocked via X-Frame-Options/CSP (browsers often render an opaque cross-origin document or blank frame)
-          // Note: Cross-origin access throws SecurityError when embedded successfully, which is normal for allowed cross-origin iframes!
-          // We rely on explicit error or user-visible Open Website fallback if blank/blocked.
-          state.phase = "viewing";
+          if (!session.running || previewFrame.src === "about:blank") return;
+          loaded = true;
+          clearTimeout(session.loadTimeoutId);
+          session.phase = "viewing";
           showIframe();
+          startAutoScrollLoop();
           updateUI();
         };
 
         previewFrame.onerror = () => {
-          handleBlockedPreview("The website refused embedded iframe access or failed to load.");
+          clearTemporarySession("blocked");
+          showOverlay("Embedded Preview Restricted", "This site restricts embedded loading. Open it directly in your browser without bypassing site security.", true);
         };
 
-        state.loadTimeoutId = setTimeout(() => {
-          if (!iframeResponded && state.running) {
-            state.phase = "viewing";
+        session.loadTimeoutId = setTimeout(() => {
+          if (!loaded && session.running) {
+            session.phase = "viewing";
             showIframe();
+            startAutoScrollLoop();
             updateUI();
           }
-        }, 4500);
-      }
-
-      function handleBlockedPreview(reason) {
-        clearTimers();
-        state.running = false;
-        state.paused = false;
-        state.phase = "blocked";
-        previewFrame.src = "about:blank";
-        showOverlay(
-          "Embedded Preview Restricted",
-          reason + " Use Open Website to test directly in a new tab without bypassing site security.",
-          true
-        );
-        addHistory(state.activeUrl, "Preview Blocked", "badge-blocked", state.completedInBatch, state.totalRuns);
-        updateUI();
+        }, 4000);
       }
 
       function tick() {
-        if (!state.running || state.paused) return;
+        if (!session.running) return;
 
-        if (state.phase === "loading" || state.phase === "viewing") {
-          if (state.phaseRemaining > 1) {
-            state.phaseRemaining -= 1;
+        if (session.phase === "loading" || session.phase === "viewing") {
+          if (session.phaseRemaining > 1) {
+            session.phaseRemaining -= 1;
             updateUI();
           } else {
-            state.completedInBatch = state.currentRun;
-            if (state.currentRun >= state.totalRuns) {
-              clearTimers();
-              state.running = false;
-              state.phase = "completed";
-              state.phaseRemaining = 0;
-              previewFrame.src = "about:blank";
-              showOverlay("All Test Runs Completed", `Finished ${state.totalRuns} sequential session(s) for ${state.activeUrl}.`, true);
-              addHistory(state.activeUrl, "Completed", "badge-completed", state.completedInBatch, state.totalRuns);
-              updateUI();
-            } else if (state.pauseSec > 0) {
-              state.phase = "cooldown";
-              state.phaseRemaining = state.pauseSec;
-              previewFrame.src = "about:blank";
-              showOverlay("Pause Between Sessions", `Waiting ${state.pauseSec}s before Run ${state.currentRun + 1}...`, false);
-              updateUI();
+            stopAutoScrollLoop();
+            if (session.currentRun < session.totalRuns && session.autoNext) {
+              if (session.pauseSec > 0) {
+                session.phase = "cooldown";
+                session.phaseRemaining = session.pauseSec;
+                previewFrame.src = "about:blank";
+                showOverlay("Pause Interval", `${session.pauseSec}s before next test`, false);
+                updateUI();
+              } else {
+                beginRun(session.currentRun + 1);
+              }
             } else {
-              beginRun(state.currentRun + 1);
+              clearTemporarySession("completed");
+              showOverlay("Testing Completed", "Temporary session data cleared.", false);
             }
           }
-        } else if (state.phase === "cooldown") {
-          if (state.phaseRemaining > 1) {
-            state.phaseRemaining -= 1;
-            overlayDesc.textContent = `Waiting ${state.phaseRemaining}s before Run ${state.currentRun + 1}...`;
+        } else if (session.phase === "cooldown") {
+          if (session.phaseRemaining > 1) {
+            session.phaseRemaining -= 1;
+            overlayDesc.textContent = `${session.phaseRemaining}s before next test`;
             updateUI();
           } else {
-            beginRun(state.currentRun + 1);
+            beginRun(session.currentRun + 1);
           }
         }
       }
 
       urlInput.addEventListener("input", () => {
-        syncProtocolChips();
+        const lower = urlInput.value.trim().toLowerCase();
+        btnHttps.classList.toggle("active", !lower.startsWith("http://"));
+        btnHttp.classList.toggle("active", lower.startsWith("http://"));
         const check = validateUrl(urlInput.value);
         urlError.textContent = urlInput.value.trim() && !check.valid ? check.error : "";
         syncExternalLinks(urlInput.value);
       });
 
       btnHttps.addEventListener("click", () => {
-        const clean = urlInput.value.trim().replace(/^https?:\/\//i, "");
-        urlInput.value = "https://" + clean;
+        urlInput.value = "https://" + urlInput.value.trim().replace(/^https?:\/\//i, "");
         urlInput.dispatchEvent(new Event("input"));
       });
 
       btnHttp.addEventListener("click", () => {
-        const clean = urlInput.value.trim().replace(/^https?:\/\//i, "");
-        urlInput.value = "http://" + clean;
+        urlInput.value = "http://" + urlInput.value.trim().replace(/^https?:\/\//i, "");
         urlInput.dispatchEvent(new Event("input"));
+      });
+
+      autoScrollToggle.addEventListener("change", () => {
+        session.autoScroll = autoScrollToggle.checked;
+        if (session.autoScroll) startAutoScrollLoop();
+        else stopAutoScrollLoop();
+        updateUI();
+      });
+
+      scrollSpeedRow.querySelectorAll("button[data-speed]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          session.scrollSpeed = btn.getAttribute("data-speed") || "medium";
+          scrollSpeedRow.querySelectorAll("button[data-speed]").forEach((b) => {
+            b.classList.toggle("active", b === btn);
+          });
+        });
+      });
+
+      autoNextToggle.addEventListener("change", () => {
+        session.autoNext = autoNextToggle.checked;
+        updateUI();
       });
 
       startBtn.addEventListener("click", () => {
@@ -1094,68 +905,39 @@
         urlError.textContent = "";
         urlInput.value = check.url;
 
-        state.viewSec = clampInt(viewSecInput.value, 3, 300, 15);
-        state.pauseSec = clampInt(pauseSecInput.value, 0, 120, 3);
-        state.totalRuns = clampInt(runsInput.value, 1, 50, 3);
-        viewSecInput.value = state.viewSec;
-        pauseSecInput.value = state.pauseSec;
-        runsInput.value = state.totalRuns;
-        saveSettings();
+        session.viewSec = clampInt(viewSecInput.value, 3, 300, 15);
+        session.pauseSec = clampInt(pauseSecInput.value, 0, 120, 3);
+        session.autoNext = autoNextToggle.checked;
+        session.totalRuns = session.autoNext ? clampInt(runsInput.value, 1, 50, 3) : 1;
+        session.running = true;
+        session.activeUrl = check.url;
 
-        clearTimers();
-        state.running = true;
-        state.paused = false;
-        state.completedInBatch = 0;
-        state.activeUrl = check.url;
         beginRun(1);
-        state.timerId = setInterval(tick, 1000);
-      });
-
-      pauseBtn.addEventListener("click", () => {
-        if (!state.running) return;
-        state.paused = !state.paused;
-        updateUI();
+        session.timerId = setInterval(tick, 1000);
       });
 
       stopBtn.addEventListener("click", () => {
-        if (!state.running) return;
-        clearTimers();
-        const completed = state.completedInBatch;
-        const total = state.totalRuns;
-        const url = state.activeUrl;
-        state.running = false;
-        state.paused = false;
-        state.phase = "stopped";
-        state.phaseRemaining = 0;
-        previewFrame.src = "about:blank";
-        showOverlay("Testing Stopped", "The active test queue was stopped by user control.", true);
-        addHistory(url, "Stopped", "badge-stopped", completed, total);
-        updateUI();
+        if (!session.running) return;
+        clearTemporarySession("stopped");
+        showOverlay("Session Stopped & Cleared", "Enter an HTTP or HTTPS URL and tap Start.", false);
       });
 
-      headerOpenBtn.addEventListener("click", () => {
-        const check = validateUrl(urlInput.value);
-        if (check.valid) {
-          addHistory(check.url, "Opened Website", "badge-opened", 1, clampInt(runsInput.value, 1, 50, 1));
-        }
+      backBtn.addEventListener("click", () => {
+        try { previewFrame.contentWindow?.history.back(); } catch {}
       });
 
-      overlayOpenBtn.addEventListener("click", () => {
-        const check = validateUrl(urlInput.value);
-        if (check.valid) {
-          addHistory(check.url, "Opened Website", "badge-opened", 1, clampInt(runsInput.value, 1, 50, 1));
-        }
+      homeBtn.addEventListener("click", () => {
+        if (session.activeUrl) previewFrame.src = session.activeUrl;
       });
 
-      clearHistoryBtn.addEventListener("click", () => {
-        localStorage.removeItem(STORAGE_HISTORY_KEY);
-        localStorage.setItem(STORAGE_TOTAL_COMPLETED_KEY, "0");
-        renderHistory();
-        updateUI();
+      reloadBtn.addEventListener("click", () => {
+        if (session.activeUrl) previewFrame.src = previewFrame.src;
       });
 
-      loadSettings();
-      renderHistory();
+      window.addEventListener("beforeunload", () => {
+        clearTemporarySession("idle");
+      });
+
       updateUI();
     })();
   </script>

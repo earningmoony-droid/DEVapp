@@ -11,7 +11,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
@@ -32,19 +31,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,27 +59,30 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.R
+import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
+import com.example.model.WebCommandEvent
+import com.example.model.WebCommandType
 import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldSuccess
 import com.example.ui.theme.GlassStrokeSubtle
-import com.example.ui.theme.GlassStrokeViolet
 import com.example.ui.theme.GlassSurfaceElevated
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.LuminousPurple
 import com.example.ui.theme.MidnightDeep
 import com.example.ui.theme.MidnightNavy
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import kotlinx.coroutines.delay
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -86,20 +94,100 @@ fun WebPreviewCard(
     isPreviewLoading: Boolean,
     blockedReason: String?,
     phaseRemainingSec: Int,
+    autoScrollEnabled: Boolean,
+    scrollSpeed: ScrollSpeed,
+    canGoBack: Boolean,
+    pendingCommand: WebCommandEvent?,
+    onConsumeCommand: (Long) -> Unit,
+    onBackClick: () -> Unit,
+    onHomeClick: () -> Unit,
+    onReloadClick: () -> Unit,
     onPageStarted: () -> Unit,
-    onPageFinished: () -> Unit,
+    onPageFinished: (Boolean) -> Unit,
+    onCanGoBackChanged: (Boolean) -> Unit,
     onBlockedOrError: (String) -> Unit,
     onOpenExternal: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var webProgress by remember { mutableIntStateOf(0) }
     var lastLoadedToken by remember { mutableIntStateOf(-1) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    // Smooth auto-scroll during active viewing
+    LaunchedEffect(
+        status,
+        autoScrollEnabled,
+        scrollSpeed,
+        activeUrl,
+        blockedReason,
+        webViewRef
+    ) {
+        val wv = webViewRef ?: return@LaunchedEffect
+        if (status == TestSessionStatus.VIEWING &&
+            autoScrollEnabled &&
+            activeUrl != null &&
+            blockedReason == null
+        ) {
+            while (true) {
+                delay(50)
+                if (wv.canScrollVertically(1)) {
+                    wv.scrollBy(0, scrollSpeed.pxPerTick)
+                }
+            }
+        }
+    }
+
+    // Handle Back, Home, Reload, and Clear Session commands cleanly
+    LaunchedEffect(pendingCommand, webViewRef) {
+        val cmd = pendingCommand ?: return@LaunchedEffect
+        val wv = webViewRef
+        when (cmd.type) {
+            WebCommandType.BACK -> {
+                if (wv != null && wv.canGoBack()) {
+                    wv.goBack()
+                    onCanGoBackChanged(wv.canGoBack())
+                }
+            }
+            WebCommandType.HOME -> {
+                val target = cmd.targetUrl
+                if (wv != null && !target.isNullOrBlank()) {
+                    wv.loadUrl(target)
+                }
+            }
+            WebCommandType.RELOAD -> {
+                wv?.reload()
+            }
+            WebCommandType.CLEAR_SESSION -> {
+                if (wv != null) {
+                    wv.stopLoading()
+                    wv.clearHistory()
+                    wv.clearCache(false)
+                    wv.loadUrl("about:blank")
+                }
+                lastLoadedToken = -1
+            }
+        }
+        onConsumeCommand(cmd.id)
+    }
+
+    // Ensure WebView session data is cleared if composable leaves composition
+    DisposableEffect(Unit) {
+        onDispose {
+            webViewRef?.apply {
+                stopLoading()
+                clearHistory()
+                loadUrl("about:blank")
+                destroy()
+            }
+            webViewRef = null
+        }
+    }
 
     LiquidGlassPanel(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(14.dp)
     ) {
-        // Preview header bar
+        // Browser navigation toolbar: Back, Home, Reload, Open Website
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -107,48 +195,30 @@ fun WebPreviewCard(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(ElectricCyan.copy(alpha = 0.25f), LuminousPurple.copy(alpha = 0.25f))
-                            )
-                        )
-                        .border(1.dp, GlassStrokeViolet, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Public,
-                        contentDescription = null,
-                        tint = ElectricCyan,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.label_preview_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = activeUrl ?: fallbackUrl.ifBlank { "No URL loaded" },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                ToolbarIconButton(
+                    icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = stringResource(R.string.nav_back),
+                    enabled = canGoBack && activeUrl != null && blockedReason == null,
+                    onClick = onBackClick,
+                    testTag = "preview_back_button"
+                )
+                ToolbarIconButton(
+                    icon = Icons.Rounded.Home,
+                    contentDescription = stringResource(R.string.nav_home),
+                    enabled = (activeUrl ?: fallbackUrl).startsWith("http", ignoreCase = true),
+                    onClick = onHomeClick,
+                    testTag = "preview_home_button"
+                )
+                ToolbarIconButton(
+                    icon = Icons.Rounded.Refresh,
+                    contentDescription = stringResource(R.string.nav_reload),
+                    enabled = activeUrl != null && blockedReason == null,
+                    onClick = onReloadClick,
+                    testTag = "preview_reload_button"
+                )
             }
-
-            Spacer(modifier = Modifier.width(8.dp))
 
             val openTarget = activeUrl ?: fallbackUrl
             Surface(
@@ -162,7 +232,7 @@ fun WebPreviewCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
@@ -187,7 +257,7 @@ fun WebPreviewCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(320.dp)
+                .height(340.dp)
                 .clip(viewportShape)
                 .background(MidnightDeep.copy(alpha = 0.85f))
                 .border(1.dp, GlassStrokeSubtle, viewportShape)
@@ -203,12 +273,12 @@ fun WebPreviewCard(
                             setBackgroundColor(android.graphics.Color.TRANSPARENT)
                             settings.apply {
                                 javaScriptEnabled = true
-                                domStorageEnabled = true
+                                domStorageEnabled = false
+                                saveFormData = false
                                 loadWithOverviewMode = true
                                 useWideViewPort = true
                                 builtInZoomControls = true
                                 displayZoomControls = false
-                                // Respect normal browser security (no mixed content spoofing/bypass)
                             }
                             webChromeClient = object : WebChromeClient() {
                                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -225,7 +295,15 @@ fun WebPreviewCard(
                                 }
 
                                 override fun onPageFinished(view: WebView?, url: String?) {
-                                    onPageFinished()
+                                    onPageFinished(view?.canGoBack() == true)
+                                }
+
+                                override fun doUpdateVisitedHistory(
+                                    view: WebView?,
+                                    url: String?,
+                                    isReload: Boolean
+                                ) {
+                                    onCanGoBackChanged(view?.canGoBack() == true)
                                 }
 
                                 override fun onReceivedError(
@@ -267,14 +345,15 @@ fun WebPreviewCard(
                                     handler: SslErrorHandler?,
                                     error: SslError?
                                 ) {
-                                    // Never bypass SSL security restrictions
                                     handler?.cancel()
-                                    onBlockedOrError("SSL certificate verification failed. Open directly in your system browser.")
+                                    onBlockedOrError("SSL certificate verification failed. Open directly in your browser.")
                                 }
                             }
+                            webViewRef = this
                         }
                     },
                     update = { webView ->
+                        webViewRef = webView
                         if (lastLoadedToken != loadToken) {
                             lastLoadedToken = loadToken
                             webProgress = 0
@@ -284,7 +363,6 @@ fun WebPreviewCard(
                     modifier = Modifier.fillMaxSize()
                 )
             } else if (status == TestSessionStatus.PAUSING_BETWEEN) {
-                // Inter-run cooldown overlay
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -299,7 +377,7 @@ fun WebPreviewCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(56.dp)
+                            .size(52.dp)
                             .clip(CircleShape)
                             .background(AmberWarning.copy(alpha = 0.16f))
                             .border(1.dp, AmberWarning.copy(alpha = 0.45f), CircleShape),
@@ -309,18 +387,18 @@ fun WebPreviewCard(
                             imageVector = Icons.Rounded.HourglassTop,
                             contentDescription = null,
                             tint = AmberWarning,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Pause Between Sessions",
+                        text = "Pause Interval",
                         style = MaterialTheme.typography.titleLarge,
                         color = TextPrimary
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "${phaseRemainingSec}s before next test run",
+                        text = "${phaseRemainingSec}s before next test",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontFamily = JetBrainsMonoFontFamily
                         ),
@@ -328,7 +406,6 @@ fun WebPreviewCard(
                     )
                 }
             } else if (blockedReason != null) {
-                // Embedded preview blocked / error fallback with Open Website button
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -343,7 +420,7 @@ fun WebPreviewCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(54.dp)
+                            .size(52.dp)
                             .clip(CircleShape)
                             .background(CoralDanger.copy(alpha = 0.16f))
                             .border(1.dp, CoralDanger.copy(alpha = 0.45f), CircleShape),
@@ -353,7 +430,7 @@ fun WebPreviewCard(
                             imageVector = Icons.Rounded.Shield,
                             contentDescription = null,
                             tint = CoralDanger,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
@@ -372,7 +449,7 @@ fun WebPreviewCard(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     GradientPrimaryButton(
                         text = stringResource(R.string.btn_open_website),
                         icon = Icons.AutoMirrored.Rounded.OpenInNew,
@@ -382,7 +459,6 @@ fun WebPreviewCard(
                     )
                 }
             } else {
-                // Idle / Completed / Stopped empty state
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -405,7 +481,7 @@ fun WebPreviewCard(
                     }
                     Box(
                         modifier = Modifier
-                            .size(58.dp)
+                            .size(54.dp)
                             .clip(CircleShape)
                             .background(accent.copy(alpha = 0.14f))
                             .border(1.dp, accent.copy(alpha = 0.4f), CircleShape),
@@ -415,14 +491,14 @@ fun WebPreviewCard(
                             imageVector = Icons.Rounded.Language,
                             contentDescription = null,
                             tint = accent,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = when (status) {
-                            TestSessionStatus.COMPLETED -> "All Test Runs Completed"
-                            TestSessionStatus.STOPPED -> "Testing Stopped"
+                            TestSessionStatus.COMPLETED -> "Testing Completed"
+                            TestSessionStatus.STOPPED -> "Session Stopped & Cleared"
                             else -> stringResource(R.string.empty_preview_title)
                         },
                         style = MaterialTheme.typography.titleLarge,
@@ -439,7 +515,6 @@ fun WebPreviewCard(
                 }
             }
 
-            // Top loading indicator inside viewport
             androidx.compose.animation.AnimatedVisibility(
                 visible = isPreviewLoading && activeUrl != null && blockedReason == null,
                 enter = fadeIn(),
@@ -455,6 +530,36 @@ fun WebPreviewCard(
                     trackColor = Color.Transparent
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ToolbarIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    testTag: String
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = CircleShape,
+        color = if (enabled) GlassSurfaceElevated.copy(alpha = 0.7f) else MidnightDeep.copy(alpha = 0.35f),
+        border = BorderStroke(1.dp, if (enabled) GlassStrokeSubtle else Color.Transparent),
+        modifier = Modifier
+            .size(38.dp)
+            .testTag(testTag)
+            .semantics { this.contentDescription = contentDescription }
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (enabled) TextPrimary else TextMuted.copy(alpha = 0.45f),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

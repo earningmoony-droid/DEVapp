@@ -1,98 +1,54 @@
 package com.example.ui
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.TesterPreferencesRepository
-import com.example.model.HistoryStatusType
-import com.example.model.TestHistoryEntry
+import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
-import com.example.model.TesterSettings
 import com.example.model.UrlValidationResult
 import com.example.model.UrlValidator
+import com.example.model.WebCommandEvent
+import com.example.model.WebCommandType
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
-
-enum class AppDestination {
-    DASHBOARD,
-    HISTORY
-}
 
 data class WebVisitUiState(
-    val selectedDestination: AppDestination = AppDestination.DASHBOARD,
-    val urlInput: String = "https://example.com",
+    val urlInput: String = "",
     val urlError: String? = null,
     val viewDurationSec: Int = 15,
     val pauseDurationSec: Int = 3,
     val totalRuns: Int = 3,
+    val autoScrollEnabled: Boolean = true,
+    val scrollSpeed: ScrollSpeed = ScrollSpeed.MEDIUM,
+    val autoNextEnabled: Boolean = true,
 
-    // Active test queue state
+    // Temporary active session state only (never persisted)
     val isRunning: Boolean = false,
-    val isPaused: Boolean = false,
     val status: TestSessionStatus = TestSessionStatus.IDLE,
     val activeUrl: String? = null,
     val previewLoadToken: Int = 0,
     val currentRunNumber: Int = 0,
-    val completedRunsInBatch: Int = 0,
-    val remainingRunsInBatch: Int = 0,
+    val activeTotalRuns: Int = 1,
     val phaseRemainingSec: Int = 0,
-    val phaseTotalSec: Int = 0,
     val overallProgress: Float = 0f,
     val isPreviewLoading: Boolean = false,
     val previewBlockedReason: String? = null,
-
-    // Persisted stats & history
-    val lifetimeCompletedSessions: Int = 0,
-    val history: List<TestHistoryEntry> = emptyList(),
+    val canGoBack: Boolean = false,
+    val webCommand: WebCommandEvent? = null,
     val isHtmlSheetVisible: Boolean = false
 )
 
-class WebVisitViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val repository = TesterPreferencesRepository(application.applicationContext)
+class WebVisitViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(WebVisitUiState())
     val uiState: StateFlow<WebVisitUiState> = _uiState.asStateFlow()
 
     private var queueJob: Job? = null
-    private var prePauseStatus: TestSessionStatus = TestSessionStatus.VIEWING
-
-    init {
-        viewModelScope.launch {
-            val savedSettings = repository.settingsFlow.first()
-            _uiState.update {
-                it.copy(
-                    urlInput = savedSettings.lastUrl,
-                    viewDurationSec = savedSettings.viewDurationSec,
-                    pauseDurationSec = savedSettings.pauseDurationSec,
-                    totalRuns = savedSettings.totalRuns
-                )
-            }
-        }
-
-        viewModelScope.launch {
-            repository.historyFlow.collect { historyList ->
-                _uiState.update { it.copy(history = historyList) }
-            }
-        }
-
-        viewModelScope.launch {
-            repository.lifetimeCompletedRunsFlow.collect { total ->
-                _uiState.update { it.copy(lifetimeCompletedSessions = total) }
-            }
-        }
-    }
-
-    fun selectDestination(destination: AppDestination) {
-        _uiState.update { it.copy(selectedDestination = destination) }
-    }
+    private var commandSeq: Long = 0L
 
     fun setHtmlSheetVisible(visible: Boolean) {
         _uiState.update { it.copy(isHtmlSheetVisible = visible) }
@@ -109,6 +65,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun applyQuickProtocol(protocol: String) {
+        if (_uiState.value.isRunning) return
         val current = _uiState.value.urlInput.trim()
         val stripped = current.removePrefix("https://").removePrefix("http://")
         onUrlChanged("$protocol$stripped")
@@ -116,37 +73,30 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
 
     fun updateViewDuration(seconds: Int) {
         if (_uiState.value.isRunning) return
-        val clamped = seconds.coerceIn(3, 300)
-        _uiState.update { it.copy(viewDurationSec = clamped) }
-        persistCurrentSettings()
+        _uiState.update { it.copy(viewDurationSec = seconds.coerceIn(3, 300)) }
     }
 
     fun updatePauseDuration(seconds: Int) {
         if (_uiState.value.isRunning) return
-        val clamped = seconds.coerceIn(0, 120)
-        _uiState.update { it.copy(pauseDurationSec = clamped) }
-        persistCurrentSettings()
+        _uiState.update { it.copy(pauseDurationSec = seconds.coerceIn(0, 120)) }
     }
 
     fun updateTotalRuns(runs: Int) {
         if (_uiState.value.isRunning) return
-        val clamped = runs.coerceIn(1, 50)
-        _uiState.update { it.copy(totalRuns = clamped) }
-        persistCurrentSettings()
+        _uiState.update { it.copy(totalRuns = runs.coerceIn(1, 50)) }
     }
 
-    private fun persistCurrentSettings() {
-        val state = _uiState.value
-        viewModelScope.launch {
-            repository.saveSettings(
-                TesterSettings(
-                    lastUrl = state.urlInput.trim(),
-                    viewDurationSec = state.viewDurationSec,
-                    pauseDurationSec = state.pauseDurationSec,
-                    totalRuns = state.totalRuns
-                )
-            )
-        }
+    fun setAutoScrollEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(autoScrollEnabled = enabled) }
+    }
+
+    fun setScrollSpeed(speed: ScrollSpeed) {
+        _uiState.update { it.copy(scrollSpeed = speed) }
+    }
+
+    fun setAutoNextEnabled(enabled: Boolean) {
+        if (_uiState.value.isRunning) return
+        _uiState.update { it.copy(autoNextEnabled = enabled) }
     }
 
     fun startTest() {
@@ -160,7 +110,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         }
 
         val normalizedUrl = (validation as UrlValidationResult.Valid).normalizedUrl
-        val runs = state.totalRuns
+        val runs = if (state.autoNextEnabled) state.totalRuns else 1
         val viewSec = state.viewDurationSec
         val pauseSec = state.pauseDurationSec
 
@@ -169,80 +119,61 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 urlInput = normalizedUrl,
                 urlError = null,
                 isRunning = true,
-                isPaused = false,
                 status = TestSessionStatus.LOADING,
                 activeUrl = normalizedUrl,
                 currentRunNumber = 1,
-                completedRunsInBatch = 0,
-                remainingRunsInBatch = runs,
+                activeTotalRuns = runs,
                 phaseRemainingSec = viewSec,
-                phaseTotalSec = viewSec,
                 overallProgress = 0f,
                 isPreviewLoading = true,
-                previewBlockedReason = null
+                previewBlockedReason = null,
+                canGoBack = false
             )
         }
-        persistCurrentSettings()
 
         queueJob?.cancel()
         queueJob = viewModelScope.launch {
-            runTestQueue(normalizedUrl, runs, viewSec, pauseSec)
+            runQueue(normalizedUrl, runs, viewSec, pauseSec)
         }
     }
 
-    private suspend fun runTestQueue(
+    private suspend fun runQueue(
         targetUrl: String,
-        totalRuns: Int,
+        runs: Int,
         viewDurationSec: Int,
         pauseDurationSec: Int
     ) {
-        var completedInBatch = 0
-
-        for (runIdx in 1..totalRuns) {
+        for (runIdx in 1..runs) {
             _uiState.update {
                 it.copy(
                     status = TestSessionStatus.LOADING,
                     activeUrl = targetUrl,
                     previewLoadToken = it.previewLoadToken + 1,
                     currentRunNumber = runIdx,
-                    completedRunsInBatch = completedInBatch,
-                    remainingRunsInBatch = totalRuns - completedInBatch,
+                    activeTotalRuns = runs,
                     phaseRemainingSec = viewDurationSec,
-                    phaseTotalSec = viewDurationSec,
                     isPreviewLoading = true,
                     previewBlockedReason = null
                 )
             }
 
-            // Wait up to 4 seconds for initial load callback or proceed into viewing timer
             var loadGraceMs = 0
             while (_uiState.value.isPreviewLoading &&
                 _uiState.value.previewBlockedReason == null &&
                 loadGraceMs < 4000
             ) {
-                while (_uiState.value.isPaused) {
-                    delay(150)
-                }
                 delay(150)
                 loadGraceMs += 150
             }
 
             if (_uiState.value.previewBlockedReason != null) {
-                // Keep showing the blocked state so user can tap "Open Website" or "Stop"
                 _uiState.update {
                     it.copy(
                         isRunning = false,
-                        isPaused = false,
                         status = TestSessionStatus.BLOCKED,
                         isPreviewLoading = false
                     )
                 }
-                recordHistory(
-                    url = targetUrl,
-                    statusType = HistoryStatusType.BLOCKED,
-                    completedRuns = completedInBatch,
-                    totalRuns = totalRuns
-                )
                 return
             }
 
@@ -253,165 +184,136 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 )
             }
 
-            // Viewing phase countdown
             for (secLeft in viewDurationSec downTo 1) {
                 _uiState.update {
                     val fractionDoneInRun =
                         (viewDurationSec - secLeft).toFloat() / viewDurationSec.toFloat()
-                    val overall = ((runIdx - 1) + fractionDoneInRun) / totalRuns.toFloat()
+                    val overall = ((runIdx - 1) + fractionDoneInRun) / runs.toFloat()
                     it.copy(
                         phaseRemainingSec = secLeft,
-                        phaseTotalSec = viewDurationSec,
                         overallProgress = overall.coerceIn(0f, 1f)
                     )
                 }
-                waitOneSecondRespectingPause()
+                delay(1000)
+
                 if (_uiState.value.previewBlockedReason != null) {
                     _uiState.update {
                         it.copy(
                             isRunning = false,
-                            isPaused = false,
                             status = TestSessionStatus.BLOCKED
                         )
                     }
-                    recordHistory(
-                        url = targetUrl,
-                        statusType = HistoryStatusType.BLOCKED,
-                        completedRuns = completedInBatch,
-                        totalRuns = totalRuns
-                    )
                     return
                 }
             }
 
-            completedInBatch = runIdx
-            val remainingAfterRun = totalRuns - completedInBatch
             _uiState.update {
-                it.copy(
-                    completedRunsInBatch = completedInBatch,
-                    remainingRunsInBatch = remainingAfterRun,
-                    overallProgress = completedInBatch.toFloat() / totalRuns.toFloat()
-                )
+                it.copy(overallProgress = runIdx.toFloat() / runs.toFloat())
             }
 
-            // Pause between runs if more runs remain and pauseDurationSec > 0
-            if (remainingAfterRun > 0 && pauseDurationSec > 0) {
+            val hasNextRun = runIdx < runs && _uiState.value.autoNextEnabled
+            if (hasNextRun && pauseDurationSec > 0) {
                 _uiState.update {
                     it.copy(
                         status = TestSessionStatus.PAUSING_BETWEEN,
                         activeUrl = null,
                         phaseRemainingSec = pauseDurationSec,
-                        phaseTotalSec = pauseDurationSec
+                        canGoBack = false
                     )
                 }
                 for (pauseLeft in pauseDurationSec downTo 1) {
-                    _uiState.update {
-                        it.copy(
-                            phaseRemainingSec = pauseLeft,
-                            phaseTotalSec = pauseDurationSec
-                        )
-                    }
-                    waitOneSecondRespectingPause()
+                    _uiState.update { it.copy(phaseRemainingSec = pauseLeft) }
+                    delay(1000)
                 }
             }
         }
 
-        // Batch completed cleanly
-        recordHistory(
-            url = targetUrl,
-            statusType = HistoryStatusType.COMPLETED,
-            completedRuns = completedInBatch,
-            totalRuns = totalRuns
-        )
-
+        // Clear active session preview cleanly upon completion
         _uiState.update {
             it.copy(
                 isRunning = false,
-                isPaused = false,
                 status = TestSessionStatus.COMPLETED,
+                activeUrl = null,
                 phaseRemainingSec = 0,
                 overallProgress = 1f,
-                remainingRunsInBatch = 0
+                canGoBack = false,
+                webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
             )
-        }
-    }
-
-    private suspend fun waitOneSecondRespectingPause() {
-        var elapsedMs = 0
-        while (elapsedMs < 1000) {
-            while (_uiState.value.isPaused) {
-                delay(120)
-            }
-            delay(100)
-            elapsedMs += 100
-        }
-    }
-
-    fun togglePauseResume() {
-        val state = _uiState.value
-        if (!state.isRunning) return
-
-        if (state.isPaused) {
-            _uiState.update {
-                it.copy(
-                    isPaused = false,
-                    status = prePauseStatus
-                )
-            }
-        } else {
-            prePauseStatus = state.status
-            _uiState.update {
-                it.copy(
-                    isPaused = true,
-                    status = TestSessionStatus.PAUSED
-                )
-            }
         }
     }
 
     fun stopTest() {
-        val state = _uiState.value
-        val wasRunning = state.isRunning
         queueJob?.cancel()
         queueJob = null
-
-        if (wasRunning && state.activeUrl != null) {
-            val urlToLog = state.activeUrl
-            val completed = state.completedRunsInBatch
-            val total = state.totalRuns
-            viewModelScope.launch {
-                recordHistory(
-                    url = urlToLog,
-                    statusType = HistoryStatusType.STOPPED,
-                    completedRuns = completed,
-                    totalRuns = total
-                )
-            }
-        }
 
         _uiState.update {
             it.copy(
                 isRunning = false,
-                isPaused = false,
-                status = if (wasRunning) TestSessionStatus.STOPPED else TestSessionStatus.IDLE,
+                status = TestSessionStatus.STOPPED,
                 activeUrl = null,
+                currentRunNumber = 0,
                 phaseRemainingSec = 0,
-                phaseTotalSec = 0,
+                overallProgress = 0f,
                 isPreviewLoading = false,
-                previewBlockedReason = null
+                previewBlockedReason = null,
+                canGoBack = false,
+                webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
             )
         }
+    }
+
+    fun triggerBack() {
+        _uiState.update {
+            it.copy(webCommand = WebCommandEvent(++commandSeq, WebCommandType.BACK))
+        }
+    }
+
+    fun triggerHome() {
+        val state = _uiState.value
+        val target = state.activeUrl ?: when (val res = UrlValidator.validate(state.urlInput)) {
+            is UrlValidationResult.Valid -> res.normalizedUrl
+            is UrlValidationResult.Invalid -> null
+        } ?: return
+
+        _uiState.update {
+            it.copy(
+                activeUrl = target,
+                previewBlockedReason = null,
+                webCommand = WebCommandEvent(++commandSeq, WebCommandType.HOME, target)
+            )
+        }
+    }
+
+    fun triggerReload() {
+        if (_uiState.value.activeUrl == null) return
+        _uiState.update {
+            it.copy(
+                previewBlockedReason = null,
+                webCommand = WebCommandEvent(++commandSeq, WebCommandType.RELOAD)
+            )
+        }
+    }
+
+    fun consumeWebCommand(commandId: Long) {
+        _uiState.update {
+            if (it.webCommand?.id == commandId) it.copy(webCommand = null) else it
+        }
+    }
+
+    fun updateCanGoBack(canGoBack: Boolean) {
+        _uiState.update { it.copy(canGoBack = canGoBack) }
     }
 
     fun onPreviewPageStarted() {
         _uiState.update { it.copy(isPreviewLoading = true) }
     }
 
-    fun onPreviewPageFinished() {
+    fun onPreviewPageFinished(canGoBack: Boolean) {
         _uiState.update {
             it.copy(
                 isPreviewLoading = false,
-                status = if (it.isRunning && !it.isPaused && it.status == TestSessionStatus.LOADING) {
+                canGoBack = canGoBack,
+                status = if (it.isRunning && it.status == TestSessionStatus.LOADING) {
                     TestSessionStatus.VIEWING
                 } else {
                     it.status
@@ -427,52 +329,6 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 previewBlockedReason = reason
             )
         }
-    }
-
-    fun recordExternalOpen(url: String) {
-        val state = _uiState.value
-        viewModelScope.launch {
-            recordHistory(
-                url = url,
-                statusType = HistoryStatusType.OPENED_EXTERNALLY,
-                completedRuns = 1,
-                totalRuns = state.totalRuns
-            )
-        }
-    }
-
-    fun retestFromHistory(url: String) {
-        if (_uiState.value.isRunning) return
-        _uiState.update {
-            it.copy(
-                urlInput = url,
-                urlError = null,
-                selectedDestination = AppDestination.DASHBOARD
-            )
-        }
-    }
-
-    fun clearHistory() {
-        viewModelScope.launch {
-            repository.clearHistory()
-        }
-    }
-
-    private suspend fun recordHistory(
-        url: String,
-        statusType: HistoryStatusType,
-        completedRuns: Int,
-        totalRuns: Int
-    ) {
-        val entry = TestHistoryEntry(
-            id = UUID.randomUUID().toString(),
-            timestampMillis = System.currentTimeMillis(),
-            url = url,
-            statusType = statusType,
-            completedRuns = completedRuns,
-            totalRuns = totalRuns
-        )
-        repository.addHistoryEntry(entry, incrementCompletedRuns = completedRuns)
     }
 
     override fun onCleared() {

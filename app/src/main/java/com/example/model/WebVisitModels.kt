@@ -3,39 +3,33 @@ package com.example.model
 import java.net.URI
 
 enum class TestSessionStatus(val displayLabel: String) {
-    IDLE("Ready"),
-    LOADING("Loading Page"),
-    VIEWING("Viewing Site"),
-    PAUSING_BETWEEN("Cooldown"),
-    PAUSED("Paused"),
-    BLOCKED("Preview Restricted"),
+    IDLE("Idle"),
+    LOADING("Loading"),
+    VIEWING("Viewing"),
+    PAUSING_BETWEEN("Pausing"),
+    BLOCKED("Restricted"),
     COMPLETED("Completed"),
     STOPPED("Stopped"),
-    ERROR("Load Error")
+    ERROR("Error")
 }
 
-enum class HistoryStatusType(val label: String) {
-    COMPLETED("Completed"),
-    STOPPED("Stopped"),
-    BLOCKED("Preview Restricted"),
-    OPENED_EXTERNALLY("Opened in Browser"),
-    ERROR("Load Error")
+enum class ScrollSpeed(val label: String, val pxPerTick: Int) {
+    SLOW("Slow", 6),
+    MEDIUM("Medium", 14),
+    FAST("Fast", 26)
 }
 
-data class TestHistoryEntry(
-    val id: String,
-    val timestampMillis: Long,
-    val url: String,
-    val statusType: HistoryStatusType,
-    val completedRuns: Int,
-    val totalRuns: Int
-)
+enum class WebCommandType {
+    BACK,
+    HOME,
+    RELOAD,
+    CLEAR_SESSION
+}
 
-data class TesterSettings(
-    val lastUrl: String = "https://example.com",
-    val viewDurationSec: Int = 15,
-    val pauseDurationSec: Int = 3,
-    val totalRuns: Int = 3
+data class WebCommandEvent(
+    val id: Long,
+    val type: WebCommandType,
+    val targetUrl: String? = null
 )
 
 sealed interface UrlValidationResult {
