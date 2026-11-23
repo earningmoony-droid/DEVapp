@@ -2,6 +2,8 @@ package com.example.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.model.AutoScrollDirection
+import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
 import com.example.model.UrlValidationResult
@@ -22,8 +24,9 @@ data class WebVisitUiState(
     val viewDurationSec: Int = 15,
     val pauseDurationSec: Int = 3,
     val totalRuns: Int = 3,
-    val autoScrollEnabled: Boolean = true,
+    val scrollDirection: AutoScrollDirection = AutoScrollDirection.NONE,
     val scrollSpeed: ScrollSpeed = ScrollSpeed.MEDIUM,
+    val scrollStatus: ScrollIndicatorState = ScrollIndicatorState.IDLE,
     val autoNextEnabled: Boolean = true,
 
     // Temporary active session state only (never persisted)
@@ -86,8 +89,35 @@ class WebVisitViewModel : ViewModel() {
         _uiState.update { it.copy(totalRuns = runs.coerceIn(1, 50)) }
     }
 
-    fun setAutoScrollEnabled(enabled: Boolean) {
-        _uiState.update { it.copy(autoScrollEnabled = enabled) }
+    fun startAutoScrollDown() {
+        _uiState.update {
+            it.copy(
+                scrollDirection = AutoScrollDirection.DOWN,
+                scrollStatus = if (it.activeUrl != null) ScrollIndicatorState.SCROLLING_DOWN else ScrollIndicatorState.IDLE
+            )
+        }
+    }
+
+    fun startAutoScrollUp() {
+        _uiState.update {
+            it.copy(
+                scrollDirection = AutoScrollDirection.UP,
+                scrollStatus = if (it.activeUrl != null) ScrollIndicatorState.SCROLLING_UP else ScrollIndicatorState.IDLE
+            )
+        }
+    }
+
+    fun stopAutoScroll() {
+        _uiState.update {
+            it.copy(
+                scrollDirection = AutoScrollDirection.NONE,
+                scrollStatus = ScrollIndicatorState.STOPPED
+            )
+        }
+    }
+
+    fun updateScrollStatus(status: ScrollIndicatorState) {
+        _uiState.update { it.copy(scrollStatus = status) }
     }
 
     fun setScrollSpeed(speed: ScrollSpeed) {
@@ -127,7 +157,12 @@ class WebVisitViewModel : ViewModel() {
                 overallProgress = 0f,
                 isPreviewLoading = true,
                 previewBlockedReason = null,
-                canGoBack = false
+                canGoBack = false,
+                scrollStatus = when (it.scrollDirection) {
+                    AutoScrollDirection.DOWN -> ScrollIndicatorState.SCROLLING_DOWN
+                    AutoScrollDirection.UP -> ScrollIndicatorState.SCROLLING_UP
+                    AutoScrollDirection.NONE -> ScrollIndicatorState.IDLE
+                }
             )
         }
 
@@ -171,7 +206,9 @@ class WebVisitViewModel : ViewModel() {
                     it.copy(
                         isRunning = false,
                         status = TestSessionStatus.BLOCKED,
-                        isPreviewLoading = false
+                        isPreviewLoading = false,
+                        scrollDirection = AutoScrollDirection.NONE,
+                        scrollStatus = ScrollIndicatorState.RESTRICTED
                     )
                 }
                 return
@@ -200,7 +237,9 @@ class WebVisitViewModel : ViewModel() {
                     _uiState.update {
                         it.copy(
                             isRunning = false,
-                            status = TestSessionStatus.BLOCKED
+                            status = TestSessionStatus.BLOCKED,
+                            scrollDirection = AutoScrollDirection.NONE,
+                            scrollStatus = ScrollIndicatorState.RESTRICTED
                         )
                     }
                     return
@@ -228,7 +267,6 @@ class WebVisitViewModel : ViewModel() {
             }
         }
 
-        // Clear active session preview cleanly upon completion
         _uiState.update {
             it.copy(
                 isRunning = false,
@@ -237,6 +275,8 @@ class WebVisitViewModel : ViewModel() {
                 phaseRemainingSec = 0,
                 overallProgress = 1f,
                 canGoBack = false,
+                scrollDirection = AutoScrollDirection.NONE,
+                scrollStatus = ScrollIndicatorState.IDLE,
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
             )
         }
@@ -257,6 +297,8 @@ class WebVisitViewModel : ViewModel() {
                 isPreviewLoading = false,
                 previewBlockedReason = null,
                 canGoBack = false,
+                scrollDirection = AutoScrollDirection.NONE,
+                scrollStatus = ScrollIndicatorState.STOPPED,
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
             )
         }
@@ -326,7 +368,9 @@ class WebVisitViewModel : ViewModel() {
         _uiState.update {
             it.copy(
                 isPreviewLoading = false,
-                previewBlockedReason = reason
+                previewBlockedReason = reason,
+                scrollDirection = AutoScrollDirection.NONE,
+                scrollStatus = ScrollIndicatorState.RESTRICTED
             )
         }
     }

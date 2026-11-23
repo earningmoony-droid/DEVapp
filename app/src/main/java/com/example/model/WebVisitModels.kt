@@ -14,9 +14,25 @@ enum class TestSessionStatus(val displayLabel: String) {
 }
 
 enum class ScrollSpeed(val label: String, val pxPerTick: Int) {
-    SLOW("Slow", 6),
-    MEDIUM("Medium", 14),
-    FAST("Fast", 26)
+    SLOW("Slow", 3),
+    MEDIUM("Medium", 7),
+    FAST("Fast", 14)
+}
+
+enum class AutoScrollDirection(val label: String) {
+    NONE("Stopped"),
+    DOWN("Scrolling Down"),
+    UP("Scrolling Up")
+}
+
+enum class ScrollIndicatorState(val label: String) {
+    IDLE("Idle"),
+    SCROLLING_DOWN("Scrolling Down"),
+    SCROLLING_UP("Scrolling Up"),
+    STOPPED("Stopped"),
+    AT_TOP("Reached Top"),
+    AT_BOTTOM("Reached Bottom"),
+    RESTRICTED("Cross-Origin Restricted")
 }
 
 enum class WebCommandType {

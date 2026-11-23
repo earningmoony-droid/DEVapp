@@ -39,7 +39,6 @@ import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -66,6 +65,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.R
+import com.example.model.AutoScrollDirection
+import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
 import com.example.model.WebCommandEvent
@@ -83,6 +84,7 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -94,7 +96,7 @@ fun WebPreviewCard(
     isPreviewLoading: Boolean,
     blockedReason: String?,
     phaseRemainingSec: Int,
-    autoScrollEnabled: Boolean,
+    scrollDirection: AutoScrollDirection,
     scrollSpeed: ScrollSpeed,
     canGoBack: Boolean,
     pendingCommand: WebCommandEvent?,
@@ -105,6 +107,7 @@ fun WebPreviewCard(
     onPageStarted: () -> Unit,
     onPageFinished: (Boolean) -> Unit,
     onCanGoBackChanged: (Boolean) -> Unit,
+    onScrollStatusChanged: (ScrollIndicatorState) -> Unit,
     onBlockedOrError: (String) -> Unit,
     onOpenExternal: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -113,31 +116,46 @@ fun WebPreviewCard(
     var lastLoadedToken by remember { mutableIntStateOf(-1) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
-    // Smooth auto-scroll during active viewing
+    // Smooth independent Auto Scroll Down / Auto Scroll Up inside webpage container
     LaunchedEffect(
-        status,
-        autoScrollEnabled,
+        scrollDirection,
         scrollSpeed,
         activeUrl,
         blockedReason,
+        status,
         webViewRef
     ) {
         val wv = webViewRef ?: return@LaunchedEffect
-        if (status == TestSessionStatus.VIEWING &&
-            autoScrollEnabled &&
-            activeUrl != null &&
-            blockedReason == null
+        if (scrollDirection == AutoScrollDirection.NONE ||
+            activeUrl == null ||
+            blockedReason != null ||
+            status == TestSessionStatus.PAUSING_BETWEEN
         ) {
-            while (true) {
-                delay(50)
-                if (wv.canScrollVertically(1)) {
-                    wv.scrollBy(0, scrollSpeed.pxPerTick)
+            return@LaunchedEffect
+        }
+
+        val delta = if (scrollDirection == AutoScrollDirection.DOWN) {
+            scrollSpeed.pxPerTick
+        } else {
+            -scrollSpeed.pxPerTick
+        }
+
+        while (isActive) {
+            val js = buildPreviewScrollScript(delta)
+            wv.evaluateJavascript(js) { rawResult ->
+                val result = rawResult?.trim('"') ?: ""
+                when (result) {
+                    "AT_TOP" -> onScrollStatusChanged(ScrollIndicatorState.AT_TOP)
+                    "AT_BOTTOM" -> onScrollStatusChanged(ScrollIndicatorState.AT_BOTTOM)
+                    "SCROLLING_UP" -> onScrollStatusChanged(ScrollIndicatorState.SCROLLING_UP)
+                    "SCROLLING_DOWN" -> onScrollStatusChanged(ScrollIndicatorState.SCROLLING_DOWN)
+                    "RESTRICTED" -> onScrollStatusChanged(ScrollIndicatorState.RESTRICTED)
                 }
             }
+            delay(20)
         }
     }
 
-    // Handle Back, Home, Reload, and Clear Session commands cleanly
     LaunchedEffect(pendingCommand, webViewRef) {
         val cmd = pendingCommand ?: return@LaunchedEffect
         val wv = webViewRef
@@ -170,7 +188,6 @@ fun WebPreviewCard(
         onConsumeCommand(cmd.id)
     }
 
-    // Ensure WebView session data is cleared if composable leaves composition
     DisposableEffect(Unit) {
         onDispose {
             webViewRef?.apply {
@@ -187,7 +204,6 @@ fun WebPreviewCard(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(14.dp)
     ) {
-        // Browser navigation toolbar: Back, Home, Reload, Open Website
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -532,6 +548,60 @@ fun WebPreviewCard(
             }
         }
     }
+}
+
+private fun buildPreviewScrollScript(delta: Int): String {
+    return """
+        (function() {
+          try {
+            var delta = $delta;
+            function findScrollable(doc) {
+              if (!doc) return null;
+              var root = doc.scrollingElement || doc.documentElement || doc.body;
+              var candidates = [];
+              if (root && root.scrollHeight > root.clientHeight + 2) {
+                candidates.push(root);
+              }
+              var all = doc.querySelectorAll('*');
+              for (var i = 0; i < all.length && i < 600; i++) {
+                var el = all[i];
+                if (el === root) continue;
+                var style = (doc.defaultView || window).getComputedStyle(el);
+                if (!style) continue;
+                var oy = style.overflowY;
+                if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 4) {
+                  candidates.push(el);
+                }
+              }
+              if (delta < 0) {
+                for (var j = 0; j < candidates.length; j++) {
+                  if (candidates[j].scrollTop > 0) return candidates[j];
+                }
+              } else {
+                for (var k = 0; k < candidates.length; k++) {
+                  var c = candidates[k];
+                  if (c.scrollTop + c.clientHeight < c.scrollHeight - 1) return c;
+                }
+              }
+              return candidates.length > 0 ? candidates[0] : root;
+            }
+            var target = findScrollable(document);
+            if (!target) return 'NO_TARGET';
+            if (delta < 0) {
+              if (target.scrollTop <= 0) return 'AT_TOP';
+              target.scrollTop = Math.max(0, target.scrollTop + delta);
+              return target.scrollTop <= 0 ? 'AT_TOP' : 'SCROLLING_UP';
+            } else {
+              var maxScroll = target.scrollHeight - target.clientHeight;
+              if (maxScroll <= 0 || target.scrollTop >= maxScroll - 1) return 'AT_BOTTOM';
+              target.scrollTop = Math.min(maxScroll, target.scrollTop + delta);
+              return target.scrollTop >= maxScroll - 1 ? 'AT_BOTTOM' : 'SCROLLING_DOWN';
+            }
+          } catch (e) {
+            return 'RESTRICTED';
+          }
+        })();
+    """.trimIndent()
 }
 
 @Composable

@@ -151,7 +151,7 @@
 
     @media (min-width: 860px) {
       .layout-grid {
-        grid-template-columns: 390px 1fr;
+        grid-template-columns: 400px 1fr;
         align-items: start;
       }
     }
@@ -228,11 +228,18 @@
       margin-bottom: 14px;
     }
 
+    .scroll-controls-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
     .btn {
       min-height: 48px;
       border-radius: var(--radius-md);
       border: 1px solid rgba(255, 255, 255, 0.22);
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       font-weight: 700;
       color: var(--text-primary);
       cursor: pointer;
@@ -240,10 +247,12 @@
       align-items: center;
       justify-content: center;
       gap: 6px;
-      padding: 0 12px;
+      padding: 0 10px;
       text-decoration: none;
+      transition: transform 0.15s ease, opacity 0.18s ease;
     }
 
+    .btn:active:not(:disabled) { transform: scale(0.97); }
     .btn:disabled { opacity: 0.42; cursor: not-allowed; }
 
     .btn-primary {
@@ -255,6 +264,40 @@
       background: rgba(251, 113, 133, 0.16);
       border-color: rgba(251, 113, 133, 0.48);
       color: #fecdd3;
+    }
+
+    .btn-scroll-down {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: rgba(56, 189, 248, 0.45);
+      color: #e0f2fe;
+      min-height: 44px;
+      font-size: 0.78rem;
+    }
+
+    .btn-scroll-down.active {
+      background: rgba(56, 189, 248, 0.32);
+      border-color: var(--cyan);
+    }
+
+    .btn-scroll-up {
+      background: rgba(168, 85, 247, 0.16);
+      border-color: rgba(168, 85, 247, 0.45);
+      color: #f3e8ff;
+      min-height: 44px;
+      font-size: 0.78rem;
+    }
+
+    .btn-scroll-up.active {
+      background: rgba(168, 85, 247, 0.34);
+      border-color: var(--purple);
+    }
+
+    .btn-scroll-stop {
+      background: rgba(251, 113, 133, 0.16);
+      border-color: rgba(251, 113, 133, 0.45);
+      color: #fecdd3;
+      min-height: 44px;
+      font-size: 0.78rem;
     }
 
     .progress-meta {
@@ -319,12 +362,37 @@
       outline: none;
     }
 
+    .scroll-section {
+      padding: 12px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .scroll-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .scroll-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(6, 9, 26, 0.55);
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
     .toggle-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      padding: 10px 0;
+      padding: 10px 0 2px;
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
@@ -374,13 +442,13 @@
     }
 
     .switch input:checked + .slider {
-      background: rgba(56, 189, 248, 0.28);
-      border-color: var(--cyan);
+      background: rgba(168, 85, 247, 0.28);
+      border-color: var(--purple);
     }
 
     .switch input:checked + .slider::before {
       transform: translateX(20px);
-      background: var(--cyan);
+      background: var(--purple);
     }
 
     .preview-toolbar {
@@ -530,21 +598,26 @@
           </div>
         </div>
 
-        <div class="toggle-row">
-          <div>
-            <div class="toggle-label">Auto Scroll</div>
-            <div class="toggle-sub">Scroll Speed</div>
+        <div class="scroll-section">
+          <div class="scroll-header">
+            <div>
+              <div class="toggle-label">Auto Scroll</div>
+              <div class="toggle-sub">Scroll Speed &amp; Preview Container</div>
+            </div>
+            <span class="scroll-badge" id="scrollStatusBadge">Idle</span>
           </div>
-          <label class="switch">
-            <input type="checkbox" id="autoScrollToggle" checked />
-            <span class="slider"></span>
-          </label>
-        </div>
 
-        <div class="chip-row" id="scrollSpeedRow" style="margin-bottom: 12px;">
-          <button type="button" class="chip-btn" data-speed="slow">Slow</button>
-          <button type="button" class="chip-btn active" data-speed="medium">Medium</button>
-          <button type="button" class="chip-btn" data-speed="fast">Fast</button>
+          <div class="scroll-controls-row">
+            <button type="button" class="btn btn-scroll-down" id="scrollDownBtn">Scroll Down</button>
+            <button type="button" class="btn btn-scroll-up" id="scrollUpBtn">Scroll Up</button>
+            <button type="button" class="btn btn-scroll-stop" id="stopScrollBtn" disabled>Stop Scroll</button>
+          </div>
+
+          <div class="chip-row" id="scrollSpeedRow">
+            <button type="button" class="chip-btn" data-speed="slow">Slow</button>
+            <button type="button" class="chip-btn active" data-speed="medium">Medium</button>
+            <button type="button" class="chip-btn" data-speed="fast">Fast</button>
+          </div>
         </div>
 
         <div class="toggle-row">
@@ -610,9 +683,13 @@
       const viewSecInput = document.getElementById("viewSecInput");
       const pauseSecInput = document.getElementById("pauseSecInput");
       const runsInput = document.getElementById("runsInput");
-      const autoScrollToggle = document.getElementById("autoScrollToggle");
-      const scrollSpeedRow = document.getElementById("scrollSpeedRow");
       const autoNextToggle = document.getElementById("autoNextToggle");
+
+      const scrollDownBtn = document.getElementById("scrollDownBtn");
+      const scrollUpBtn = document.getElementById("scrollUpBtn");
+      const stopScrollBtn = document.getElementById("stopScrollBtn");
+      const scrollSpeedRow = document.getElementById("scrollSpeedRow");
+      const scrollStatusBadge = document.getElementById("scrollStatusBadge");
 
       const startBtn = document.getElementById("startBtn");
       const stopBtn = document.getElementById("stopBtn");
@@ -633,7 +710,8 @@
       const overlayOpenBtn = document.getElementById("overlayOpenBtn");
       const headerOpenBtn = document.getElementById("headerOpenBtn");
 
-      const SPEED_PX = { slow: 1, medium: 3, fast: 6 };
+      // Speeds in pixels per second for smooth requestAnimationFrame scrolling
+      const SPEED_PX_PER_SEC = { slow: 65, medium: 160, fast: 320 };
 
       let session = {
         running: false,
@@ -641,15 +719,19 @@
         totalRuns: 3,
         viewSec: 15,
         pauseSec: 3,
-        autoScroll: true,
+        scrollDirection: "none", // "none" | "down" | "up"
         scrollSpeed: "medium",
+        scrollStatusText: "Idle",
+        scrollStatusColor: "#94a3b8",
         autoNext: true,
         phase: "idle", // idle | loading | viewing | cooldown | blocked | completed | stopped
         phaseRemaining: 0,
         activeUrl: "",
         timerId: null,
         loadTimeoutId: null,
-        scrollTimerId: null
+        scrollRafId: null,
+        lastFrameTime: 0,
+        subPixelCarry: 0
       };
 
       function validateUrl(raw) {
@@ -702,6 +784,169 @@
         overlayOpenBtn.href = safeHref;
       }
 
+      function setScrollStatus(text, color) {
+        session.scrollStatusText = text;
+        session.scrollStatusColor = color;
+        scrollStatusBadge.textContent = text;
+        scrollStatusBadge.style.color = color;
+        scrollStatusBadge.style.borderColor = color;
+      }
+
+      // Safely check same-origin iframe document access without bypassing security restrictions
+      function getAccessibleIframeDocument() {
+        try {
+          if (!previewFrame || previewFrame.style.display === "none") return null;
+          const win = previewFrame.contentWindow;
+          const doc = previewFrame.contentDocument || (win ? win.document : null);
+          if (!doc) return null;
+          // Accessing location.href throws SecurityError on cross-origin iframes
+          const href = doc.location && doc.location.href;
+          if (!href || href === "about:blank") return null;
+          return { doc, win };
+        } catch {
+          return null;
+        }
+      }
+
+      // Detect the actual scrollable container inside the previewed page
+      function findScrollableContainer(doc, direction) {
+        const win = doc.defaultView || previewFrame.contentWindow;
+        const root = doc.scrollingElement || doc.documentElement || doc.body;
+        const candidates = [];
+
+        if (root && root.scrollHeight > root.clientHeight + 2) {
+          candidates.push(root);
+        }
+
+        const elements = doc.querySelectorAll("*");
+        const limit = Math.min(elements.length, 600);
+        for (let i = 0; i < limit; i++) {
+          const el = elements[i];
+          if (el === root) continue;
+          const style = win ? win.getComputedStyle(el) : null;
+          if (!style) continue;
+          const oy = style.overflowY;
+          if ((oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight + 4) {
+            candidates.push(el);
+          }
+        }
+
+        if (direction === "up") {
+          for (let i = 0; i < candidates.length; i++) {
+            if (candidates[i].scrollTop > 0) return candidates[i];
+          }
+        } else {
+          for (let i = 0; i < candidates.length; i++) {
+            const c = candidates[i];
+            if (c.scrollTop + c.clientHeight < c.scrollHeight - 1) return c;
+          }
+        }
+
+        return candidates.length > 0 ? candidates[0] : root;
+      }
+
+      function stopScrolling(reasonText = "Stopped", color = "#fbbf24") {
+        if (session.scrollRafId !== null) {
+          cancelAnimationFrame(session.scrollRafId);
+          session.scrollRafId = null;
+        }
+        session.scrollDirection = "none";
+        session.lastFrameTime = 0;
+        session.subPixelCarry = 0;
+        setScrollStatus(reasonText, color);
+        updateUI();
+      }
+
+      function runScrollAnimationFrame(timestamp) {
+        if (session.scrollDirection === "none") {
+          session.scrollRafId = null;
+          return;
+        }
+
+        const access = getAccessibleIframeDocument();
+        if (!access) {
+          // Cross-origin or unavailable iframe: stop cleanly and do NOT scroll the outer app page
+          stopScrolling("Cross-Origin Restricted", "#fb7185");
+          return;
+        }
+
+        const { doc } = access;
+        const target = findScrollableContainer(doc, session.scrollDirection);
+        if (!target) {
+          stopScrolling("No Scrollable Container", "#fbbf24");
+          return;
+        }
+
+        if (!session.lastFrameTime) {
+          session.lastFrameTime = timestamp;
+        }
+        const dtSec = Math.min(0.05, Math.max(0, (timestamp - session.lastFrameTime) / 1000));
+        session.lastFrameTime = timestamp;
+
+        const speed = SPEED_PX_PER_SEC[session.scrollSpeed] || 160;
+        session.subPixelCarry += speed * dtSec;
+        const stepPx = Math.floor(session.subPixelCarry);
+        if (stepPx >= 1) {
+          session.subPixelCarry -= stepPx;
+
+          if (session.scrollDirection === "up") {
+            if (target.scrollTop <= 0) {
+              stopScrolling("Reached Top", "#fbbf24");
+              return;
+            }
+            target.scrollTop = Math.max(0, target.scrollTop - stepPx);
+            if (target.scrollTop <= 0) {
+              stopScrolling("Reached Top", "#fbbf24");
+              return;
+            }
+          } else if (session.scrollDirection === "down") {
+            const maxScroll = target.scrollHeight - target.clientHeight;
+            if (maxScroll <= 0 || target.scrollTop >= maxScroll - 1) {
+              stopScrolling("Reached Bottom", "#fbbf24");
+              return;
+            }
+            target.scrollTop = Math.min(maxScroll, target.scrollTop + stepPx);
+            if (target.scrollTop >= maxScroll - 1) {
+              stopScrolling("Reached Bottom", "#fbbf24");
+              return;
+            }
+          }
+        }
+
+        session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
+      }
+
+      function startScrolling(direction) {
+        if (session.scrollRafId !== null) {
+          cancelAnimationFrame(session.scrollRafId);
+          session.scrollRafId = null;
+        }
+
+        const access = getAccessibleIframeDocument();
+        if (!access) {
+          session.scrollDirection = "none";
+          if (previewFrame.style.display === "block") {
+            setScrollStatus("Cross-Origin Restricted", "#fb7185");
+          } else {
+            setScrollStatus("Load Preview First", "#fbbf24");
+          }
+          updateUI();
+          return;
+        }
+
+        session.scrollDirection = direction;
+        session.lastFrameTime = 0;
+        session.subPixelCarry = 0;
+
+        if (direction === "up") {
+          setScrollStatus(`Scrolling Up (${session.scrollSpeed})`, "#a855f7");
+        } else {
+          setScrollStatus(`Scrolling Down (${session.scrollSpeed})`, "#38bdf8");
+        }
+        updateUI();
+        session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
+      }
+
       function updateUI() {
         const labels = {
           idle: ["Idle", "#38bdf8"],
@@ -739,36 +984,21 @@
         startBtn.disabled = session.running;
         stopBtn.disabled = !session.running;
 
+        scrollDownBtn.classList.toggle("active", session.scrollDirection === "down");
+        scrollUpBtn.classList.toggle("active", session.scrollDirection === "up");
+        scrollDownBtn.disabled = session.scrollDirection === "down";
+        scrollUpBtn.disabled = session.scrollDirection === "up";
+        stopScrollBtn.disabled = session.scrollDirection === "none";
+
         const hasActive = Boolean(session.activeUrl) && session.phase !== "blocked";
         backBtn.disabled = !hasActive;
         homeBtn.disabled = !session.activeUrl;
         reloadBtn.disabled = !hasActive;
-        scrollSpeedRow.style.display = session.autoScroll ? "flex" : "none";
-      }
-
-      function stopAutoScrollLoop() {
-        if (session.scrollTimerId) {
-          clearInterval(session.scrollTimerId);
-          session.scrollTimerId = null;
-        }
-      }
-
-      function startAutoScrollLoop() {
-        stopAutoScrollLoop();
-        if (!session.autoScroll || session.phase !== "viewing") return;
-        session.scrollTimerId = setInterval(() => {
-          if (!session.running || !session.autoScroll || session.phase !== "viewing") return;
-          try {
-            const win = previewFrame.contentWindow;
-            if (win) win.scrollBy(0, SPEED_PX[session.scrollSpeed] || 3);
-          } catch {}
-        }, 50);
       }
 
       function clearTemporarySession(nextPhase) {
         if (session.timerId) clearInterval(session.timerId);
         if (session.loadTimeoutId) clearTimeout(session.loadTimeoutId);
-        stopAutoScrollLoop();
         session.timerId = null;
         session.loadTimeoutId = null;
         session.running = false;
@@ -776,6 +1006,7 @@
         session.phaseRemaining = 0;
         session.activeUrl = "";
         session.phase = nextPhase;
+        stopScrolling(nextPhase === "idle" ? "Idle" : "Stopped", nextPhase === "idle" ? "#94a3b8" : "#fbbf24");
         previewFrame.src = "about:blank";
         syncExternalLinks(urlInput.value);
         updateUI();
@@ -802,12 +1033,15 @@
           clearTimeout(session.loadTimeoutId);
           session.phase = "viewing";
           showIframe();
-          startAutoScrollLoop();
+          if (session.scrollDirection !== "none") {
+            startScrolling(session.scrollDirection);
+          }
           updateUI();
         };
 
         previewFrame.onerror = () => {
           clearTemporarySession("blocked");
+          setScrollStatus("Cross-Origin Restricted", "#fb7185");
           showOverlay("Embedded Preview Restricted", "This site restricts embedded loading. Open it directly in your browser without bypassing site security.", true);
         };
 
@@ -815,7 +1049,9 @@
           if (!loaded && session.running) {
             session.phase = "viewing";
             showIframe();
-            startAutoScrollLoop();
+            if (session.scrollDirection !== "none") {
+              startScrolling(session.scrollDirection);
+            }
             updateUI();
           }
         }, 4000);
@@ -829,7 +1065,7 @@
             session.phaseRemaining -= 1;
             updateUI();
           } else {
-            stopAutoScrollLoop();
+            stopScrolling("Idle", "#94a3b8");
             if (session.currentRun < session.totalRuns && session.autoNext) {
               if (session.pauseSec > 0) {
                 session.phase = "cooldown";
@@ -875,12 +1111,9 @@
         urlInput.dispatchEvent(new Event("input"));
       });
 
-      autoScrollToggle.addEventListener("change", () => {
-        session.autoScroll = autoScrollToggle.checked;
-        if (session.autoScroll) startAutoScrollLoop();
-        else stopAutoScrollLoop();
-        updateUI();
-      });
+      scrollDownBtn.addEventListener("click", () => startScrolling("down"));
+      scrollUpBtn.addEventListener("click", () => startScrolling("up"));
+      stopScrollBtn.addEventListener("click", () => stopScrolling("Stopped", "#fbbf24"));
 
       scrollSpeedRow.querySelectorAll("button[data-speed]").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -888,6 +1121,11 @@
           scrollSpeedRow.querySelectorAll("button[data-speed]").forEach((b) => {
             b.classList.toggle("active", b === btn);
           });
+          if (session.scrollDirection === "up") {
+            setScrollStatus(`Scrolling Up (${session.scrollSpeed})`, "#a855f7");
+          } else if (session.scrollDirection === "down") {
+            setScrollStatus(`Scrolling Down (${session.scrollSpeed})`, "#38bdf8");
+          }
         });
       });
 
@@ -923,7 +1161,10 @@
       });
 
       backBtn.addEventListener("click", () => {
-        try { previewFrame.contentWindow?.history.back(); } catch {}
+        const access = getAccessibleIframeDocument();
+        if (access && access.win) {
+          access.win.history.back();
+        }
       });
 
       homeBtn.addEventListener("click", () => {

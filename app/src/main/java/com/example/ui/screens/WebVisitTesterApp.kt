@@ -42,6 +42,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Code
@@ -69,7 +71,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -83,6 +84,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
+import com.example.model.AutoScrollDirection
+import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
 import com.example.ui.WebVisitUiState
@@ -102,7 +105,6 @@ import com.example.ui.theme.GlassStrokeSubtle
 import com.example.ui.theme.GlassStrokeViolet
 import com.example.ui.theme.GlassSurfaceElevated
 import com.example.ui.theme.IndigoAccent
-import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LuminousPurple
 import com.example.ui.theme.MidnightDeep
 import com.example.ui.theme.MidnightNavy
@@ -179,7 +181,9 @@ fun WebVisitTesterApp(
                                 onStopTest = viewModel::stopTest,
                                 onViewDurationChanged = viewModel::updateViewDuration,
                                 onPauseDurationChanged = viewModel::updatePauseDuration,
-                                onAutoScrollChanged = viewModel::setAutoScrollEnabled,
+                                onScrollDown = viewModel::startAutoScrollDown,
+                                onScrollUp = viewModel::startAutoScrollUp,
+                                onStopScroll = viewModel::stopAutoScroll,
                                 onScrollSpeedChanged = viewModel::setScrollSpeed,
                                 onAutoNextChanged = viewModel::setAutoNextEnabled,
                                 onTotalRunsChanged = viewModel::updateTotalRuns,
@@ -194,7 +198,7 @@ fun WebVisitTesterApp(
                                 isPreviewLoading = uiState.isPreviewLoading,
                                 blockedReason = uiState.previewBlockedReason,
                                 phaseRemainingSec = uiState.phaseRemainingSec,
-                                autoScrollEnabled = uiState.autoScrollEnabled,
+                                scrollDirection = uiState.scrollDirection,
                                 scrollSpeed = uiState.scrollSpeed,
                                 canGoBack = uiState.canGoBack,
                                 pendingCommand = uiState.webCommand,
@@ -205,6 +209,7 @@ fun WebVisitTesterApp(
                                 onPageStarted = viewModel::onPreviewPageStarted,
                                 onPageFinished = viewModel::onPreviewPageFinished,
                                 onCanGoBackChanged = viewModel::updateCanGoBack,
+                                onScrollStatusChanged = viewModel::updateScrollStatus,
                                 onBlockedOrError = viewModel::onPreviewBlockedOrError,
                                 onOpenExternal = openWebsiteInBrowser,
                                 modifier = Modifier.weight(1.05f)
@@ -219,7 +224,9 @@ fun WebVisitTesterApp(
                             onStopTest = viewModel::stopTest,
                             onViewDurationChanged = viewModel::updateViewDuration,
                             onPauseDurationChanged = viewModel::updatePauseDuration,
-                            onAutoScrollChanged = viewModel::setAutoScrollEnabled,
+                            onScrollDown = viewModel::startAutoScrollDown,
+                            onScrollUp = viewModel::startAutoScrollUp,
+                            onStopScroll = viewModel::stopAutoScroll,
                             onScrollSpeedChanged = viewModel::setScrollSpeed,
                             onAutoNextChanged = viewModel::setAutoNextEnabled,
                             onTotalRunsChanged = viewModel::updateTotalRuns
@@ -233,7 +240,7 @@ fun WebVisitTesterApp(
                             isPreviewLoading = uiState.isPreviewLoading,
                             blockedReason = uiState.previewBlockedReason,
                             phaseRemainingSec = uiState.phaseRemainingSec,
-                            autoScrollEnabled = uiState.autoScrollEnabled,
+                            scrollDirection = uiState.scrollDirection,
                             scrollSpeed = uiState.scrollSpeed,
                             canGoBack = uiState.canGoBack,
                             pendingCommand = uiState.webCommand,
@@ -244,6 +251,7 @@ fun WebVisitTesterApp(
                             onPageStarted = viewModel::onPreviewPageStarted,
                             onPageFinished = viewModel::onPreviewPageFinished,
                             onCanGoBackChanged = viewModel::updateCanGoBack,
+                            onScrollStatusChanged = viewModel::updateScrollStatus,
                             onBlockedOrError = viewModel::onPreviewBlockedOrError,
                             onOpenExternal = openWebsiteInBrowser
                         )
@@ -336,7 +344,6 @@ private fun MinimalHeaderBar(
                 }
             }
 
-            // Live testing status pill
             Surface(
                 shape = RoundedCornerShape(999.dp),
                 color = statusColor.copy(alpha = 0.14f),
@@ -380,7 +387,9 @@ private fun MinimalControlPanel(
     onStopTest: () -> Unit,
     onViewDurationChanged: (Int) -> Unit,
     onPauseDurationChanged: (Int) -> Unit,
-    onAutoScrollChanged: (Boolean) -> Unit,
+    onScrollDown: () -> Unit,
+    onScrollUp: () -> Unit,
+    onStopScroll: () -> Unit,
     onScrollSpeedChanged: (ScrollSpeed) -> Unit,
     onAutoNextChanged: (Boolean) -> Unit,
     onTotalRunsChanged: (Int) -> Unit,
@@ -500,7 +509,6 @@ private fun MinimalControlPanel(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Start & Stop controls
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -530,7 +538,6 @@ private fun MinimalControlPanel(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Live progress line
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -578,7 +585,6 @@ private fun MinimalControlPanel(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Viewing Duration & Pause Interval
         DurationStepperRow(
             label = stringResource(R.string.label_view_duration),
             valueText = "${uiState.viewDurationSec}s",
@@ -607,79 +613,116 @@ private fun MinimalControlPanel(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Auto Scroll & Scroll Speed
+        // Independent Auto Scroll Down / Up / Stop Scroll + Status Indicator
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
+            Text(
+                text = stringResource(R.string.label_auto_scroll),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = TextPrimary
+            )
+
+            val scrollColor = when (uiState.scrollStatus) {
+                ScrollIndicatorState.SCROLLING_DOWN -> ElectricCyan
+                ScrollIndicatorState.SCROLLING_UP -> LuminousPurple
+                ScrollIndicatorState.RESTRICTED -> CoralDanger
+                ScrollIndicatorState.AT_TOP, ScrollIndicatorState.AT_BOTTOM, ScrollIndicatorState.STOPPED -> AmberWarning
+                ScrollIndicatorState.IDLE -> TextMuted
+            }
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = scrollColor.copy(alpha = 0.14f),
+                border = BorderStroke(1.dp, scrollColor.copy(alpha = 0.4f)),
+                modifier = Modifier.testTag("scroll_status_badge")
+            ) {
                 Text(
-                    text = stringResource(R.string.label_auto_scroll),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                    color = TextPrimary
-                )
-                Text(
-                    text = stringResource(R.string.label_scroll_speed),
+                    text = uiState.scrollStatus.label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
+                    color = scrollColor,
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
                 )
             }
+        }
 
-            Switch(
-                checked = uiState.autoScrollEnabled,
-                onCheckedChange = onAutoScrollChanged,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = MidnightDeep,
-                    checkedTrackColor = ElectricCyan,
-                    uncheckedThumbColor = TextMuted,
-                    uncheckedTrackColor = MidnightDeep.copy(alpha = 0.6f)
-                ),
-                modifier = Modifier.testTag("auto_scroll_switch")
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val downActive = uiState.scrollDirection == AutoScrollDirection.DOWN
+            val upActive = uiState.scrollDirection == AutoScrollDirection.UP
+
+            GlassActionButton(
+                text = stringResource(R.string.btn_scroll_down),
+                icon = Icons.Rounded.ArrowDownward,
+                onClick = onScrollDown,
+                enabled = !downActive,
+                accentColor = ElectricCyan,
+                testTag = "scroll_down_button",
+                modifier = Modifier.weight(1f)
+            )
+            GlassActionButton(
+                text = stringResource(R.string.btn_scroll_up),
+                icon = Icons.Rounded.ArrowUpward,
+                onClick = onScrollUp,
+                enabled = !upActive,
+                accentColor = LuminousPurple,
+                testTag = "scroll_up_button",
+                modifier = Modifier.weight(1f)
+            )
+            GlassActionButton(
+                text = stringResource(R.string.btn_stop_scroll),
+                icon = Icons.Rounded.Stop,
+                onClick = onStopScroll,
+                enabled = uiState.scrollDirection != AutoScrollDirection.NONE,
+                accentColor = CoralDanger,
+                testTag = "stop_scroll_button",
+                modifier = Modifier.weight(1f)
             )
         }
 
-        AnimatedVisibility(visible = uiState.autoScrollEnabled) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ScrollSpeed.entries.forEach { speed ->
-                    val selected = uiState.scrollSpeed == speed
-                    val shape = RoundedCornerShape(10.dp)
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(shape)
-                            .background(
-                                if (selected) ElectricCyan.copy(alpha = 0.22f)
-                                else MidnightDeep.copy(alpha = 0.45f)
-                            )
-                            .border(
-                                1.dp,
-                                if (selected) ElectricCyan.copy(alpha = 0.65f) else GlassStrokeSubtle,
-                                shape
-                            )
-                            .clickable { onScrollSpeedChanged(speed) }
-                            .padding(vertical = 8.dp)
-                            .testTag("scroll_speed_${speed.name.lowercase()}"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = speed.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (selected) ElectricCyan else TextMuted
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ScrollSpeed.entries.forEach { speed ->
+                val selected = uiState.scrollSpeed == speed
+                val shape = RoundedCornerShape(10.dp)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(shape)
+                        .background(
+                            if (selected) ElectricCyan.copy(alpha = 0.22f)
+                            else MidnightDeep.copy(alpha = 0.45f)
                         )
-                    }
+                        .border(
+                            1.dp,
+                            if (selected) ElectricCyan.copy(alpha = 0.65f) else GlassStrokeSubtle,
+                            shape
+                        )
+                        .clickable { onScrollSpeedChanged(speed) }
+                        .padding(vertical = 8.dp)
+                        .testTag("scroll_speed_${speed.name.lowercase()}"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = speed.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (selected) ElectricCyan else TextMuted
+                    )
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Auto Next toggle & Runs stepper
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
