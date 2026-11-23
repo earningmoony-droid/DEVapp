@@ -66,17 +66,35 @@ data class VpnVerificationInfo(
     val errorMessage: String? = null
 )
 
+data class ClickTargetItem(
+    val selector: String,
+    val label: String,
+    val tagType: String
+)
+
+enum class ClickTestStatus(val label: String) {
+    IDLE("Idle"),
+    RUNNING("Auto Clicking"),
+    STOPPED("Stopped"),
+    BLOCKED_AD("Ad Blocked"),
+    RESTRICTED("Restricted"),
+    NO_TARGET("No Target")
+}
+
 enum class WebCommandType {
     BACK,
     HOME,
     RELOAD,
-    CLEAR_SESSION
+    CLEAR_SESSION,
+    SCAN_CLICK_TARGETS,
+    EXECUTE_SINGLE_CLICK
 }
 
 data class WebCommandEvent(
     val id: Long,
     val type: WebCommandType,
-    val targetUrl: String? = null
+    val targetUrl: String? = null,
+    val selector: String? = null
 )
 
 sealed interface UrlValidationResult {

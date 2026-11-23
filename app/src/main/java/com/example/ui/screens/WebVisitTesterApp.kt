@@ -54,8 +54,10 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material3.AlertDialog
@@ -94,6 +96,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.model.AutoScrollDirection
+import com.example.model.ClickTargetItem
+import com.example.model.ClickTestStatus
 import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
@@ -217,6 +221,18 @@ fun WebVisitTesterApp(
                                     onTotalRunsChanged = viewModel::updateTotalRuns
                                 )
 
+                                ClicksAutomationPanel(
+                                    uiState = uiState,
+                                    onAuthorizedChanged = viewModel::setAuthorizedOwnSite,
+                                    onSelectorChanged = viewModel::onClickSelectorChanged,
+                                    onSelectTarget = viewModel::selectDiscoveredTarget,
+                                    onScanTargets = viewModel::scanClickTargets,
+                                    onClickIntervalChanged = viewModel::updateClickInterval,
+                                    onSingleClickTest = viewModel::triggerSingleClickTest,
+                                    onStartAutoClick = viewModel::startAutoClick,
+                                    onStopAutoClick = { viewModel.stopAutoClick() }
+                                )
+
                                 VpnTestingPanel(
                                     uiState = uiState,
                                     onSelectProvider = viewModel::selectVpnProvider,
@@ -248,6 +264,8 @@ fun WebVisitTesterApp(
                                 onScrollStatusChanged = viewModel::updateScrollStatus,
                                 onBlockedOrError = viewModel::onPreviewBlockedOrError,
                                 onOpenExternal = openWebsiteInBrowser,
+                                onTargetsScanned = viewModel::onClickTargetsScanned,
+                                onClickExecuted = viewModel::onSingleClickExecuted,
                                 modifier = Modifier.weight(1.05f)
                             )
                         }
@@ -267,6 +285,18 @@ fun WebVisitTesterApp(
                             onScrollSpeedChanged = viewModel::setScrollSpeed,
                             onAutoNextChanged = viewModel::setAutoNextEnabled,
                             onTotalRunsChanged = viewModel::updateTotalRuns
+                        )
+
+                        ClicksAutomationPanel(
+                            uiState = uiState,
+                            onAuthorizedChanged = viewModel::setAuthorizedOwnSite,
+                            onSelectorChanged = viewModel::onClickSelectorChanged,
+                            onSelectTarget = viewModel::selectDiscoveredTarget,
+                            onScanTargets = viewModel::scanClickTargets,
+                            onClickIntervalChanged = viewModel::updateClickInterval,
+                            onSingleClickTest = viewModel::triggerSingleClickTest,
+                            onStartAutoClick = viewModel::startAutoClick,
+                            onStopAutoClick = { viewModel.stopAutoClick() }
                         )
 
                         VpnTestingPanel(
@@ -298,7 +328,9 @@ fun WebVisitTesterApp(
                             onCanGoBackChanged = viewModel::updateCanGoBack,
                             onScrollStatusChanged = viewModel::updateScrollStatus,
                             onBlockedOrError = viewModel::onPreviewBlockedOrError,
-                            onOpenExternal = openWebsiteInBrowser
+                            onOpenExternal = openWebsiteInBrowser,
+                            onTargetsScanned = viewModel::onClickTargetsScanned,
+                            onClickExecuted = viewModel::onSingleClickExecuted
                         )
                     }
                 }
@@ -1044,6 +1076,246 @@ private fun VpnTestingPanel(
                     uncheckedTrackColor = MidnightDeep.copy(alpha = 0.6f)
                 ),
                 modifier = Modifier.testTag("require_vpn_switch")
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClicksAutomationPanel(
+    uiState: WebVisitUiState,
+    onAuthorizedChanged: (Boolean) -> Unit,
+    onSelectorChanged: (String) -> Unit,
+    onSelectTarget: (ClickTargetItem) -> Unit,
+    onScanTargets: () -> Unit,
+    onClickIntervalChanged: (Int) -> Unit,
+    onSingleClickTest: () -> Unit,
+    onStartAutoClick: () -> Unit,
+    onStopAutoClick: () -> Unit
+) {
+    val clickBadgeColor = when (uiState.clickStatus) {
+        ClickTestStatus.RUNNING -> EmeraldSuccess
+        ClickTestStatus.BLOCKED_AD, ClickTestStatus.RESTRICTED -> CoralDanger
+        ClickTestStatus.STOPPED, ClickTestStatus.NO_TARGET -> AmberWarning
+        ClickTestStatus.IDLE -> ElectricCyan
+    }
+
+    LiquidGlassPanel(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.TouchApp,
+                    contentDescription = null,
+                    tint = LuminousPurple,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = stringResource(R.string.label_click_module),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = clickBadgeColor.copy(alpha = 0.14f),
+                border = BorderStroke(1.dp, clickBadgeColor.copy(alpha = 0.45f)),
+                modifier = Modifier.testTag("click_counter_badge")
+            ) {
+                Text(
+                    text = "Clicks: ${uiState.clickCount} • ${uiState.clickStatus.label}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = clickBadgeColor,
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Authorized Own Site / Test Page",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = TextPrimary
+                )
+                Text(
+                    text = "Ads & sponsored clicks are strictly blocked",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = uiState.isAuthorizedOwnSite,
+                onCheckedChange = onAuthorizedChanged,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MidnightDeep,
+                    checkedTrackColor = ElectricCyan,
+                    uncheckedThumbColor = TextMuted,
+                    uncheckedTrackColor = MidnightDeep.copy(alpha = 0.6f)
+                ),
+                modifier = Modifier.testTag("authorized_site_switch")
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        OutlinedTextField(
+            value = uiState.clickSelector,
+            onValueChange = onSelectorChanged,
+            enabled = !uiState.isAutoClickRunning,
+            singleLine = true,
+            placeholder = {
+                Text(
+                    text = "CSS selector (e.g. #submit-btn, .cta)",
+                    color = TextMuted
+                )
+            },
+            shape = RoundedCornerShape(14.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = LuminousPurple,
+                unfocusedBorderColor = GlassStrokeViolet,
+                focusedContainerColor = MidnightDeep.copy(alpha = 0.65f),
+                unfocusedContainerColor = MidnightDeep.copy(alpha = 0.50f),
+                disabledContainerColor = MidnightDeep.copy(alpha = 0.35f),
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary,
+                disabledTextColor = TextSecondary
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("click_selector_input")
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            GlassActionButton(
+                text = if (uiState.isScanningTargets) "Scanning..." else stringResource(R.string.btn_scan_targets),
+                icon = Icons.Rounded.Search,
+                onClick = onScanTargets,
+                enabled = !uiState.isScanningTargets && !uiState.isAutoClickRunning,
+                accentColor = ElectricCyan,
+                testTag = "scan_targets_button",
+                modifier = Modifier.weight(1f)
+            )
+            GlassActionButton(
+                text = stringResource(R.string.btn_single_click),
+                icon = Icons.Rounded.TouchApp,
+                onClick = onSingleClickTest,
+                enabled = !uiState.isAutoClickRunning,
+                accentColor = LuminousPurple,
+                testTag = "single_click_test_button",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (uiState.discoveredClickTargets.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                uiState.discoveredClickTargets.forEachIndexed { idx, item ->
+                    val selected = uiState.clickSelector == item.selector
+                    val shape = RoundedCornerShape(10.dp)
+                    Box(
+                        modifier = Modifier
+                            .clip(shape)
+                            .background(
+                                if (selected) LuminousPurple.copy(alpha = 0.24f)
+                                else MidnightDeep.copy(alpha = 0.52f)
+                            )
+                            .border(
+                                1.dp,
+                                if (selected) LuminousPurple.copy(alpha = 0.65f) else GlassStrokeSubtle,
+                                shape
+                            )
+                            .clickable(enabled = !uiState.isAutoClickRunning) { onSelectTarget(item) }
+                            .padding(horizontal = 10.dp, vertical = 7.dp)
+                            .testTag("click_target_chip_$idx"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${item.tagType}: ${item.label}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (selected) TextPrimary else TextSecondary,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        DurationStepperRow(
+            label = stringResource(R.string.label_click_interval),
+            valueText = "${uiState.clickIntervalSec}s",
+            presets = listOf("1s" to 1, "2s" to 2, "5s" to 5, "10s" to 10),
+            currentValue = uiState.clickIntervalSec,
+            enabled = !uiState.isAutoClickRunning,
+            onDecrement = { onClickIntervalChanged(uiState.clickIntervalSec - 1) },
+            onIncrement = { onClickIntervalChanged(uiState.clickIntervalSec + 1) },
+            onPresetSelected = onClickIntervalChanged,
+            testTagPrefix = "click_interval"
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            GlassActionButton(
+                text = stringResource(R.string.btn_start_click),
+                icon = Icons.Rounded.PlayArrow,
+                onClick = onStartAutoClick,
+                enabled = !uiState.isAutoClickRunning,
+                accentColor = EmeraldSuccess,
+                testTag = "start_click_button",
+                modifier = Modifier.weight(1f)
+            )
+            GlassActionButton(
+                text = stringResource(R.string.btn_stop_click),
+                icon = Icons.Rounded.Stop,
+                onClick = onStopAutoClick,
+                enabled = uiState.isAutoClickRunning,
+                accentColor = CoralDanger,
+                testTag = "stop_click_button",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        uiState.clickStatusMessage?.let { msg ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = msg,
+                style = MaterialTheme.typography.labelSmall,
+                color = when (uiState.clickStatus) {
+                    ClickTestStatus.BLOCKED_AD, ClickTestStatus.RESTRICTED -> CoralDanger
+                    ClickTestStatus.RUNNING -> EmeraldSuccess
+                    ClickTestStatus.STOPPED, ClickTestStatus.NO_TARGET -> AmberWarning
+                    ClickTestStatus.IDLE -> ElectricCyan
+                }
             )
         }
     }

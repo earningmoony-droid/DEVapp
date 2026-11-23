@@ -25,6 +25,12 @@
     <string name="btn_vpn_connect">Connect VPN</string>
     <string name="btn_vpn_disconnect">Disconnect</string>
     <string name="btn_vpn_verify">Verify</string>
+    <string name="label_click_module">Clicks Automation</string>
+    <string name="btn_start_click">Start Click</string>
+    <string name="btn_stop_click">Stop Click</string>
+    <string name="btn_single_click">1x Test</string>
+    <string name="btn_scan_targets">Scan Targets</string>
+    <string name="label_click_interval">Click Interval</string>
     <string name="nav_back">Back</string>
     <string name="nav_home">Home</string>
     <string name="nav_reload">Reload</string>

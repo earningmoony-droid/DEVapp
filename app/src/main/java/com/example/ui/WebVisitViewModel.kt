@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.AutoScrollDirection
+import com.example.model.ClickTargetItem
+import com.example.model.ClickTestStatus
 import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
@@ -44,6 +46,17 @@ data class WebVisitUiState(
     val vpnActionMessage: String? = null,
     val isVerifyingVpn: Boolean = false,
 
+    // Clicks Automation (temporary in-memory state only, no history/logs)
+    val clickIntervalSec: Int = 2,
+    val clickSelector: String = "",
+    val discoveredClickTargets: List<ClickTargetItem> = emptyList(),
+    val isScanningTargets: Boolean = false,
+    val isAutoClickRunning: Boolean = false,
+    val clickCount: Int = 0,
+    val clickStatus: ClickTestStatus = ClickTestStatus.IDLE,
+    val clickStatusMessage: String? = null,
+    val isAuthorizedOwnSite: Boolean = false,
+
     // Temporary active session state only
     val isRunning: Boolean = false,
     val status: TestSessionStatus = TestSessionStatus.IDLE,
@@ -68,6 +81,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     val uiState: StateFlow<WebVisitUiState> = _uiState.asStateFlow()
 
     private var queueJob: Job? = null
+    private var autoClickJob: Job? = null
     private var commandSeq: Long = 0L
     private var wasVpnActive: Boolean = false
 
@@ -241,6 +255,283 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         _uiState.update { it.copy(autoNextEnabled = enabled) }
     }
 
+    // --- Clicks Automation Controls (Strictly for authorized own sites / test pages, zero ads) ---
+
+    fun setAuthorizedOwnSite(authorized: Boolean) {
+        if (!authorized && _uiState.value.isAutoClickRunning) {
+            stopAutoClick("Stopped: Authorization unchecked.")
+        }
+        _uiState.update {
+            it.copy(
+                isAuthorizedOwnSite = authorized,
+                clickStatusMessage = if (authorized) null else it.clickStatusMessage
+            )
+        }
+    }
+
+    fun onClickSelectorChanged(selector: String) {
+        _uiState.update {
+            it.copy(
+                clickSelector = selector,
+                clickStatusMessage = null
+            )
+        }
+    }
+
+    fun selectDiscoveredTarget(target: ClickTargetItem) {
+        _uiState.update {
+            it.copy(
+                clickSelector = target.selector,
+                clickStatusMessage = "Selected: ${target.label}"
+            )
+        }
+    }
+
+    fun updateClickInterval(seconds: Int) {
+        if (_uiState.value.isAutoClickRunning) return
+        _uiState.update { it.copy(clickIntervalSec = seconds.coerceIn(1, 60)) }
+    }
+
+    fun scanClickTargets() {
+        val state = _uiState.value
+        if (state.activeUrl == null || state.previewBlockedReason != null || state.status == TestSessionStatus.PAUSING_BETWEEN) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.RESTRICTED,
+                    clickStatusMessage = "Load your website preview first before scanning buttons or links."
+                )
+            }
+            return
+        }
+        _uiState.update {
+            it.copy(
+                isScanningTargets = true,
+                clickStatusMessage = null,
+                webCommand = WebCommandEvent(++commandSeq, WebCommandType.SCAN_CLICK_TARGETS)
+            )
+        }
+    }
+
+    fun onClickTargetsScanned(targets: List<ClickTargetItem>, errorMsg: String?) {
+        _uiState.update { state ->
+            val currentStillValid = targets.any { it.selector == state.clickSelector }
+            state.copy(
+                isScanningTargets = false,
+                discoveredClickTargets = targets,
+                clickSelector = when {
+                    state.clickSelector.isNotBlank() && currentStillValid -> state.clickSelector
+                    state.clickSelector.isBlank() && targets.isNotEmpty() -> targets.first().selector
+                    else -> state.clickSelector
+                },
+                clickStatus = when {
+                    errorMsg != null -> ClickTestStatus.RESTRICTED
+                    targets.isEmpty() -> ClickTestStatus.NO_TARGET
+                    else -> if (state.isAutoClickRunning) ClickTestStatus.RUNNING else ClickTestStatus.IDLE
+                },
+                clickStatusMessage = errorMsg ?: if (targets.isEmpty()) {
+                    "No safe buttons or links found on this view."
+                } else {
+                    "Found ${targets.size} safe button/link target(s)."
+                }
+            )
+        }
+    }
+
+    private fun isProhibitedAdSelector(selector: String): Boolean {
+        val lower = selector.lowercase()
+        val blockedTokens = listOf(
+            "adsbygoogle", "doubleclick", "googlesyndication", "adservice",
+            "adsystem", "adserver", "adnxs", "taboola", "outbrain", "mgid",
+            "sponsored", "advertisement", "ad-slot", "ad_slot", "ad-banner",
+            "ad_banner", "google_ads", "data-ad"
+        )
+        return blockedTokens.any { lower.contains(it) }
+    }
+
+    fun triggerSingleClickTest() {
+        val state = _uiState.value
+        if (!state.isAuthorizedOwnSite) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.RESTRICTED,
+                    clickStatusMessage = "Confirm this is your own website or authorized test page first."
+                )
+            }
+            return
+        }
+        if (state.activeUrl == null || state.previewBlockedReason != null || state.status == TestSessionStatus.PAUSING_BETWEEN) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.RESTRICTED,
+                    clickStatusMessage = "Start a test session so the website preview is loaded."
+                )
+            }
+            return
+        }
+        val selector = state.clickSelector.trim()
+        if (selector.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.NO_TARGET,
+                    clickStatusMessage = "Scan targets or enter a button/link selector."
+                )
+            }
+            return
+        }
+        if (isProhibitedAdSelector(selector)) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.BLOCKED_AD,
+                    clickStatusMessage = "Blocked: Ad elements and CTR manipulation are prohibited."
+                )
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                clickStatusMessage = null,
+                webCommand = WebCommandEvent(++commandSeq, WebCommandType.EXECUTE_SINGLE_CLICK, selector = selector)
+            )
+        }
+    }
+
+    fun startAutoClick() {
+        val state = _uiState.value
+        if (state.isAutoClickRunning) return
+        if (!state.isAuthorizedOwnSite) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.RESTRICTED,
+                    clickStatusMessage = "Confirm this is your own website or authorized test page first."
+                )
+            }
+            return
+        }
+        if (state.activeUrl == null || state.previewBlockedReason != null || state.status == TestSessionStatus.PAUSING_BETWEEN) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.RESTRICTED,
+                    clickStatusMessage = "Start a test session so the website preview is loaded."
+                )
+            }
+            return
+        }
+        val selector = state.clickSelector.trim()
+        if (selector.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.NO_TARGET,
+                    clickStatusMessage = "Select or enter a target button/link before starting Auto Click."
+                )
+            }
+            return
+        }
+        if (isProhibitedAdSelector(selector)) {
+            _uiState.update {
+                it.copy(
+                    clickStatus = ClickTestStatus.BLOCKED_AD,
+                    clickStatusMessage = "Blocked: Ad elements and artificial clicks are strictly prohibited."
+                )
+            }
+            return
+        }
+
+        val intervalMs = state.clickIntervalSec.coerceIn(1, 60) * 1000L
+        _uiState.update {
+            it.copy(
+                isAutoClickRunning = true,
+                clickStatus = ClickTestStatus.RUNNING,
+                clickStatusMessage = "Auto Click active every ${state.clickIntervalSec}s"
+            )
+        }
+
+        autoClickJob?.cancel()
+        autoClickJob = viewModelScope.launch {
+            while (_uiState.value.isAutoClickRunning) {
+                val cur = _uiState.value
+                if (!cur.isAuthorizedOwnSite ||
+                    cur.activeUrl == null ||
+                    cur.previewBlockedReason != null
+                ) {
+                    stopAutoClick("Auto Click stopped: Preview not active.")
+                    break
+                }
+                if (cur.status != TestSessionStatus.PAUSING_BETWEEN && !cur.isPreviewLoading) {
+                    _uiState.update {
+                        it.copy(
+                            webCommand = WebCommandEvent(
+                                id = ++commandSeq,
+                                type = WebCommandType.EXECUTE_SINGLE_CLICK,
+                                selector = cur.clickSelector.trim()
+                            )
+                        )
+                    }
+                }
+                delay(intervalMs)
+            }
+        }
+    }
+
+    fun stopAutoClick(reason: String? = "Auto Click stopped.") {
+        autoClickJob?.cancel()
+        autoClickJob = null
+        _uiState.update {
+            it.copy(
+                isAutoClickRunning = false,
+                clickStatus = ClickTestStatus.STOPPED,
+                clickStatusMessage = reason
+            )
+        }
+    }
+
+    fun onSingleClickExecuted(resultCode: String, detail: String?) {
+        when (resultCode) {
+            "CLICKED" -> {
+                _uiState.update {
+                    it.copy(
+                        clickCount = it.clickCount + 1,
+                        clickStatus = if (it.isAutoClickRunning) ClickTestStatus.RUNNING else ClickTestStatus.IDLE,
+                        clickStatusMessage = detail ?: "Tested button/link click (${it.clickCount + 1})."
+                    )
+                }
+            }
+            "BLOCKED_AD" -> {
+                autoClickJob?.cancel()
+                autoClickJob = null
+                _uiState.update {
+                    it.copy(
+                        isAutoClickRunning = false,
+                        clickStatus = ClickTestStatus.BLOCKED_AD,
+                        clickStatusMessage = "Blocked: Clicking ads or sponsored elements is strictly prohibited."
+                    )
+                }
+            }
+            "NO_TARGET" -> {
+                autoClickJob?.cancel()
+                autoClickJob = null
+                _uiState.update {
+                    it.copy(
+                        isAutoClickRunning = false,
+                        clickStatus = ClickTestStatus.NO_TARGET,
+                        clickStatusMessage = "Selected button/link was not found on the current view."
+                    )
+                }
+            }
+            else -> {
+                autoClickJob?.cancel()
+                autoClickJob = null
+                _uiState.update {
+                    it.copy(
+                        isAutoClickRunning = false,
+                        clickStatus = ClickTestStatus.RESTRICTED,
+                        clickStatusMessage = detail ?: "Click blocked by page security restrictions."
+                    )
+                }
+            }
+        }
+    }
+
     fun startTest() {
         val state = _uiState.value
         if (state.isRunning) return
@@ -410,6 +701,9 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
+        autoClickJob?.cancel()
+        autoClickJob = null
+
         _uiState.update {
             it.copy(
                 isRunning = false,
@@ -420,6 +714,11 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 canGoBack = false,
                 scrollDirection = AutoScrollDirection.NONE,
                 scrollStatus = ScrollIndicatorState.IDLE,
+                isAutoClickRunning = false,
+                clickCount = 0,
+                discoveredClickTargets = emptyList(),
+                clickStatus = ClickTestStatus.IDLE,
+                clickStatusMessage = null,
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
             )
         }
@@ -428,6 +727,8 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     private fun stopTestForVpnLoss() {
         queueJob?.cancel()
         queueJob = null
+        autoClickJob?.cancel()
+        autoClickJob = null
 
         _uiState.update {
             it.copy(
@@ -442,6 +743,11 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 canGoBack = false,
                 scrollDirection = AutoScrollDirection.NONE,
                 scrollStatus = ScrollIndicatorState.STOPPED,
+                isAutoClickRunning = false,
+                clickCount = 0,
+                discoveredClickTargets = emptyList(),
+                clickStatus = ClickTestStatus.IDLE,
+                clickStatusMessage = null,
                 vpnStatus = VpnConnectionStatus.LOST,
                 vpnInterfaceName = null,
                 vpnActionMessage = "Test stopped: VPN connectivity was lost.",
@@ -453,6 +759,8 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     fun stopTest() {
         queueJob?.cancel()
         queueJob = null
+        autoClickJob?.cancel()
+        autoClickJob = null
 
         _uiState.update {
             it.copy(
@@ -467,6 +775,11 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 canGoBack = false,
                 scrollDirection = AutoScrollDirection.NONE,
                 scrollStatus = ScrollIndicatorState.STOPPED,
+                isAutoClickRunning = false,
+                clickCount = 0,
+                discoveredClickTargets = emptyList(),
+                clickStatus = ClickTestStatus.IDLE,
+                clickStatusMessage = null,
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
             )
         }
@@ -546,6 +859,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     override fun onCleared() {
         super.onCleared()
         queueJob?.cancel()
+        autoClickJob?.cancel()
         vpnMonitor.release()
     }
 }

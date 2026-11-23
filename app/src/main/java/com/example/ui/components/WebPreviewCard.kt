@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.R
 import com.example.model.AutoScrollDirection
+import com.example.model.ClickTargetItem
 import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
@@ -110,6 +111,8 @@ fun WebPreviewCard(
     onScrollStatusChanged: (ScrollIndicatorState) -> Unit,
     onBlockedOrError: (String) -> Unit,
     onOpenExternal: (String) -> Unit,
+    onTargetsScanned: (List<ClickTargetItem>, String?) -> Unit,
+    onClickExecuted: (String, String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var webProgress by remember { mutableIntStateOf(0) }
@@ -212,6 +215,30 @@ fun WebPreviewCard(
                     wv.loadUrl("about:blank")
                 }
                 lastLoadedToken = -1
+            }
+            WebCommandType.SCAN_CLICK_TARGETS -> {
+                if (wv == null) {
+                    onTargetsScanned(emptyList(), "Preview WebView is not ready.")
+                } else {
+                    wv.evaluateJavascript(buildScanClickablesScript()) { raw ->
+                        val parsed = parseScannedTargets(raw)
+                        onTargetsScanned(parsed.first, parsed.second)
+                    }
+                }
+            }
+            WebCommandType.EXECUTE_SINGLE_CLICK -> {
+                val selector = cmd.selector.orEmpty()
+                if (wv == null || selector.isBlank()) {
+                    onClickExecuted("NO_TARGET", "Preview or target selector unavailable.")
+                } else {
+                    wv.evaluateJavascript(buildSafeClickScript(selector)) { raw ->
+                        val decoded = decodeJsString(raw)
+                        val parts = decoded.split("::", limit = 2)
+                        val code = parts.firstOrNull().orEmpty().ifBlank { "RESTRICTED" }
+                        val detail = parts.getOrNull(1)?.takeIf { it.isNotBlank() }
+                        onClickExecuted(code, detail)
+                    }
+                }
             }
         }
         onConsumeCommand(cmd.id)
@@ -631,6 +658,155 @@ private fun buildPreviewScrollScript(delta: Int): String {
           }
         })();
     """.trimIndent()
+}
+
+private const val AD_GUARD_JS = """
+  function isProhibitedAdElement(el) {
+    if (!el) return true;
+    var adPattern = /(adsbygoogle|doubleclick|googlesyndication|adservice|adsystem|adserver|adnxs|taboola|outbrain|mgid|sponsored|advertisement|ad-slot|ad_slot|ad-banner|ad_banner|google_ads)/i;
+    var cur = el;
+    var depth = 0;
+    while (cur && depth < 6) {
+      if (cur.tagName && cur.tagName.toLowerCase() === 'ins') return true;
+      var attrs = [
+        cur.id || '',
+        typeof cur.className === 'string' ? cur.className : '',
+        cur.getAttribute ? (cur.getAttribute('href') || '') : '',
+        cur.getAttribute ? (cur.getAttribute('src') || '') : '',
+        cur.getAttribute ? (cur.getAttribute('aria-label') || '') : '',
+        cur.getAttribute ? (cur.getAttribute('data-ad-client') || '') : '',
+        cur.getAttribute ? (cur.getAttribute('data-ad-slot') || '') : ''
+      ].join(' ');
+      if (adPattern.test(attrs)) return true;
+      cur = cur.parentElement;
+      depth++;
+    }
+    return false;
+  }
+"""
+
+private fun buildScanClickablesScript(): String {
+    return """
+        (function() {
+          try {
+            $AD_GUARD_JS
+            function buildSelector(el) {
+              if (el.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(el.id)) {
+                return '#' + el.id;
+              }
+              var testId = el.getAttribute('data-testid');
+              if (testId) {
+                return el.tagName.toLowerCase() + '[data-testid="' + testId.replace(/"/g, '\\"') + '"]';
+              }
+              var parts = [];
+              var cur = el;
+              while (cur && cur.nodeType === 1 && cur.tagName.toLowerCase() !== 'html') {
+                var tag = cur.tagName.toLowerCase();
+                if (cur.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(cur.id)) {
+                  parts.unshift('#' + cur.id);
+                  break;
+                }
+                var sib = cur;
+                var idx = 1;
+                while (sib.previousElementSibling) {
+                  sib = sib.previousElementSibling;
+                  if (sib.tagName === cur.tagName) idx++;
+                }
+                parts.unshift(tag + ':nth-of-type(' + idx + ')');
+                cur = cur.parentElement;
+                if (parts.length >= 4) break;
+              }
+              return parts.join(' > ');
+            }
+            var nodes = document.querySelectorAll('button, a[href], [role="button"], input[type="button"], input[type="submit"]');
+            var results = [];
+            var seen = {};
+            for (var i = 0; i < nodes.length && results.length < 18; i++) {
+              var el = nodes[i];
+              var rect = el.getBoundingClientRect();
+              if (rect.width < 2 || rect.height < 2) continue;
+              if (isProhibitedAdElement(el)) continue;
+              var sel = buildSelector(el);
+              if (!sel || seen[sel]) continue;
+              seen[sel] = true;
+              var txt = (el.innerText || el.value || el.getAttribute('aria-label') || el.tagName).replace(/\s+/g, ' ').trim();
+              if (!txt) txt = el.tagName.toLowerCase();
+              if (txt.length > 26) txt = txt.slice(0, 26) + '...';
+              results.push({
+                selector: sel,
+                label: txt,
+                tagType: el.tagName.toLowerCase()
+              });
+            }
+            return JSON.stringify(results);
+          } catch (e) {
+            return 'ERROR:' + (e && e.message ? e.message : 'scan failed');
+          }
+        })();
+    """.trimIndent()
+}
+
+private fun buildSafeClickScript(rawSelector: String): String {
+    val quotedSelector = org.json.JSONObject.quote(rawSelector)
+    return """
+        (function() {
+          try {
+            $AD_GUARD_JS
+            var sel = $quotedSelector;
+            if (/(adsbygoogle|doubleclick|googlesyndication|adservice|adsystem|adserver|adnxs|taboola|outbrain|mgid|sponsored|advertisement|ad-slot|ad_slot|ad-banner|ad_banner|google_ads|data-ad)/i.test(sel)) {
+              return 'BLOCKED_AD::Blocked ad-related selector.';
+            }
+            var el = document.querySelector(sel);
+            if (!el) return 'NO_TARGET::Target element not found on current page.';
+            if (isProhibitedAdElement(el)) {
+              return 'BLOCKED_AD::Blocked ad or sponsored element.';
+            }
+            if (el.scrollIntoView) {
+              el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+            var prevOutline = el.style.outline;
+            el.style.outline = '2px solid #38BDF8';
+            setTimeout(function() { try { el.style.outline = prevOutline; } catch (_) {} }, 350);
+            el.click();
+            var label = (el.innerText || el.value || el.getAttribute('aria-label') || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 24);
+            return 'CLICKED::Tested click on "' + (label || el.tagName.toLowerCase()) + '"';
+          } catch (e) {
+            return 'RESTRICTED::' + (e && e.message ? e.message : 'Unable to execute click');
+          }
+        })();
+    """.trimIndent()
+}
+
+private fun decodeJsString(raw: String?): String {
+    if (raw.isNullOrBlank() || raw == "null") return ""
+    return runCatching {
+        org.json.JSONArray("[$raw]").optString(0, raw.trim('"'))
+    }.getOrDefault(raw.trim('"'))
+}
+
+private fun parseScannedTargets(raw: String?): Pair<List<ClickTargetItem>, String?> {
+    val decoded = decodeJsString(raw)
+    if (decoded.startsWith("ERROR:")) {
+        return emptyList<ClickTargetItem>() to decoded.removePrefix("ERROR:")
+    }
+    if (decoded.isBlank() || !decoded.trimStart().startsWith("[")) {
+        return emptyList<ClickTargetItem>() to null
+    }
+    return runCatching {
+        val arr = org.json.JSONArray(decoded)
+        val list = buildList {
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val selector = obj.optString("selector")
+                val label = obj.optString("label")
+                val tagType = obj.optString("tagType", "button")
+                if (selector.isNotBlank() && label.isNotBlank()) {
+                    add(ClickTargetItem(selector = selector, label = label, tagType = tagType))
+                }
+            }
+        }
+        list to null
+    }.getOrElse { emptyList<ClickTargetItem>() to "Could not parse scanned buttons/links." }
 }
 
 @Composable

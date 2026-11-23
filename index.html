@@ -656,6 +656,96 @@
     .vpn-info-err {
       color: var(--coral);
     }
+
+    .click-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      background: rgba(56, 189, 248, 0.14);
+      color: var(--cyan);
+      white-space: nowrap;
+    }
+
+    .click-actions-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .btn-click-scan {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: rgba(56, 189, 248, 0.45);
+      color: #e0f2fe;
+      min-height: 44px;
+      font-size: 0.78rem;
+    }
+
+    .btn-click-once {
+      background: rgba(168, 85, 247, 0.16);
+      border-color: rgba(168, 85, 247, 0.45);
+      color: #f3e8ff;
+      min-height: 44px;
+      font-size: 0.78rem;
+    }
+
+    .btn-click-start {
+      background: rgba(52, 211, 153, 0.16);
+      border-color: rgba(52, 211, 153, 0.45);
+      color: #d1fae5;
+      min-height: 44px;
+      font-size: 0.8rem;
+    }
+
+    .btn-click-stop {
+      background: rgba(251, 113, 133, 0.16);
+      border-color: rgba(251, 113, 133, 0.45);
+      color: #fecdd3;
+      min-height: 44px;
+      font-size: 0.8rem;
+    }
+
+    .target-chips-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 10px;
+    }
+
+    .target-chip {
+      flex-shrink: 0;
+      min-height: 34px;
+      padding: 0 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(6, 9, 26, 0.55);
+      color: var(--text-secondary);
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .target-chip.active {
+      background: rgba(168, 85, 247, 0.24);
+      border-color: rgba(168, 85, 247, 0.65);
+      color: var(--text-primary);
+    }
+
+    .click-interval-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: rgba(6, 9, 26, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-md);
+      padding: 8px 12px;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
@@ -761,6 +851,66 @@
               <input type="checkbox" id="autoNextToggle" checked />
               <span class="slider"></span>
             </label>
+          </div>
+        </section>
+
+        <section class="glass-panel" aria-label="Clicks Automation">
+          <div class="vpn-header">
+            <div class="vpn-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 11V6a3 3 0 0 1 6 0v5"></path>
+                <path d="M12 11v9"></path>
+                <path d="M5 13a7 7 0 0 0 14 0"></path>
+              </svg>
+              <span>Clicks Automation</span>
+            </div>
+            <span class="click-badge" id="clickCounterBadge">Clicks: 0 • Idle</span>
+          </div>
+
+          <div class="toggle-row" style="border-top: none; padding-top: 0; margin-bottom: 10px;">
+            <div>
+              <div class="toggle-label">Authorized Own Site / Test Page</div>
+              <div class="toggle-sub">Ads &amp; sponsored clicks are strictly blocked</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="authorizedSiteToggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="field-group" style="margin-bottom: 8px;">
+            <div class="url-row">
+              <input
+                id="clickSelectorInput"
+                class="url-input"
+                type="text"
+                autocomplete="off"
+                placeholder="CSS selector (e.g. #submit-btn, .cta)"
+              />
+            </div>
+          </div>
+
+          <div class="click-actions-row">
+            <button type="button" class="btn btn-click-scan" id="scanTargetsBtn">Scan Targets</button>
+            <button type="button" class="btn btn-click-once" id="singleClickBtn">1x Test</button>
+          </div>
+
+          <div class="target-chips-row" id="clickTargetChips" style="display: none;"></div>
+
+          <div class="click-interval-row">
+            <label for="clickIntervalInput" class="toggle-label">Click Interval (s)</label>
+            <input id="clickIntervalInput" class="num-input" style="width: 72px; text-align: right;" type="number" min="1" max="60" value="2" />
+          </div>
+
+          <div class="click-actions-row">
+            <button type="button" class="btn btn-click-start" id="startClickBtn">Start Click</button>
+            <button type="button" class="btn btn-click-stop" id="stopClickBtn" disabled>Stop Click</button>
+          </div>
+
+          <div class="vpn-info-box" style="margin-bottom: 0;">
+            <div class="toggle-sub" id="clickStatusMsg">
+              Works on your own loaded preview page (same-origin iframe). Never used for ad clicking or artificial CTR.
+            </div>
           </div>
         </section>
 
@@ -880,6 +1030,17 @@
       const vpnVerifyResult = document.getElementById("vpnVerifyResult");
       const requireVpnToggle = document.getElementById("requireVpnToggle");
 
+      const clickCounterBadge = document.getElementById("clickCounterBadge");
+      const authorizedSiteToggle = document.getElementById("authorizedSiteToggle");
+      const clickSelectorInput = document.getElementById("clickSelectorInput");
+      const scanTargetsBtn = document.getElementById("scanTargetsBtn");
+      const singleClickBtn = document.getElementById("singleClickBtn");
+      const clickTargetChips = document.getElementById("clickTargetChips");
+      const clickIntervalInput = document.getElementById("clickIntervalInput");
+      const startClickBtn = document.getElementById("startClickBtn");
+      const stopClickBtn = document.getElementById("stopClickBtn");
+      const clickStatusMsg = document.getElementById("clickStatusMsg");
+
       const startBtn = document.getElementById("startBtn");
       const stopBtn = document.getElementById("stopBtn");
       const backBtn = document.getElementById("backBtn");
@@ -916,6 +1077,11 @@
         scrollStatusColor: "#94a3b8",
         autoNext: true,
         selectedVpnProvider: "Android System VPN",
+        autoClickRunning: false,
+        autoClickTimerId: null,
+        clickCount: 0,
+        clickStatusLabel: "Idle",
+        discoveredTargets: [],
         phase: "idle", // idle | loading | viewing | cooldown | blocked | completed | stopped
         phaseRemaining: 0,
         activeUrl: "",
@@ -1235,13 +1401,173 @@
         backBtn.disabled = !hasActive;
         homeBtn.disabled = !session.activeUrl;
         reloadBtn.disabled = !hasActive;
+
+        clickCounterBadge.textContent = `Clicks: ${session.clickCount} • ${session.clickStatusLabel}`;
+        clickSelectorInput.disabled = session.autoClickRunning;
+        clickIntervalInput.disabled = session.autoClickRunning;
+        scanTargetsBtn.disabled = session.autoClickRunning;
+        singleClickBtn.disabled = session.autoClickRunning;
+        startClickBtn.disabled = session.autoClickRunning;
+        stopClickBtn.disabled = !session.autoClickRunning;
+      }
+
+      const AD_SELECTOR_REGEX = /(adsbygoogle|doubleclick|googlesyndication|adservice|adsystem|adserver|adnxs|taboola|outbrain|mgid|sponsored|advertisement|ad-slot|ad_slot|ad-banner|ad_banner|google_ads|data-ad)/i;
+
+      function isProhibitedAdElement(el) {
+        if (!el) return true;
+        let cur = el;
+        let depth = 0;
+        while (cur && depth < 6) {
+          if (cur.tagName && cur.tagName.toLowerCase() === "ins") return true;
+          const attrs = [
+            cur.id || "",
+            typeof cur.className === "string" ? cur.className : "",
+            cur.getAttribute ? (cur.getAttribute("href") || "") : "",
+            cur.getAttribute ? (cur.getAttribute("src") || "") : "",
+            cur.getAttribute ? (cur.getAttribute("aria-label") || "") : "",
+            cur.getAttribute ? (cur.getAttribute("data-ad-client") || "") : "",
+            cur.getAttribute ? (cur.getAttribute("data-ad-slot") || "") : ""
+          ].join(" ");
+          if (AD_SELECTOR_REGEX.test(attrs)) return true;
+          cur = cur.parentElement;
+          depth += 1;
+        }
+        return false;
+      }
+
+      function buildCssSelector(el) {
+        if (el.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(el.id)) {
+          return `#${el.id}`;
+        }
+        const testId = el.getAttribute && el.getAttribute("data-testid");
+        if (testId) {
+          return `${el.tagName.toLowerCase()}[data-testid="${testId.replace(/"/g, '\\"')}"]`;
+        }
+        const parts = [];
+        let cur = el;
+        while (cur && cur.nodeType === 1 && cur.tagName.toLowerCase() !== "html") {
+          const tag = cur.tagName.toLowerCase();
+          if (cur.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(cur.id)) {
+            parts.unshift(`#${cur.id}`);
+            break;
+          }
+          let sib = cur;
+          let idx = 1;
+          while (sib.previousElementSibling) {
+            sib = sib.previousElementSibling;
+            if (sib.tagName === cur.tagName) idx += 1;
+          }
+          parts.unshift(`${tag}:nth-of-type(${idx})`);
+          cur = cur.parentElement;
+          if (parts.length >= 4) break;
+        }
+        return parts.join(" > ");
+      }
+
+      function setClickFeedback(label, color, msg, className) {
+        session.clickStatusLabel = label;
+        clickCounterBadge.style.color = color;
+        clickCounterBadge.style.borderColor = color;
+        clickStatusMsg.className = className;
+        clickStatusMsg.textContent = msg;
+        updateUI();
+      }
+
+      function renderTargetChips() {
+        clickTargetChips.innerHTML = "";
+        if (!session.discoveredTargets.length) {
+          clickTargetChips.style.display = "none";
+          return;
+        }
+        clickTargetChips.style.display = "flex";
+        session.discoveredTargets.forEach((item) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "target-chip" + (clickSelectorInput.value.trim() === item.selector ? " active" : "");
+          btn.textContent = `${item.tagType}: ${item.label}`;
+          btn.addEventListener("click", () => {
+            if (session.autoClickRunning) return;
+            clickSelectorInput.value = item.selector;
+            renderTargetChips();
+            setClickFeedback("Idle", "#38bdf8", `Selected "${item.label}" (${item.selector}).`, "vpn-info-ok");
+          });
+          clickTargetChips.appendChild(btn);
+        });
+      }
+
+      function stopAutoClick(reason = "Auto Click stopped.", color = "#fbbf24", statusLabel = "Stopped") {
+        if (session.autoClickTimerId) {
+          clearInterval(session.autoClickTimerId);
+          session.autoClickTimerId = null;
+        }
+        session.autoClickRunning = false;
+        setClickFeedback(statusLabel, color, reason, statusLabel === "Ad Blocked" || statusLabel === "Restricted" ? "vpn-info-err" : "vpn-info-warn");
+      }
+
+      function executeSafeClickOnce() {
+        if (!authorizedSiteToggle.checked) {
+          stopAutoClick("Confirm this is your own website or authorized test page first.", "#fb7185", "Restricted");
+          return false;
+        }
+        const selector = (clickSelectorInput.value || "").trim();
+        if (!selector) {
+          stopAutoClick("Enter a CSS selector or scan targets first.", "#fbbf24", "No Target");
+          return false;
+        }
+        if (AD_SELECTOR_REGEX.test(selector)) {
+          stopAutoClick("Blocked: Clicking ads or CTR manipulation is strictly prohibited.", "#fb7185", "Ad Blocked");
+          return false;
+        }
+        const access = getAccessibleIframeDocument();
+        if (!access) {
+          stopAutoClick("Preview unavailable or cross-origin restricted (use native Android app for external sites).", "#fb7185", "Restricted");
+          return false;
+        }
+        try {
+          const el = access.doc.querySelector(selector);
+          if (!el) {
+            stopAutoClick("Selected button/link was not found on the current preview.", "#fbbf24", "No Target");
+            return false;
+          }
+          if (isProhibitedAdElement(el)) {
+            stopAutoClick("Blocked: Ad or sponsored elements cannot be clicked.", "#fb7185", "Ad Blocked");
+            return false;
+          }
+          if (el.scrollIntoView) {
+            el.scrollIntoView({ block: "center", behavior: "smooth" });
+          }
+          const prevOutline = el.style.outline;
+          el.style.outline = "2px solid #38BDF8";
+          setTimeout(() => { try { el.style.outline = prevOutline; } catch (_) {} }, 350);
+          el.click();
+          session.clickCount += 1;
+          const label = (el.innerText || el.value || el.getAttribute("aria-label") || el.tagName).replace(/\s+/g, " ").trim().slice(0, 24);
+          const nextLabel = session.autoClickRunning ? "Auto Clicking" : "Idle";
+          const nextColor = session.autoClickRunning ? "#34d399" : "#38bdf8";
+          setClickFeedback(nextLabel, nextColor, `Tested click on "${label || el.tagName.toLowerCase()}" (${session.clickCount}).`, "vpn-info-ok");
+          return true;
+        } catch (err) {
+          stopAutoClick(`Click blocked (${err && err.message ? err.message : "Restricted"}).`, "#fb7185", "Restricted");
+          return false;
+        }
       }
 
       function clearTemporarySession(nextPhase) {
         if (session.timerId) clearInterval(session.timerId);
         if (session.loadTimeoutId) clearTimeout(session.loadTimeoutId);
+        if (session.autoClickTimerId) clearInterval(session.autoClickTimerId);
         session.timerId = null;
         session.loadTimeoutId = null;
+        session.autoClickTimerId = null;
+        session.autoClickRunning = false;
+        session.clickCount = 0;
+        session.discoveredTargets = [];
+        session.clickStatusLabel = "Idle";
+        clickCounterBadge.style.color = "#38bdf8";
+        clickCounterBadge.style.borderColor = "rgba(56, 189, 248, 0.45)";
+        clickStatusMsg.className = "toggle-sub";
+        clickStatusMsg.textContent = "Works on your own loaded preview page (same-origin iframe). Never used for ad clicking or artificial CTR.";
+        renderTargetChips();
         session.running = false;
         session.currentRun = 0;
         session.phaseRemaining = 0;
@@ -1424,6 +1750,99 @@
           vpnMessage.className = "vpn-info-warn";
           vpnMessage.textContent = "Note: Automatic VPN drop detection (TRANSPORT_VPN) requires the native Android app. Browser HTML cannot detect OS VPN state.";
         }
+      });
+
+      authorizedSiteToggle.addEventListener("change", () => {
+        if (!authorizedSiteToggle.checked && session.autoClickRunning) {
+          stopAutoClick("Stopped: Authorization unchecked.", "#fbbf24", "Stopped");
+        }
+      });
+
+      scanTargetsBtn.addEventListener("click", () => {
+        const access = getAccessibleIframeDocument();
+        if (!access) {
+          setClickFeedback(
+            "Restricted",
+            "#fb7185",
+            previewFrame.style.display === "block"
+              ? "Cross-origin iframe restricted in browser HTML. Use the native Android app for external sites."
+              : "Load your website preview first before scanning targets.",
+            "vpn-info-err"
+          );
+          return;
+        }
+        try {
+          const nodes = access.doc.querySelectorAll('button, a[href], [role="button"], input[type="button"], input[type="submit"]');
+          const found = [];
+          const seen = new Set();
+          for (let i = 0; i < nodes.length && found.length < 18; i += 1) {
+            const el = nodes[i];
+            const rect = el.getBoundingClientRect();
+            if (rect.width < 2 || rect.height < 2) continue;
+            if (isProhibitedAdElement(el)) continue;
+            const sel = buildCssSelector(el);
+            if (!sel || seen.has(sel)) continue;
+            seen.add(sel);
+            let txt = (el.innerText || el.value || el.getAttribute("aria-label") || el.tagName).replace(/\s+/g, " ").trim();
+            if (!txt) txt = el.tagName.toLowerCase();
+            if (txt.length > 26) txt = txt.slice(0, 26) + "...";
+            found.push({ selector: sel, label: txt, tagType: el.tagName.toLowerCase() });
+          }
+          session.discoveredTargets = found;
+          if (!clickSelectorInput.value.trim() && found.length > 0) {
+            clickSelectorInput.value = found[0].selector;
+          }
+          renderTargetChips();
+          if (found.length === 0) {
+            setClickFeedback("No Target", "#fbbf24", "No safe buttons or links found in this view.", "vpn-info-warn");
+          } else {
+            setClickFeedback("Idle", "#38bdf8", `Found ${found.length} safe button/link target(s).`, "vpn-info-ok");
+          }
+        } catch (err) {
+          setClickFeedback("Restricted", "#fb7185", `Target scan blocked (${err && err.message ? err.message : "Restricted"}).`, "vpn-info-err");
+        }
+      });
+
+      singleClickBtn.addEventListener("click", () => {
+        executeSafeClickOnce();
+      });
+
+      startClickBtn.addEventListener("click", () => {
+        if (session.autoClickRunning) return;
+        const intervalSec = clampInt(clickIntervalInput.value, 1, 60, 2);
+        clickIntervalInput.value = String(intervalSec);
+
+        if (!authorizedSiteToggle.checked) {
+          setClickFeedback("Restricted", "#fb7185", "Confirm this is your own website or authorized test page first.", "vpn-info-err");
+          return;
+        }
+        const selector = (clickSelectorInput.value || "").trim();
+        if (!selector) {
+          setClickFeedback("No Target", "#fbbf24", "Scan targets or enter a button/link selector first.", "vpn-info-warn");
+          return;
+        }
+        if (AD_SELECTOR_REGEX.test(selector)) {
+          setClickFeedback("Ad Blocked", "#fb7185", "Blocked: Ad elements and artificial clicks are strictly prohibited.", "vpn-info-err");
+          return;
+        }
+        if (!getAccessibleIframeDocument()) {
+          setClickFeedback("Restricted", "#fb7185", "Load a same-origin preview first (or use native Android WebView for external sites).", "vpn-info-err");
+          return;
+        }
+
+        session.autoClickRunning = true;
+        setClickFeedback("Auto Clicking", "#34d399", `Auto Click active every ${intervalSec}s`, "vpn-info-ok");
+        executeSafeClickOnce();
+        if (session.autoClickRunning) {
+          session.autoClickTimerId = setInterval(() => {
+            if (!session.autoClickRunning) return;
+            executeSafeClickOnce();
+          }, intervalSec * 1000);
+        }
+      });
+
+      stopClickBtn.addEventListener("click", () => {
+        stopAutoClick("Auto Click stopped.", "#fbbf24", "Stopped");
       });
 
       autoNextToggle.addEventListener("change", () => {
