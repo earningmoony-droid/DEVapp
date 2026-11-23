@@ -101,6 +101,7 @@ import com.example.model.AutoScrollDirection
 import com.example.model.ClickInteractionMode
 import com.example.model.ClickTargetItem
 import com.example.model.ClickTestStatus
+import com.example.model.RandomInteractionStatus
 import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
@@ -241,6 +242,16 @@ fun WebVisitTesterApp(
                                     onResetClickCounter = viewModel::resetClickCounter
                                 )
 
+                                RandomInteractionPanel(
+                                    uiState = uiState,
+                                    onTargetInputChanged = viewModel::updateRandomTapTargetInput,
+                                    onDelayInputChanged = viewModel::updateRandomTapDelayInput,
+                                    onLoadDemoEnvironment = viewModel::loadDemoTestEnvironment,
+                                    onStartRandomTest = viewModel::startRandomInteraction,
+                                    onStopRandomTest = { viewModel.stopRandomInteraction() },
+                                    onResetRandomCounter = viewModel::resetRandomInteractionCounter
+                                )
+
                                 VpnTestingPanel(
                                     uiState = uiState,
                                     onSelectProvider = viewModel::selectVpnProvider,
@@ -276,6 +287,8 @@ fun WebVisitTesterApp(
                                 onTargetsScanned = viewModel::onClickTargetsScanned,
                                 onClickExecuted = viewModel::onSingleClickExecuted,
                                 onDirectPreviewClick = viewModel::onDirectPreviewClick,
+                                onRandomTapExecuted = viewModel::onRandomTapExecuted,
+                                onRandomScrollFinished = viewModel::onRandomScrollFinished,
                                 modifier = Modifier.weight(1.05f)
                             )
                         }
@@ -314,6 +327,16 @@ fun WebVisitTesterApp(
                             onResetClickCounter = viewModel::resetClickCounter
                         )
 
+                        RandomInteractionPanel(
+                            uiState = uiState,
+                            onTargetInputChanged = viewModel::updateRandomTapTargetInput,
+                            onDelayInputChanged = viewModel::updateRandomTapDelayInput,
+                            onLoadDemoEnvironment = viewModel::loadDemoTestEnvironment,
+                            onStartRandomTest = viewModel::startRandomInteraction,
+                            onStopRandomTest = { viewModel.stopRandomInteraction() },
+                            onResetRandomCounter = viewModel::resetRandomInteractionCounter
+                        )
+
                         VpnTestingPanel(
                             uiState = uiState,
                             onSelectProvider = viewModel::selectVpnProvider,
@@ -347,7 +370,9 @@ fun WebVisitTesterApp(
                             onOpenExternal = openWebsiteInBrowser,
                             onTargetsScanned = viewModel::onClickTargetsScanned,
                             onClickExecuted = viewModel::onSingleClickExecuted,
-                            onDirectPreviewClick = viewModel::onDirectPreviewClick
+                            onDirectPreviewClick = viewModel::onDirectPreviewClick,
+                            onRandomTapExecuted = viewModel::onRandomTapExecuted,
+                            onRandomScrollFinished = viewModel::onRandomScrollFinished
                         )
                     }
                 }
@@ -1602,6 +1627,282 @@ private fun ClicksAutomationPanel(
                     ClickTestStatus.RUNNING, ClickTestStatus.COMPLETED -> EmeraldSuccess
                     ClickTestStatus.STOPPED, ClickTestStatus.NO_TARGET -> AmberWarning
                     ClickTestStatus.IDLE -> ElectricCyan
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun RandomInteractionPanel(
+    uiState: WebVisitUiState,
+    onTargetInputChanged: (String) -> Unit,
+    onDelayInputChanged: (String) -> Unit,
+    onLoadDemoEnvironment: () -> Unit,
+    onStartRandomTest: () -> Unit,
+    onStopRandomTest: () -> Unit,
+    onResetRandomCounter: () -> Unit
+) {
+    val badgeColor = when (uiState.randomStatus) {
+        RandomInteractionStatus.TAPPING,
+        RandomInteractionStatus.COMPLETED -> EmeraldSuccess
+        RandomInteractionStatus.WAITING_LOAD,
+        RandomInteractionStatus.SCROLLING_DOWN -> ElectricCyan
+        RandomInteractionStatus.SCROLLING_UP -> LuminousPurple
+        RandomInteractionStatus.STOPPED -> AmberWarning
+        RandomInteractionStatus.FAILED,
+        RandomInteractionStatus.RESTRICTED -> CoralDanger
+        RandomInteractionStatus.IDLE -> EmeraldSuccess
+    }
+    val safeTarget = uiState.randomTapTarget.coerceAtLeast(1)
+    val progressFraction = (uiState.randomTapCount.toFloat() / safeTarget.toFloat()).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = progressFraction,
+        animationSpec = spring(),
+        label = "random_tap_progress"
+    )
+    val isBusy = uiState.isRandomInteractionRunning || uiState.isRandomArmedOnLoad
+    val focusManager = LocalFocusManager.current
+
+    LiquidGlassPanel(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Shuffle,
+                    contentDescription = null,
+                    tint = EmeraldSuccess,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = stringResource(R.string.label_random_module),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = badgeColor.copy(alpha = 0.14f),
+                border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.45f)),
+                modifier = Modifier.testTag("random_status_badge")
+            ) {
+                Text(
+                    text = uiState.randomStatus.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = badgeColor,
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MidnightDeep.copy(alpha = 0.58f))
+                .border(1.dp, GlassStrokeViolet, RoundedCornerShape(16.dp))
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Random Tap Progress",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = TextSecondary
+                )
+                Text(
+                    text = "${uiState.randomTapCount}/$safeTarget (${(animatedProgress * 100).toInt()}%)",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = EmeraldSuccess,
+                    modifier = Modifier.testTag("random_ratio_text")
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LiveCounterPill(
+                    label = "Live Tap Counter",
+                    value = uiState.randomTapCount.toString(),
+                    accentColor = EmeraldSuccess,
+                    testTag = "random_tap_count_stat",
+                    modifier = Modifier.weight(1f)
+                )
+                LiveCounterPill(
+                    label = "Tap Target",
+                    value = safeTarget.toString(),
+                    accentColor = ElectricCyan,
+                    testTag = "random_tap_target_stat",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(MidnightDeep.copy(alpha = 0.85f))
+                    .border(1.dp, GlassStrokeSubtle, RoundedCornerShape(999.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(EmeraldSuccess, ElectricCyan, LuminousPurple)
+                            )
+                        )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = uiState.randomTapTargetInput,
+                onValueChange = onTargetInputChanged,
+                singleLine = true,
+                label = { Text("Tap Target", color = TextMuted) },
+                placeholder = { Text("20", color = TextMuted) },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = ElectricCyan,
+                    unfocusedBorderColor = GlassStrokeSubtle,
+                    focusedContainerColor = MidnightDeep.copy(alpha = 0.65f),
+                    unfocusedContainerColor = MidnightDeep.copy(alpha = 0.50f),
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("random_target_input")
+            )
+
+            OutlinedTextField(
+                value = uiState.randomTapDelayInput,
+                onValueChange = onDelayInputChanged,
+                enabled = !isBusy,
+                singleLine = true,
+                label = { Text("Tap Delay (s)", color = TextMuted) },
+                placeholder = { Text("2", color = TextMuted) },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = LuminousPurple,
+                    unfocusedBorderColor = GlassStrokeSubtle,
+                    focusedContainerColor = MidnightDeep.copy(alpha = 0.65f),
+                    unfocusedContainerColor = MidnightDeep.copy(alpha = 0.50f),
+                    disabledContainerColor = MidnightDeep.copy(alpha = 0.35f),
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    disabledTextColor = TextSecondary
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("random_delay_input")
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        GlassActionButton(
+            text = stringResource(R.string.btn_load_demo),
+            icon = Icons.Rounded.Public,
+            onClick = onLoadDemoEnvironment,
+            enabled = !uiState.isRunning && !isBusy,
+            accentColor = ElectricCyan,
+            testTag = "load_demo_button",
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            GlassActionButton(
+                text = stringResource(R.string.btn_start_random),
+                icon = Icons.Rounded.PlayArrow,
+                onClick = {
+                    focusManager.clearFocus()
+                    onStartRandomTest()
+                },
+                enabled = !isBusy,
+                accentColor = EmeraldSuccess,
+                testTag = "start_random_button",
+                modifier = Modifier.weight(1f)
+            )
+            GlassActionButton(
+                text = stringResource(R.string.btn_stop_random),
+                icon = Icons.Rounded.Stop,
+                onClick = onStopRandomTest,
+                enabled = isBusy,
+                accentColor = CoralDanger,
+                testTag = "stop_random_button",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        GlassActionButton(
+            text = stringResource(R.string.btn_reset_random),
+            icon = Icons.Rounded.Refresh,
+            onClick = onResetRandomCounter,
+            enabled = uiState.randomTapCount > 0 || uiState.randomStatus != RandomInteractionStatus.IDLE,
+            accentColor = TextSecondary,
+            testTag = "reset_random_button",
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        uiState.randomStatusMessage?.let { msg ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = msg,
+                style = MaterialTheme.typography.labelSmall,
+                color = when (uiState.randomStatus) {
+                    RandomInteractionStatus.FAILED, RandomInteractionStatus.RESTRICTED -> CoralDanger
+                    RandomInteractionStatus.TAPPING, RandomInteractionStatus.COMPLETED, RandomInteractionStatus.WAITING_LOAD -> EmeraldSuccess
+                    RandomInteractionStatus.SCROLLING_DOWN, RandomInteractionStatus.SCROLLING_UP -> ElectricCyan
+                    RandomInteractionStatus.STOPPED -> AmberWarning
+                    RandomInteractionStatus.IDLE -> TextSecondary
                 }
             )
         }

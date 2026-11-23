@@ -37,6 +37,11 @@
     <string name="btn_single_tap">1x Tap Test</string>
     <string name="btn_scan_targets">Scan Targets</string>
     <string name="label_click_interval">Interval (s)</string>
+    <string name="label_random_module">Random Interaction Testing</string>
+    <string name="btn_load_demo">Load Demo Test Environment</string>
+    <string name="btn_start_random">Start Random Test</string>
+    <string name="btn_stop_random">Stop</string>
+    <string name="btn_reset_random">Reset Random Counter</string>
     <string name="nav_back">Back</string>
     <string name="nav_home">Home</string>
     <string name="nav_reload">Reload</string>

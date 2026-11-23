@@ -892,6 +892,35 @@
       gap: 6px;
       margin-top: 8px;
     }
+
+    .random-inputs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .btn-demo-page {
+      width: 100%;
+      background: rgba(56, 189, 248, 0.14);
+      border-color: rgba(56, 189, 248, 0.45);
+      color: #e0f2fe;
+      min-height: 44px;
+      font-size: 0.78rem;
+      margin-bottom: 8px;
+    }
+
+    .random-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(52, 211, 153, 0.45);
+      background: rgba(52, 211, 153, 0.14);
+      color: var(--emerald);
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -1131,6 +1160,69 @@
           </div>
         </section>
 
+        <section class="glass-panel" aria-label="Random Interaction Testing Mode">
+          <div class="vpn-header">
+            <div class="vpn-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="16 3 21 3 21 8"></polyline>
+                <line x1="4" y1="20" x2="21" y2="3"></line>
+                <polyline points="21 16 21 21 16 21"></polyline>
+                <line x1="15" y1="15" x2="21" y2="21"></line>
+                <line x1="4" y1="4" x2="9" y2="9"></line>
+              </svg>
+              <span>Random Interaction Testing</span>
+            </div>
+            <span class="random-badge" id="randomStatusBadge">Idle</span>
+          </div>
+
+          <div class="click-target-box" aria-label="Random Tap Counter">
+            <div class="progress-meta" style="margin-bottom: 8px;">
+              <span>Random Tap Progress</span>
+              <span id="randomRatioLabel" style="color: var(--emerald); font-weight: 700;">0/20 (0%)</span>
+            </div>
+
+            <div class="click-target-grid">
+              <div class="click-target-stat">
+                <span class="counter-lbl">Live Tap Counter</span>
+                <span class="counter-num" id="randomTapCountValue" style="color: var(--emerald);">0</span>
+              </div>
+              <div class="click-target-stat">
+                <span class="counter-lbl">Tap Target</span>
+                <span class="counter-num" id="randomTapTargetValue" style="color: var(--cyan);">20</span>
+              </div>
+            </div>
+
+            <div class="click-progress-track" style="margin-bottom: 0;">
+              <div class="click-progress-fill" id="randomProgressFill"></div>
+            </div>
+          </div>
+
+          <div class="random-inputs-grid">
+            <div class="num-box">
+              <label for="randomTargetInput">Tap Target</label>
+              <input id="randomTargetInput" class="num-input" type="number" inputmode="numeric" min="1" max="5000" value="20" />
+            </div>
+            <div class="num-box">
+              <label for="randomDelayInput">Tap Delay (s)</label>
+              <input id="randomDelayInput" class="num-input" type="number" inputmode="numeric" min="1" max="30" value="2" />
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-demo-page" id="loadDemoPageBtn">Load Demo Test Environment</button>
+
+          <div class="click-actions-row">
+            <button type="button" class="btn btn-click-start" id="startRandomBtn">Start Random Test</button>
+            <button type="button" class="btn btn-click-stop" id="stopRandomBtn" disabled>Stop</button>
+          </div>
+          <button type="button" class="btn btn-click-reset" id="resetRandomBtn">Reset Random Counter</button>
+
+          <div class="vpn-info-box" style="margin-bottom: 0;">
+            <div class="toggle-sub" id="randomStatusMsg">
+              Starts after verified page load. Performs safe random UI taps with scroll down/up cycles. Own Test Page &amp; Demo Environment only; ads are blocked.
+            </div>
+          </div>
+        </section>
+
         <section class="glass-panel" aria-label="VPN Testing Module">
           <div class="vpn-header">
             <div class="vpn-title">
@@ -1272,6 +1364,19 @@
       const resetClickBtn = document.getElementById("resetClickBtn");
       const clickStatusMsg = document.getElementById("clickStatusMsg");
 
+      const randomStatusBadge = document.getElementById("randomStatusBadge");
+      const randomRatioLabel = document.getElementById("randomRatioLabel");
+      const randomTapCountValue = document.getElementById("randomTapCountValue");
+      const randomTapTargetValue = document.getElementById("randomTapTargetValue");
+      const randomProgressFill = document.getElementById("randomProgressFill");
+      const randomTargetInput = document.getElementById("randomTargetInput");
+      const randomDelayInput = document.getElementById("randomDelayInput");
+      const loadDemoPageBtn = document.getElementById("loadDemoPageBtn");
+      const startRandomBtn = document.getElementById("startRandomBtn");
+      const stopRandomBtn = document.getElementById("stopRandomBtn");
+      const resetRandomBtn = document.getElementById("resetRandomBtn");
+      const randomStatusMsg = document.getElementById("randomStatusMsg");
+
       const startBtn = document.getElementById("startBtn");
       const stopBtn = document.getElementById("stopBtn");
       const backBtn = document.getElementById("backBtn");
@@ -1300,6 +1405,70 @@
       const MIN_ACTION_COOLDOWN_MS = 300;
       const LOAD_TIMEOUT_MS = 8000;
       const AD_SELECTOR_REGEX = /(adsbygoogle|doubleclick|googlesyndication|adservice|adsystem|adserver|adnxs|taboola|outbrain|mgid|sponsored|advertisement|ad-slot|ad_slot|ad-banner|ad_banner|google_ads|data-ad)/i;
+      const DEMO_TEST_URL = "demo://webvisittester.local";
+      const DEMO_TEST_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebVisit Demo Test Environment</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; padding: 18px; background: linear-gradient(160deg, #06091a, #101944, #1b1045); color: #f8fafc; }
+    .hdr { padding: 16px; border-radius: 18px; background: rgba(255,255,255,0.08); border: 1px solid rgba(56,189,248,0.35); margin-bottom: 16px; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: rgba(52,211,153,0.18); color: #34d399; border: 1px solid rgba(52,211,153,0.45); }
+    .card { padding: 16px; border-radius: 16px; background: rgba(15,23,56,0.78); border: 1px solid rgba(255,255,255,0.14); margin-bottom: 16px; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    button, .demo-link { padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(56,189,248,0.5); background: rgba(56,189,248,0.16); color: #f8fafc; font-weight: 700; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
+    button.purple { border-color: rgba(168,85,247,0.55); background: rgba(168,85,247,0.2); }
+    button.emerald { border-color: rgba(52,211,153,0.55); background: rgba(52,211,153,0.18); }
+    #demoFeedback { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(6,9,26,0.7); color: #38bdf8; font-size: 13px; font-weight: 600; }
+    .spacer { height: 220px; display: flex; align-items: center; justify-content: center; border-radius: 14px; border: 1px dashed rgba(255,255,255,0.15); color: #94a3b8; margin-bottom: 16px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="hdr" id="top">
+    <span class="badge">Safe Demo Test Environment</span>
+    <h2 style="margin:8px 0 4px;">WebVisit Interactive Test Page</h2>
+    <p style="margin:0;color:#cbd5e1;font-size:13px;">Built-in local environment for verifying Random Tap, Scroll Down &amp; Scroll Up interactions.</p>
+    <div id="demoFeedback">Waiting for UI interaction...</div>
+  </div>
+  <div class="card">
+    <h3>Section 1: Primary Navigation &amp; Actions</h3>
+    <div class="btn-row">
+      <button type="button" id="demoOverviewBtn" onclick="reportTap('Overview Tab')">Overview Tab</button>
+      <button type="button" class="purple" id="demoLayoutBtn" onclick="reportTap('Layout Check')">Layout Check</button>
+      <a href="#section-2" class="demo-link" onclick="reportTap('Jump Section 2')">Jump to Section 2</a>
+    </div>
+  </div>
+  <div class="spacer">Scrollable Test Spacer A (Viewport Test)</div>
+  <div class="card" id="section-2">
+    <h3>Section 2: Form &amp; Feature Controls</h3>
+    <div class="btn-row">
+      <button type="button" class="emerald" id="demoFeatureBtn" onclick="reportTap('Toggle Feature')">Toggle Feature</button>
+      <button type="button" id="demoVerifyBtn" onclick="reportTap('Verify Widget')">Verify Widget</button>
+      <button type="button" class="purple" id="demoFilterBtn" onclick="reportTap('Apply Filter')">Apply Filter</button>
+    </div>
+  </div>
+  <div class="spacer">Scrollable Test Spacer B (Mid-Page Scroll)</div>
+  <div class="card" id="section-3">
+    <h3>Section 3: Footer Actions</h3>
+    <div class="btn-row">
+      <button type="button" class="emerald" id="demoSubmitBtn" onclick="reportTap('Submit Demo Form')">Submit Demo Form</button>
+      <button type="button" id="demoRefreshBtn" onclick="reportTap('Refresh Panel')">Refresh Panel</button>
+      <a href="#top" class="demo-link" onclick="reportTap('Back to Top Link')">Scroll Anchor Top</a>
+    </div>
+  </div>
+  <script>
+    let demoTapSeq = 0;
+    function reportTap(name) {
+      demoTapSeq += 1;
+      const el = document.getElementById('demoFeedback');
+      if (el) el.textContent = 'Demo Event #' + demoTapSeq + ': Activated "' + name + '"';
+    }
+  <\/script>
+</body>
+</html>`;
 
       // Track same-origin iframe documents once so listeners are never duplicated across loads
       const guardedDocs = new WeakSet();
@@ -1339,6 +1508,18 @@
         clickTarget: 100,
         clickStatusLabel: "Idle",
         discoveredTargets: [],
+        randomRunning: false,
+        randomArmedOnLoad: false,
+        randomPhase: "idle", // idle | waiting_load | tapping | scrolling_down | scrolling_up | completed | failed | stopped | restricted
+        randomTapCount: 0,
+        randomTapTarget: 20,
+        randomTapDelaySec: 2,
+        randomScrollNextDir: "down",
+        randomLastSelector: "",
+        randomTimerId: null,
+        randomCycleSeq: 0,
+        randomStatusLabel: "Idle",
+        isDemoLoaded: false,
         phase: "idle", // idle | loading | viewing | cooldown | blocked | failed | error | completed | stopped
         phaseRemaining: 0,
         activeUrl: "",
@@ -1423,7 +1604,7 @@
           const doc = previewFrame.contentDocument || (win ? win.document : null);
           if (!doc || !win) return null;
           const href = doc.location && doc.location.href;
-          if (!href || href === "about:blank") return null;
+          if (!href || (href === "about:blank" && !previewFrame.hasAttribute("srcdoc"))) return null;
           if (!doc.documentElement && !doc.body) return null;
           return { doc, win };
         } catch {
@@ -1470,6 +1651,65 @@
         return false;
       }
 
+      function spawnIframeTapRipple(doc, win, clientX, clientY, accentHex = "#38BDF8") {
+        try {
+          const root = doc.body || doc.documentElement;
+          if (!root) return;
+
+          let layer = doc.getElementById("__wv_ripple_layer");
+          if (!layer) {
+            layer = doc.createElement("div");
+            layer.id = "__wv_ripple_layer";
+            layer.setAttribute("aria-hidden", "true");
+            layer.style.cssText = "position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:2147483647;";
+            root.appendChild(layer);
+          }
+
+          const ripple = doc.createElement("span");
+          ripple.setAttribute("aria-hidden", "true");
+          const x = Number.isFinite(clientX) ? clientX : (win.innerWidth || 300) / 2;
+          const y = Number.isFinite(clientY) ? clientY : (win.innerHeight || 300) / 2;
+          const rgb = accentHex === "#34D399"
+            ? "52, 211, 153"
+            : (accentHex === "#A855F7" ? "168, 85, 247" : "56, 189, 248");
+
+          ripple.style.cssText =
+            `position:fixed;left:${x}px;top:${y}px;width:46px;height:46px;border-radius:9999px;` +
+            `pointer-events:none;box-sizing:border-box;` +
+            `background:radial-gradient(circle, rgba(${rgb}, 0.34) 0%, rgba(${rgb}, 0.12) 55%, rgba(${rgb}, 0) 75%);` +
+            `border:1.5px solid rgba(${rgb}, 0.72);` +
+            `box-shadow:0 0 12px rgba(${rgb}, 0.28);` +
+            `transform:translate(-50%, -50%) scale(0.22);opacity:0.9;`;
+
+          layer.appendChild(ripple);
+
+          const cleanup = () => {
+            try { ripple.remove(); } catch {}
+          };
+
+          if (typeof ripple.animate === "function") {
+            const anim = ripple.animate(
+              [
+                { transform: "translate(-50%, -50%) scale(0.22)", opacity: 0.9 },
+                { transform: "translate(-50%, -50%) scale(1.3)", opacity: 0 }
+              ],
+              { duration: 480, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "forwards" }
+            );
+            anim.onfinish = cleanup;
+            setTimeout(cleanup, 560);
+          } else {
+            ripple.style.transition = "transform 0.46s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.46s ease-out";
+            win.requestAnimationFrame(() => {
+              ripple.style.transform = "translate(-50%, -50%) scale(1.3)";
+              ripple.style.opacity = "0";
+            });
+            setTimeout(cleanup, 520);
+          }
+        } catch {
+          // Ignore DOM restriction errors cleanly
+        }
+      }
+
       // Attach a single debounced touch/click guard inside same-origin preview so mobile taps never double-fire
       function attachSameOriginPreviewHandlers(access) {
         if (!access || !access.doc || guardedDocs.has(access.doc)) return;
@@ -1498,7 +1738,7 @@
             : null;
           if (!rawTarget) return;
 
-          if (!authorizedSiteToggle.checked) {
+          if (!authorizedSiteToggle.checked && !session.isDemoLoaded) {
             setClickFeedback("Restricted", "#fb7185", "Enable 'Authorized Own Site / Test Page' to count preview clicks.", "vpn-info-err");
             return;
           }
@@ -1516,6 +1756,16 @@
             setClickFeedback("Ad Blocked", "#fb7185", "Ad click blocked by policy guard.", "vpn-info-err");
             return;
           }
+
+          const hasPointerCoord = (typeof ev.clientX === "number" && typeof ev.clientY === "number") && (ev.clientX !== 0 || ev.clientY !== 0);
+          let tapX = ev.clientX;
+          let tapY = ev.clientY;
+          if (!hasPointerCoord) {
+            const r = rawTarget.getBoundingClientRect();
+            tapX = r.left + r.width / 2;
+            tapY = r.top + r.height / 2;
+          }
+          spawnIframeTapRipple(doc, win, tapX, tapY, session.interactionMode === "tap" ? "#A855F7" : "#38BDF8");
 
           if (session.autoClickRunning && session.clickCount >= session.clickTarget) {
             completeClickTargetReached();
@@ -2026,13 +2276,15 @@
         );
       }
 
-      function dispatchSingleActivation(el, win, doc, mode) {
+      function dispatchSingleActivation(el, win, doc, mode, rippleAccent = null) {
         if (el.scrollIntoView) {
           el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
         }
         const rect = el.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
+        const accent = rippleAccent || (mode === "tap" ? "#A855F7" : "#38BDF8");
+        spawnIframeTapRipple(doc, win, cx, cy, accent);
 
         if (mode === "tap") {
           let touchHandled = false;
@@ -2302,11 +2554,38 @@
         stopClickBtn.disabled = !session.autoClickRunning;
       }
 
+      function renderRandomInteractionUI() {
+        const target = Math.max(1, session.randomTapTarget || 1);
+        const pct = Math.min(100, Math.round((session.randomTapCount / target) * 100));
+        randomTapCountValue.textContent = String(session.randomTapCount);
+        randomTapTargetValue.textContent = String(target);
+        randomRatioLabel.textContent = `${session.randomTapCount}/${target} (${pct}%)`;
+        randomProgressFill.style.width = `${pct}%`;
+
+        const isBusy = session.randomRunning || session.randomArmedOnLoad;
+        randomTargetInput.disabled = false;
+        randomDelayInput.disabled = isBusy;
+        startRandomBtn.disabled = isBusy;
+        stopRandomBtn.disabled = !isBusy;
+        loadDemoPageBtn.disabled = session.running || isBusy;
+      }
+
+      function setRandomFeedback(badgeText, color, msg, msgClass) {
+        session.randomStatusLabel = badgeText;
+        randomStatusBadge.textContent = badgeText;
+        randomStatusBadge.style.color = color;
+        randomStatusBadge.style.borderColor = color;
+        randomStatusMsg.className = msgClass;
+        randomStatusMsg.textContent = msg;
+        renderRandomInteractionUI();
+      }
+
       function clearPendingNetworkAndTimers() {
         if (session.timerId) clearInterval(session.timerId);
         if (session.loadTimeoutId) clearTimeout(session.loadTimeoutId);
         if (session.loadStepTimeoutId) clearTimeout(session.loadStepTimeoutId);
         if (session.autoClickTimerId) clearInterval(session.autoClickTimerId);
+        if (session.randomTimerId) clearTimeout(session.randomTimerId);
         if (session.activeAbortController) {
           try { session.activeAbortController.abort(); } catch {}
         }
@@ -2314,14 +2593,20 @@
         session.loadTimeoutId = null;
         session.loadStepTimeoutId = null;
         session.autoClickTimerId = null;
+        session.randomTimerId = null;
         session.activeAbortController = null;
       }
 
       function clearTemporarySession(nextPhase, resetCounters = true) {
         session.loadSeq += 1;
+        session.randomCycleSeq += 1;
         clearPendingNetworkAndTimers();
         session.autoClickRunning = false;
         session.clickTestMode = "none";
+        session.randomRunning = false;
+        session.randomArmedOnLoad = false;
+        session.randomPhase = "idle";
+        session.isDemoLoaded = false;
         session.actionLock = false;
         session.discoveredTargets = [];
         session.clickStatusLabel = "Idle";
@@ -2335,6 +2620,7 @@
           session.visitCount = 0;
           session.failedCount = 0;
           session.clickCount = 0;
+          session.randomTapCount = 0;
           session.countedVisitSeq = -1;
           session.countedFailSeq = -1;
         }
@@ -2346,24 +2632,31 @@
         session.phase = nextPhase;
         setScrollPosition(0, 0);
         stopScrolling(nextPhase === "idle" ? "Idle" : "Stopped", nextPhase === "idle" ? "#94a3b8" : "#fbbf24");
+        previewFrame.removeAttribute("srcdoc");
         previewFrame.src = "about:blank";
         syncExternalLinks(urlInput.value);
+        setRandomFeedback("Idle", "#34d399", "Starts after verified page load. Performs safe random UI taps with scroll down/up cycles. Own Test Page & Demo Environment only; ads are blocked.", "toggle-sub");
         updateUI();
       }
 
       function finishSessionPreservingResults(finalPhase, title, desc, showOpen = false) {
         session.loadSeq += 1;
+        session.randomCycleSeq += 1;
         clearPendingNetworkAndTimers();
         session.autoClickRunning = false;
         session.clickTestMode = "none";
+        session.randomRunning = false;
+        session.randomArmedOnLoad = false;
         session.actionLock = false;
         session.running = false;
         session.phaseRemaining = 0;
         session.phase = finalPhase;
         stopScrolling("Idle", "#94a3b8");
         if (finalPhase === "completed") {
+          previewFrame.removeAttribute("srcdoc");
           previewFrame.src = "about:blank";
           session.activeUrl = "";
+          session.isDemoLoaded = false;
         }
         showOverlay(title, desc, showOpen);
         updateUI();
@@ -2433,6 +2726,9 @@
           session.failedCount += 1;
         }
         stopScrolling(nextPhase === "error" ? "Network Error" : "Load Failed", "#fb7185");
+        if (session.randomRunning || session.randomArmedOnLoad) {
+          stopRandomInteraction(`Stopped: Page load failed (${reason})`, "Load Failed", "#fb7185", "vpn-info-err");
+        }
 
         const canContinueQueue = nextPhase !== "error" &&
           session.autoNext &&
@@ -2448,6 +2744,7 @@
             if (session.pauseSec > 0) {
               session.phase = "cooldown";
               session.phaseRemaining = session.pauseSec;
+              previewFrame.removeAttribute("srcdoc");
               previewFrame.src = "about:blank";
               showOverlay("Pause Interval", `${session.pauseSec}s before next test`, false);
               updateUI();
@@ -2469,7 +2766,8 @@
       async function onPreviewLoadedForSeq(seq, reachabilityPromise) {
         if (!session.running || seq !== session.loadSeq) return;
         const currentSrc = previewFrame.getAttribute("src") || "";
-        if (!currentSrc || currentSrc === "about:blank") return;
+        const hasSrcdoc = previewFrame.hasAttribute("srcdoc");
+        if (!hasSrcdoc && (!currentSrc || currentSrc === "about:blank")) return;
 
         let access = getAccessibleIframeDocument();
         if (access) {
@@ -2514,20 +2812,30 @@
             setScrollPosition(0, 0);
           }
         }
-        if (session.scrollDirection !== "none" && !session.scrollPaused) {
+        if (session.scrollDirection !== "none" && !session.scrollPaused && !session.randomRunning) {
           startScrolling(session.scrollDirection);
         }
         updateUI();
+
+        if (session.randomArmedOnLoad && !session.randomRunning) {
+          session.randomArmedOnLoad = false;
+          beginRandomInteractionLoop();
+        }
       }
 
       let currentReachabilityPromise = null;
 
       previewFrame.addEventListener("load", () => {
         const attrSrc = previewFrame.getAttribute("src") || "";
-        if (!attrSrc || attrSrc === "about:blank") return;
+        const hasSrcdoc = previewFrame.hasAttribute("srcdoc");
+        if (!hasSrcdoc && (!attrSrc || attrSrc === "about:blank")) return;
         const access = getAccessibleIframeDocument();
         if (access) {
           attachSameOriginPreviewHandlers(access);
+          if (session.isDemoLoaded && session.phase === "viewing") {
+            const t = detectScrollTarget(access.doc, access.win, "down");
+            if (t) setScrollPosition(t.getTop(), t.maxScroll);
+          }
         }
         if (session.running && session.phase === "loading") {
           onPreviewLoadedForSeq(session.loadSeq, currentReachabilityPromise);
@@ -2535,6 +2843,9 @@
       });
 
       previewFrame.addEventListener("error", () => {
+        if (session.randomRunning || session.randomArmedOnLoad) {
+          stopRandomInteraction("Stopped: Page load error.", "Load Failed", "#fb7185", "vpn-info-err");
+        }
         if (!session.running) return;
         handleRunLoadFailure(session.loadSeq, "error", "Website preview failed to load due to a network or embedding restriction.");
       });
@@ -2571,6 +2882,7 @@
 
         currentReachabilityPromise = verifyUrlReachability(session.activeUrl, seq);
 
+        previewFrame.removeAttribute("srcdoc");
         previewFrame.src = "about:blank";
         session.loadStepTimeoutId = setTimeout(() => {
           if (!session.running || seq !== session.loadSeq) return;
@@ -2591,12 +2903,16 @@
           if (session.phaseRemaining > 1) {
             session.phaseRemaining -= 1;
             updateUI();
+          } else if (session.randomRunning || session.randomArmedOnLoad) {
+            // Keep preview active while Random Interaction Testing is finishing its Tap & Scroll cycle
+            updateUI();
           } else {
             stopScrolling("Idle", "#94a3b8");
             if (session.currentRun < session.totalRuns && session.autoNext) {
               if (session.pauseSec > 0) {
                 session.phase = "cooldown";
                 session.phaseRemaining = session.pauseSec;
+                previewFrame.removeAttribute("srcdoc");
                 previewFrame.src = "about:blank";
                 showOverlay("Pause Interval", `${session.pauseSec}s before next test`, false);
                 updateUI();
@@ -2719,8 +3035,13 @@
       });
 
       authorizedSiteToggle.addEventListener("change", () => {
-        if (!authorizedSiteToggle.checked && session.autoClickRunning) {
-          stopAutoClick("Stopped: Authorization unchecked.", "#fbbf24", "Stopped");
+        if (!authorizedSiteToggle.checked) {
+          if (session.autoClickRunning) {
+            stopAutoClick("Stopped: Authorization unchecked.", "#fbbf24", "Stopped");
+          }
+          if ((session.randomRunning || session.randomArmedOnLoad) && !session.isDemoLoaded) {
+            stopRandomInteraction("Stopped: Authorization unchecked.", "Stopped", "#fbbf24", "vpn-info-warn");
+          }
         }
       });
 
@@ -2930,6 +3251,356 @@
         updateUI();
       });
 
+      // --- Random Interaction Testing Engine (Own Test Page & Demo Environment Only, Zero Ads) ---
+
+      function scanSafeRandomElements(doc, win) {
+        const nodes = doc.querySelectorAll('button, a[href], [role="button"], input[type="button"], input[type="submit"]');
+        const viewportH = win.innerHeight || 360;
+        const inViewport = [];
+        const allSafe = [];
+        const currentOrigin = (doc.location && doc.location.origin && doc.location.origin !== "null") ? doc.location.origin : "";
+
+        for (let i = 0; i < nodes.length && allSafe.length < 40; i += 1) {
+          const el = nodes[i];
+          if (!isElementInteractable(el, win)) continue;
+          if (isProhibitedAdElement(el)) continue;
+
+          if (el.tagName && el.tagName.toLowerCase() === "a") {
+            const hrefAttr = el.getAttribute("href") || "";
+            if (/^https?:\/\//i.test(hrefAttr) && currentOrigin) {
+              try {
+                const parsedHref = new URL(hrefAttr, doc.location.href);
+                if (parsedHref.origin !== currentOrigin) continue;
+              } catch {
+                continue;
+              }
+            }
+          }
+
+          const sel = buildCssSelector(el, doc);
+          if (!sel) continue;
+          const rect = el.getBoundingClientRect();
+          const item = { el, selector: sel };
+          allSafe.push(item);
+          if (rect.bottom > 8 && rect.top < viewportH - 8) {
+            inViewport.push(item);
+          }
+        }
+        return inViewport.length > 0 ? inViewport : allSafe;
+      }
+
+      function stopRandomInteraction(reason = "Random Interaction stopped.", badge = "Stopped", color = "#fbbf24", msgClass = "vpn-info-warn") {
+        session.randomCycleSeq += 1;
+        if (session.randomTimerId) {
+          clearTimeout(session.randomTimerId);
+          session.randomTimerId = null;
+        }
+        session.randomRunning = false;
+        session.randomArmedOnLoad = false;
+        session.randomPhase = badge.toLowerCase();
+        cancelScrollRaf();
+        setRandomFeedback(badge, color, reason, msgClass);
+        updateUI();
+      }
+
+      function performSmoothScrollStep(direction, cycleSeq) {
+        return new Promise((resolve) => {
+          if (!session.randomRunning || cycleSeq !== session.randomCycleSeq) {
+            resolve(false);
+            return;
+          }
+          const access = getAccessibleIframeDocument();
+          if (!access) {
+            resolve(false);
+            return;
+          }
+          const { doc, win } = access;
+          const target = detectScrollTarget(doc, win, direction);
+          if (!target || target.maxScroll <= 2) {
+            resolve(false);
+            return;
+          }
+
+          let chosenDir = direction;
+          if (chosenDir === "down" && target.getTop() >= target.maxScroll - 2) {
+            chosenDir = "up";
+          } else if (chosenDir === "up" && target.getTop() <= 2) {
+            chosenDir = "down";
+          }
+
+          setScrollStatus(chosenDir === "down" ? "Random Scroll Down" : "Random Scroll Up", chosenDir === "down" ? "#38bdf8" : "#a855f7");
+          setRandomFeedback(
+            chosenDir === "down" ? "Scrolling Down" : "Scrolling Up",
+            chosenDir === "down" ? "#38bdf8" : "#a855f7",
+            `Scrolling ${chosenDir} before re-scanning UI elements (${session.randomTapCount}/${session.randomTapTarget})...`,
+            "vpn-info-ok"
+          );
+
+          const startTop = target.getTop();
+          const distance = Math.max(140, Math.round((win.innerHeight || 340) * 0.65));
+          const goalTop = chosenDir === "down"
+            ? Math.min(target.maxScroll, startTop + distance)
+            : Math.max(0, startTop - distance);
+          const durationMs = 1000;
+          const startTime = performance.now();
+
+          function frame(now) {
+            if (!session.randomRunning || cycleSeq !== session.randomCycleSeq) {
+              resolve(false);
+              return;
+            }
+            const t = Math.min(1, (now - startTime) / durationMs);
+            const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            const nextTop = startTop + (goalTop - startTop) * eased;
+            target.setTop(nextTop);
+            setScrollPosition(target.getTop(), target.maxScroll);
+
+            if (t < 1) {
+              session.scrollRafId = requestAnimationFrame(frame);
+            } else {
+              session.scrollRafId = null;
+              session.randomScrollNextDir = chosenDir === "down" ? "up" : "down";
+              resolve(true);
+            }
+          }
+          session.scrollRafId = requestAnimationFrame(frame);
+        });
+      }
+
+      async function beginRandomInteractionLoop() {
+        session.randomCycleSeq += 1;
+        const cycleSeq = session.randomCycleSeq;
+        session.randomRunning = true;
+        session.randomArmedOnLoad = false;
+        session.randomScrollNextDir = "down";
+        session.randomLastSelector = "";
+        updateUI();
+
+        let tapsSinceScroll = 0;
+
+        while (session.randomRunning && cycleSeq === session.randomCycleSeq) {
+          if (session.phase === "failed" || session.phase === "error" || session.phase === "blocked") {
+            stopRandomInteraction("Stopped: Page load failed.", "Load Failed", "#fb7185", "vpn-info-err");
+            return;
+          }
+          if (!session.isDemoLoaded && !authorizedSiteToggle.checked) {
+            stopRandomInteraction("Stopped: Authorized Test Page or Demo Environment required.", "Restricted", "#fb7185", "vpn-info-err");
+            return;
+          }
+          const access = getAccessibleIframeDocument();
+          if (!access) {
+            stopRandomInteraction(
+              "Cross-origin restriction: Random Interaction only runs on your own same-origin Test Page or the Demo Environment.",
+              "Restricted",
+              "#fb7185",
+              "vpn-info-err"
+            );
+            return;
+          }
+
+          if (session.randomTapCount >= session.randomTapTarget) {
+            stopRandomInteraction(
+              `Random Interaction completed (${session.randomTapCount}/${session.randomTapTarget} taps).`,
+              "Completed",
+              "#34d399",
+              "vpn-info-ok"
+            );
+            return;
+          }
+
+          if (tapsSinceScroll >= 2) {
+            await performSmoothScrollStep(session.randomScrollNextDir, cycleSeq);
+            if (!session.randomRunning || cycleSeq !== session.randomCycleSeq) return;
+            tapsSinceScroll = 0;
+            await new Promise((res) => {
+              session.randomTimerId = setTimeout(res, 350);
+            });
+            if (!session.randomRunning || cycleSeq !== session.randomCycleSeq) return;
+            continue;
+          }
+
+          const candidates = scanSafeRandomElements(access.doc, access.win);
+          if (!candidates.length) {
+            stopRandomInteraction("No safe non-ad UI elements found to tap on this test page.", "No Target", "#fbbf24", "vpn-info-warn");
+            return;
+          }
+
+          const filtered = candidates.length > 1
+            ? candidates.filter((c) => c.selector !== session.randomLastSelector)
+            : candidates;
+          const pick = filtered[Math.floor(Math.random() * filtered.length)] || candidates[0];
+          session.randomLastSelector = pick.selector;
+
+          const prevOutline = pick.el.style.outline;
+          pick.el.style.outline = "2px solid #34D399";
+          setTimeout(() => { try { pick.el.style.outline = prevOutline; } catch {} }, 350);
+
+          dispatchSingleActivation(pick.el, access.win, access.doc, "tap", "#34D399");
+          session.randomTapCount += 1;
+          tapsSinceScroll += 1;
+
+          const elLabel = (pick.el.innerText || pick.el.value || pick.el.getAttribute("aria-label") || pick.el.tagName)
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 22) || "UI element";
+
+          if (session.randomTapCount >= session.randomTapTarget) {
+            stopRandomInteraction(
+              `Target reached (${session.randomTapCount}/${session.randomTapTarget}) after tapping "${elLabel}".`,
+              "Completed",
+              "#34d399",
+              "vpn-info-ok"
+            );
+            return;
+          }
+
+          setRandomFeedback(
+            "Random Tapping",
+            "#34d399",
+            `Tapped "${elLabel}" (${session.randomTapCount}/${session.randomTapTarget}) • Next in ${session.randomTapDelaySec}s`,
+            "vpn-info-ok"
+          );
+
+          await new Promise((res) => {
+            session.randomTimerId = setTimeout(res, session.randomTapDelaySec * 1000);
+          });
+        }
+      }
+
+      loadDemoPageBtn.addEventListener("click", () => {
+        if (session.running || session.randomRunning) return;
+        clearTemporarySession("viewing", false);
+        session.isDemoLoaded = true;
+        session.activeUrl = DEMO_TEST_URL;
+        session.phase = "viewing";
+        previewFrame.srcdoc = DEMO_TEST_HTML;
+        showIframe();
+        setRandomFeedback(
+          "Demo Ready",
+          "#34d399",
+          "Demo Test Environment loaded. Tap 'Start Random Test' to run Random Tap & Scroll Down/Up testing.",
+          "vpn-info-ok"
+        );
+        updateUI();
+      });
+
+      randomTargetInput.addEventListener("input", () => {
+        const parsed = parseInt((randomTargetInput.value || "").trim(), 10);
+        if (!Number.isNaN(parsed) && parsed >= 1) {
+          session.randomTapTarget = Math.min(5000, parsed);
+          if (session.randomRunning && session.randomTapCount >= session.randomTapTarget) {
+            stopRandomInteraction(
+              `Random Interaction completed (${session.randomTapCount}/${session.randomTapTarget} taps).`,
+              "Completed",
+              "#34d399",
+              "vpn-info-ok"
+            );
+            return;
+          }
+          renderRandomInteractionUI();
+        }
+      });
+
+      randomDelayInput.addEventListener("change", () => {
+        const d = clampInt(randomDelayInput.value, 1, 30, 2);
+        randomDelayInput.value = String(d);
+        session.randomTapDelaySec = d;
+      });
+
+      startRandomBtn.addEventListener("click", () => {
+        if (session.randomRunning || session.randomArmedOnLoad) return;
+
+        const targetVal = clampInt(randomTargetInput.value, 1, 5000, 20);
+        randomTargetInput.value = String(targetVal);
+        session.randomTapTarget = targetVal;
+
+        const delayVal = clampInt(randomDelayInput.value, 1, 30, 2);
+        randomDelayInput.value = String(delayVal);
+        session.randomTapDelaySec = delayVal;
+
+        if (session.randomTapCount >= session.randomTapTarget) {
+          setRandomFeedback(
+            "Completed",
+            "#34d399",
+            `Tap Target (${session.randomTapCount}/${session.randomTapTarget}) already reached. Press Reset or raise Tap Target.`,
+            "vpn-info-ok"
+          );
+          return;
+        }
+
+        if (!session.isDemoLoaded && !authorizedSiteToggle.checked) {
+          setRandomFeedback(
+            "Restricted",
+            "#fb7185",
+            "Random Interaction only works on your own Test Page ('Authorized Own Site') or Demo Environment ('Load Demo Test Environment').",
+            "vpn-info-err"
+          );
+          return;
+        }
+
+        if (session.phase === "viewing" || session.isDemoLoaded) {
+          const access = getAccessibleIframeDocument();
+          if (!access) {
+            setRandomFeedback(
+              "Restricted",
+              "#fb7185",
+              "Cross-origin restriction: Cannot access external site DOM. Use your same-origin Test Page, Demo Environment, or Android app.",
+              "vpn-info-err"
+            );
+            return;
+          }
+          beginRandomInteractionLoop();
+          return;
+        }
+
+        if (session.running && session.phase === "loading") {
+          session.randomArmedOnLoad = true;
+          setRandomFeedback(
+            "Waiting Load",
+            "#38bdf8",
+            "Waiting for page load to finish before starting Random Interaction...",
+            "vpn-info-ok"
+          );
+          return;
+        }
+
+        const check = validateUrl(urlInput.value);
+        if (!check.valid) {
+          setRandomFeedback(
+            "Load Failed",
+            "#fb7185",
+            "Load Demo Test Environment or enter a valid Test Page URL first.",
+            "vpn-info-err"
+          );
+          return;
+        }
+
+        session.randomArmedOnLoad = true;
+        setRandomFeedback(
+          "Waiting Load",
+          "#38bdf8",
+          "Loading Test Page; Random Interaction will begin once page load completes...",
+          "vpn-info-ok"
+        );
+        startBtn.click();
+      });
+
+      stopRandomBtn.addEventListener("click", () => {
+        stopRandomInteraction(
+          `Random Interaction stopped (${session.randomTapCount}/${session.randomTapTarget}).`,
+          "Stopped",
+          "#fbbf24",
+          "vpn-info-warn"
+        );
+      });
+
+      resetRandomBtn.addEventListener("click", () => {
+        stopRandomInteraction("Random Tap Counter reset.", "Idle", "#34d399", "vpn-info-ok");
+        session.randomTapCount = 0;
+        session.randomLastSelector = "";
+        setRandomFeedback("Idle", "#34d399", `Counter reset (0/${session.randomTapTarget}). Ready to start.`, "vpn-info-ok");
+      });
+
       startBtn.addEventListener("click", () => {
         if (session.running) return;
         const check = validateUrl(urlInput.value);
@@ -2940,7 +3611,17 @@
         urlError.textContent = "";
         urlInput.value = check.url;
 
+        const keepArmed = session.randomArmedOnLoad;
         clearTemporarySession("loading", true);
+        if (keepArmed) {
+          session.randomArmedOnLoad = true;
+          setRandomFeedback(
+            "Waiting Load",
+            "#38bdf8",
+            "Loading Test Page; Random Interaction will start after page load completes...",
+            "vpn-info-ok"
+          );
+        }
 
         session.viewSec = clampInt(viewSecInput.value, 3, 300, 15);
         session.pauseSec = clampInt(pauseSecInput.value, 0, 120, 3);
@@ -2954,7 +3635,7 @@
       });
 
       stopBtn.addEventListener("click", () => {
-        if (!session.running) return;
+        if (!session.running && !session.isDemoLoaded && !session.randomRunning) return;
         clearTemporarySession("stopped", true);
         showOverlay("Session Stopped & Cleared", "Temporary session data and counters cleared.", false);
       });
@@ -2967,10 +3648,19 @@
       });
 
       homeBtn.addEventListener("click", () => {
-        if (session.activeUrl) previewFrame.src = session.activeUrl;
+        if (session.isDemoLoaded) {
+          previewFrame.srcdoc = DEMO_TEST_HTML;
+        } else if (session.activeUrl) {
+          previewFrame.removeAttribute("srcdoc");
+          previewFrame.src = session.activeUrl;
+        }
       });
 
       reloadBtn.addEventListener("click", () => {
+        if (session.isDemoLoaded) {
+          previewFrame.srcdoc = DEMO_TEST_HTML;
+          return;
+        }
         if (!session.activeUrl) return;
         const access = getAccessibleIframeDocument();
         if (access && access.win) {
@@ -2990,6 +3680,7 @@
         clearTemporarySession("idle", true);
       });
 
+      renderRandomInteractionUI();
       updateUI();
     })();
   </script>

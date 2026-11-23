@@ -81,6 +81,8 @@ data class ClickTargetItem(
     val tagType: String
 )
 
+const val DEMO_ENV_URL = "demo://webvisittester.local"
+
 enum class ClickTestStatus(val label: String) {
     IDLE("Idle"),
     RUNNING("Active"),
@@ -91,13 +93,27 @@ enum class ClickTestStatus(val label: String) {
     NO_TARGET("No Target")
 }
 
+enum class RandomInteractionStatus(val label: String) {
+    IDLE("Idle"),
+    WAITING_LOAD("Waiting Load"),
+    TAPPING("Random Tapping"),
+    SCROLLING_DOWN("Scrolling Down"),
+    SCROLLING_UP("Scrolling Up"),
+    COMPLETED("Completed"),
+    FAILED("Load Failed"),
+    STOPPED("Stopped"),
+    RESTRICTED("Restricted")
+}
+
 enum class WebCommandType {
     BACK,
     HOME,
     RELOAD,
     CLEAR_SESSION,
     SCAN_CLICK_TARGETS,
-    EXECUTE_SINGLE_CLICK
+    EXECUTE_SINGLE_CLICK,
+    EXECUTE_RANDOM_TAP,
+    RANDOM_SCROLL_STEP
 }
 
 data class WebCommandEvent(

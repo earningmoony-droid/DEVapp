@@ -54,6 +54,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +73,7 @@ import com.example.R
 import com.example.model.AutoScrollDirection
 import com.example.model.ClickInteractionMode
 import com.example.model.ClickTargetItem
+import com.example.model.DEMO_ENV_URL
 import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
@@ -89,8 +91,10 @@ import com.example.ui.theme.MidnightNavy
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
@@ -123,12 +127,16 @@ fun WebPreviewCard(
     onTargetsScanned: (List<ClickTargetItem>, String?) -> Unit,
     onClickExecuted: (String, String?) -> Unit,
     onDirectPreviewClick: (String) -> Unit,
+    onRandomTapExecuted: (String, String?, String?) -> Unit,
+    onRandomScrollFinished: (Boolean, String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var webProgress by remember { mutableIntStateOf(0) }
     var lastLoadedToken by remember { mutableIntStateOf(-1) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val commandScope = rememberCoroutineScope()
+    var randomScrollAnimJob by remember { mutableStateOf<Job?>(null) }
 
     // Smooth independent Scroll Down / Scroll Up / Random Scroll with Pause, Position & Stuck detection
     LaunchedEffect(
@@ -258,13 +266,25 @@ fun WebPreviewCard(
             WebCommandType.HOME -> {
                 val target = cmd.targetUrl
                 if (wv != null && !target.isNullOrBlank()) {
-                    wv.loadUrl(target)
+                    if (target == DEMO_ENV_URL) {
+                        wv.loadDataWithBaseURL("https://demo.webvisittester.local/", DEMO_TEST_HTML, "text/html", "utf-8", null)
+                    } else {
+                        wv.loadUrl(target)
+                    }
                 }
             }
             WebCommandType.RELOAD -> {
-                wv?.reload()
+                if (wv != null) {
+                    if (cmd.targetUrl == DEMO_ENV_URL || activeUrl == DEMO_ENV_URL) {
+                        wv.loadDataWithBaseURL("https://demo.webvisittester.local/", DEMO_TEST_HTML, "text/html", "utf-8", null)
+                    } else {
+                        wv.reload()
+                    }
+                }
             }
             WebCommandType.CLEAR_SESSION -> {
+                randomScrollAnimJob?.cancel()
+                randomScrollAnimJob = null
                 if (wv != null) {
                     wv.stopLoading()
                     wv.clearHistory()
@@ -297,12 +317,84 @@ fun WebPreviewCard(
                     }
                 }
             }
+            WebCommandType.EXECUTE_RANDOM_TAP -> {
+                if (wv == null) {
+                    onRandomTapExecuted("RESTRICTED", "Preview WebView is not ready.", null)
+                } else {
+                    wv.evaluateJavascript(buildRandomSafeTapScript(cmd.selector.orEmpty())) { raw ->
+                        val decoded = decodeJsString(raw)
+                        val obj = runCatching { org.json.JSONObject(decoded) }.getOrNull()
+                        val st = obj?.optString("status").orEmpty().ifBlank { "RESTRICTED" }
+                        val lbl = obj?.optString("label")?.takeIf { it.isNotBlank() }
+                        val sel = obj?.optString("selector")?.takeIf { it.isNotBlank() }
+                        onRandomTapExecuted(st, lbl, sel)
+                    }
+                }
+            }
+            WebCommandType.RANDOM_SCROLL_STEP -> {
+                if (wv == null) {
+                    onRandomScrollFinished(false, null)
+                } else {
+                    randomScrollAnimJob?.cancel()
+                    val initialDir = if (cmd.selector == "up") "up" else "down"
+                    randomScrollAnimJob = commandScope.launch {
+                        var dir = initialDir
+                        var movedAny = false
+                        var latestPos: String? = null
+                        for (step in 0 until 45) {
+                            if (!isActive) break
+                            val delta = if (dir == "down") 16 else -16
+                            val raw = withTimeoutOrNull(400L) {
+                                suspendCancellableCoroutine<String?> { cont ->
+                                    wv.evaluateJavascript(buildPreviewScrollScript(delta)) { value ->
+                                        if (cont.isActive) cont.resume(value)
+                                    }
+                                }
+                            }
+                            val decoded = decodeJsString(raw)
+                            val parsed = runCatching { org.json.JSONObject(decoded) }.getOrNull()
+                            val st = parsed?.optString("state").orEmpty()
+                            val posText = parsed?.optString("pos")?.takeIf { it.isNotBlank() }
+                            if (posText != null) latestPos = posText
+
+                            if (st == "NOT_SCROLLABLE" || st == "RESTRICTED") {
+                                break
+                            }
+                            if (st == "AT_BOTTOM") {
+                                if (step == 0 && dir == "down") {
+                                    dir = "up"
+                                    continue
+                                }
+                                onScrollFeedback(ScrollIndicatorState.RANDOM_UP, posText)
+                                break
+                            }
+                            if (st == "AT_TOP") {
+                                if (step == 0 && dir == "up") {
+                                    dir = "down"
+                                    continue
+                                }
+                                onScrollFeedback(ScrollIndicatorState.RANDOM_DOWN, posText)
+                                break
+                            }
+                            movedAny = true
+                            onScrollFeedback(
+                                if (dir == "down") ScrollIndicatorState.RANDOM_DOWN else ScrollIndicatorState.RANDOM_UP,
+                                posText
+                            )
+                            delay(18)
+                        }
+                        onRandomScrollFinished(movedAny, latestPos)
+                    }
+                }
+            }
         }
         onConsumeCommand(cmd.id)
     }
 
     DisposableEffect(Unit) {
         onDispose {
+            randomScrollAnimJob?.cancel()
+            randomScrollAnimJob = null
             webViewRef?.apply {
                 stopLoading()
                 clearHistory()
@@ -336,7 +428,7 @@ fun WebPreviewCard(
                 ToolbarIconButton(
                     icon = Icons.Rounded.Home,
                     contentDescription = stringResource(R.string.nav_home),
-                    enabled = (activeUrl ?: fallbackUrl).startsWith("http", ignoreCase = true),
+                    enabled = activeUrl == DEMO_ENV_URL || (activeUrl ?: fallbackUrl).startsWith("http", ignoreCase = true),
                     onClick = onHomeClick,
                     testTag = "preview_home_button"
                 )
@@ -517,7 +609,17 @@ fun WebPreviewCard(
                         if (lastLoadedToken != loadToken) {
                             lastLoadedToken = loadToken
                             webProgress = 0
-                            webView.loadUrl(activeUrl)
+                            if (activeUrl == DEMO_ENV_URL) {
+                                webView.loadDataWithBaseURL(
+                                    "https://demo.webvisittester.local/",
+                                    DEMO_TEST_HTML,
+                                    "text/html",
+                                    "utf-8",
+                                    null
+                                )
+                            } else {
+                                webView.loadUrl(activeUrl)
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxSize()
@@ -874,6 +976,57 @@ private const val AD_GUARD_JS = """
   }
 """
 
+private const val TAP_RIPPLE_JS = """
+  function spawnTapRipple(clientX, clientY, accentHex) {
+    try {
+      var root = document.body || document.documentElement;
+      if (!root) return;
+      var layer = document.getElementById('__wv_ripple_layer');
+      if (!layer) {
+        layer = document.createElement('div');
+        layer.id = '__wv_ripple_layer';
+        layer.setAttribute('aria-hidden', 'true');
+        layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:2147483647;';
+        root.appendChild(layer);
+      }
+      var ripple = document.createElement('span');
+      ripple.setAttribute('aria-hidden', 'true');
+      var x = (typeof clientX === 'number' && isFinite(clientX)) ? clientX : ((window.innerWidth || 300) / 2);
+      var y = (typeof clientY === 'number' && isFinite(clientY)) ? clientY : ((window.innerHeight || 300) / 2);
+      var rgb = accentHex === '#34D399'
+        ? '52, 211, 153'
+        : (accentHex === '#A855F7' ? '168, 85, 247' : '56, 189, 248');
+      ripple.style.cssText =
+        'position:fixed;left:' + x + 'px;top:' + y + 'px;width:46px;height:46px;border-radius:9999px;' +
+        'pointer-events:none;box-sizing:border-box;' +
+        'background:radial-gradient(circle, rgba(' + rgb + ', 0.34) 0%, rgba(' + rgb + ', 0.12) 55%, rgba(' + rgb + ', 0) 75%);' +
+        'border:1.5px solid rgba(' + rgb + ', 0.72);' +
+        'box-shadow:0 0 12px rgba(' + rgb + ', 0.28);' +
+        'transform:translate(-50%, -50%) scale(0.22);opacity:0.9;';
+      layer.appendChild(ripple);
+      var cleanup = function() { try { if (ripple.parentNode) ripple.parentNode.removeChild(ripple); } catch (_) {} };
+      if (typeof ripple.animate === 'function') {
+        var anim = ripple.animate(
+          [
+            { transform: 'translate(-50%, -50%) scale(0.22)', opacity: 0.9 },
+            { transform: 'translate(-50%, -50%) scale(1.3)', opacity: 0 }
+          ],
+          { duration: 480, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'forwards' }
+        );
+        anim.onfinish = cleanup;
+        setTimeout(cleanup, 560);
+      } else {
+        ripple.style.transition = 'transform 0.46s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.46s ease-out';
+        requestAnimationFrame(function() {
+          ripple.style.transform = 'translate(-50%, -50%) scale(1.3)';
+          ripple.style.opacity = '0';
+        });
+        setTimeout(cleanup, 520);
+      }
+    } catch (_) {}
+  }
+"""
+
 private fun buildDirectClickObserverScript(): String {
     return """
         (function() {
@@ -881,6 +1034,7 @@ private fun buildDirectClickObserverScript(): String {
             if (window.__wvDirectClickBound) return;
             window.__wvDirectClickBound = true;
             $AD_GUARD_JS
+            $TAP_RIPPLE_JS
             var lastEl = null;
             var lastAt = 0;
             document.addEventListener('click', function(ev) {
@@ -898,6 +1052,15 @@ private fun buildDirectClickObserverScript(): String {
               lastEl = raw;
               lastAt = now;
               if (isProhibitedAdElement(raw)) return;
+              var hasCoord = (typeof ev.clientX === 'number' && typeof ev.clientY === 'number') && (ev.clientX !== 0 || ev.clientY !== 0);
+              var tx = ev.clientX;
+              var ty = ev.clientY;
+              if (!hasCoord && raw.getBoundingClientRect) {
+                var rr = raw.getBoundingClientRect();
+                tx = rr.left + rr.width / 2;
+                ty = rr.top + rr.height / 2;
+              }
+              spawnTapRipple(tx, ty, '#38BDF8');
               var label = (raw.innerText || raw.value || raw.getAttribute('aria-label') || raw.tagName)
                 .replace(/\s+/g, ' ')
                 .trim()
@@ -984,6 +1147,7 @@ private fun buildSafeClickScript(rawSelector: String, mode: ClickInteractionMode
         (function() {
           try {
             $AD_GUARD_JS
+            $TAP_RIPPLE_JS
             var now = Date.now();
             if (window.__wvLastActAt && now - window.__wvLastActAt < 280) {
               return 'SKIPPED::Debounced accidental double interaction.';
@@ -1008,6 +1172,8 @@ private fun buildSafeClickScript(rawSelector: String, mode: ClickInteractionMode
             var cx = rect.left + rect.width / 2;
             var cy = rect.top + rect.height / 2;
             var isTap = $isTap;
+
+            spawnTapRipple(cx, cy, isTap ? '#A855F7' : '#38BDF8');
 
             var prevOutline = el.style.outline;
             el.style.outline = isTap ? '2px solid #A855F7' : '2px solid #38BDF8';
@@ -1083,6 +1249,208 @@ private fun buildSafeClickScript(rawSelector: String, mode: ClickInteractionMode
         })();
     """.trimIndent()
 }
+
+private fun buildRandomSafeTapScript(lastSelector: String): String {
+    val quotedLast = org.json.JSONObject.quote(lastSelector)
+    return """
+        (function() {
+          try {
+            $AD_GUARD_JS
+            $TAP_RIPPLE_JS
+            var now = Date.now();
+            function escapeCssId(id) {
+              return (window.CSS && CSS.escape) ? CSS.escape(id) : id.replace(/([^\w-])/g, '\\$1');
+            }
+            function buildSelector(el) {
+              if (el.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(el.id)) {
+                var idSel = '#' + escapeCssId(el.id);
+                try { if (document.querySelector(idSel) === el) return idSel; } catch (e0) {}
+              }
+              var parts = [];
+              var cur = el;
+              while (cur && cur.nodeType === 1 && cur.tagName.toLowerCase() !== 'html') {
+                var tag = cur.tagName.toLowerCase();
+                if (cur.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(cur.id)) {
+                  parts.unshift('#' + escapeCssId(cur.id));
+                  break;
+                }
+                var sib = cur;
+                var idx = 1;
+                while (sib.previousElementSibling) {
+                  sib = sib.previousElementSibling;
+                  if (sib.tagName === cur.tagName) idx++;
+                }
+                parts.unshift(tag + ':nth-of-type(' + idx + ')');
+                cur = cur.parentElement;
+              }
+              return parts.join(' > ');
+            }
+
+            var nodes = document.querySelectorAll('button, a[href], [role="button"], input[type="button"], input[type="submit"]');
+            var viewportH = window.innerHeight || 360;
+            var curOrigin = (window.location && window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
+            var inViewport = [];
+            var allSafe = [];
+
+            for (var i = 0; i < nodes.length && allSafe.length < 40; i++) {
+              var el = nodes[i];
+              if (!isInteractable(el)) continue;
+              if (isProhibitedAdElement(el)) continue;
+              if (el.tagName && el.tagName.toLowerCase() === 'a') {
+                var hrefAttr = el.getAttribute('href') || '';
+                if (/^https?:\/\//i.test(hrefAttr) && curOrigin) {
+                  try {
+                    var parsed = new URL(hrefAttr, window.location.href);
+                    if (parsed.origin !== curOrigin) continue;
+                  } catch (eUrl) { continue; }
+                }
+              }
+              var sel = buildSelector(el);
+              if (!sel) continue;
+              var rect = el.getBoundingClientRect();
+              var entry = { el: el, sel: sel };
+              allSafe.push(entry);
+              if (rect.bottom > 8 && rect.top < viewportH - 8) {
+                inViewport.push(entry);
+              }
+            }
+
+            var pool = inViewport.length > 0 ? inViewport : allSafe;
+            if (pool.length === 0) {
+              return JSON.stringify({ status: 'NO_TARGET', label: 'No safe non-ad elements found', selector: '' });
+            }
+
+            var lastSel = $quotedLast;
+            var filtered = (pool.length > 1 && lastSel) ? pool.filter(function(item) { return item.sel !== lastSel; }) : pool;
+            if (filtered.length === 0) filtered = pool;
+            var pick = filtered[Math.floor(Math.random() * filtered.length)];
+            var chosenEl = pick.el;
+
+            if (chosenEl.scrollIntoView) {
+              chosenEl.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+            }
+            var r = chosenEl.getBoundingClientRect();
+            var cx = r.left + r.width / 2;
+            var cy = r.top + r.height / 2;
+
+            spawnTapRipple(cx, cy, '#34D399');
+
+            var prevOutline = chosenEl.style.outline;
+            chosenEl.style.outline = '2px solid #34D399';
+            setTimeout(function() { try { chosenEl.style.outline = prevOutline; } catch (_) {} }, 350);
+
+            var touchHandled = false;
+            if (typeof Touch === 'function' && typeof TouchEvent === 'function') {
+              try {
+                var touchObj = new Touch({
+                  identifier: now % 100000,
+                  target: chosenEl,
+                  clientX: cx, clientY: cy, screenX: cx, screenY: cy,
+                  pageX: cx + (window.scrollX || 0), pageY: cy + (window.scrollY || 0),
+                  radiusX: 4, radiusY: 4, force: 1
+                });
+                chosenEl.dispatchEvent(new TouchEvent('touchstart', {
+                  bubbles: true, cancelable: true, view: window,
+                  touches: [touchObj], targetTouches: [touchObj], changedTouches: [touchObj]
+                }));
+                touchHandled = !chosenEl.dispatchEvent(new TouchEvent('touchend', {
+                  bubbles: true, cancelable: true, view: window,
+                  touches: [], targetTouches: [], changedTouches: [touchObj]
+                }));
+              } catch (eTouch) {}
+            }
+            if (typeof PointerEvent === 'function') {
+              chosenEl.dispatchEvent(new PointerEvent('pointerdown', {
+                bubbles: true, cancelable: true, view: window, pointerType: 'touch', isPrimary: true, clientX: cx, clientY: cy
+              }));
+              var puCanceled = !chosenEl.dispatchEvent(new PointerEvent('pointerup', {
+                bubbles: true, cancelable: true, view: window, pointerType: 'touch', isPrimary: true, clientX: cx, clientY: cy
+              }));
+              touchHandled = touchHandled || puCanceled;
+            }
+            if (!touchHandled) {
+              if (chosenEl.focus) { try { chosenEl.focus({ preventScroll: true }); } catch (_) {} }
+              chosenEl.click();
+            }
+
+            var lbl = (chosenEl.innerText || chosenEl.value || chosenEl.getAttribute('aria-label') || chosenEl.tagName)
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 22) || chosenEl.tagName.toLowerCase();
+
+            return JSON.stringify({ status: 'TAPPED', label: lbl, selector: pick.sel });
+          } catch (e) {
+            return JSON.stringify({ status: 'RESTRICTED', label: (e && e.message) ? e.message : 'Restricted', selector: '' });
+          }
+        })();
+    """.trimIndent()
+}
+
+private val DEMO_TEST_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebVisit Demo Test Environment</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; padding: 18px; background: linear-gradient(160deg, #06091a, #101944, #1b1045); color: #f8fafc; }
+    .hdr { padding: 16px; border-radius: 18px; background: rgba(255,255,255,0.08); border: 1px solid rgba(56,189,248,0.35); margin-bottom: 16px; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: rgba(52,211,153,0.18); color: #34d399; border: 1px solid rgba(52,211,153,0.45); }
+    .card { padding: 16px; border-radius: 16px; background: rgba(15,23,56,0.78); border: 1px solid rgba(255,255,255,0.14); margin-bottom: 16px; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    button, .demo-link { padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(56,189,248,0.5); background: rgba(56,189,248,0.16); color: #f8fafc; font-weight: 700; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
+    button.purple { border-color: rgba(168,85,247,0.55); background: rgba(168,85,247,0.2); }
+    button.emerald { border-color: rgba(52,211,153,0.55); background: rgba(52,211,153,0.18); }
+    #demoFeedback { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(6,9,26,0.7); color: #38bdf8; font-size: 13px; font-weight: 600; }
+    .spacer { height: 220px; display: flex; align-items: center; justify-content: center; border-radius: 14px; border: 1px dashed rgba(255,255,255,0.15); color: #94a3b8; margin-bottom: 16px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="hdr" id="top">
+    <span class="badge">Safe Demo Test Environment</span>
+    <h2 style="margin:8px 0 4px;">WebVisit Interactive Test Page</h2>
+    <p style="margin:0;color:#cbd5e1;font-size:13px;">Built-in local environment for verifying Random Tap, Scroll Down &amp; Scroll Up interactions.</p>
+    <div id="demoFeedback">Waiting for UI interaction...</div>
+  </div>
+  <div class="card">
+    <h3>Section 1: Primary Navigation &amp; Actions</h3>
+    <div class="btn-row">
+      <button type="button" id="demoOverviewBtn" onclick="reportTap('Overview Tab')">Overview Tab</button>
+      <button type="button" class="purple" id="demoLayoutBtn" onclick="reportTap('Layout Check')">Layout Check</button>
+      <a href="#section-2" class="demo-link" onclick="reportTap('Jump Section 2')">Jump to Section 2</a>
+    </div>
+  </div>
+  <div class="spacer">Scrollable Test Spacer A (Viewport Test)</div>
+  <div class="card" id="section-2">
+    <h3>Section 2: Form &amp; Feature Controls</h3>
+    <div class="btn-row">
+      <button type="button" class="emerald" id="demoFeatureBtn" onclick="reportTap('Toggle Feature')">Toggle Feature</button>
+      <button type="button" id="demoVerifyBtn" onclick="reportTap('Verify Widget')">Verify Widget</button>
+      <button type="button" class="purple" id="demoFilterBtn" onclick="reportTap('Apply Filter')">Apply Filter</button>
+    </div>
+  </div>
+  <div class="spacer">Scrollable Test Spacer B (Mid-Page Scroll)</div>
+  <div class="card" id="section-3">
+    <h3>Section 3: Footer Actions</h3>
+    <div class="btn-row">
+      <button type="button" class="emerald" id="demoSubmitBtn" onclick="reportTap('Submit Demo Form')">Submit Demo Form</button>
+      <button type="button" id="demoRefreshBtn" onclick="reportTap('Refresh Panel')">Refresh Panel</button>
+      <a href="#top" class="demo-link" onclick="reportTap('Back to Top Link')">Scroll Anchor Top</a>
+    </div>
+  </div>
+  <script>
+    var demoTapSeq = 0;
+    function reportTap(name) {
+      demoTapSeq += 1;
+      var el = document.getElementById('demoFeedback');
+      if (el) el.textContent = 'Demo Event #' + demoTapSeq + ': Activated "' + name + '"';
+    }
+  </script>
+</body>
+</html>
+""".trimIndent()
 
 private fun decodeJsString(raw: String?): String {
     if (raw.isNullOrBlank() || raw == "null") return ""

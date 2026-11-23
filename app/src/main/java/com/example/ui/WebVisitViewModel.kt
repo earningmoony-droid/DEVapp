@@ -7,6 +7,8 @@ import com.example.model.AutoScrollDirection
 import com.example.model.ClickInteractionMode
 import com.example.model.ClickTargetItem
 import com.example.model.ClickTestStatus
+import com.example.model.DEMO_ENV_URL
+import com.example.model.RandomInteractionStatus
 import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
@@ -18,6 +20,7 @@ import com.example.model.VpnVerificationInfo
 import com.example.model.WebCommandEvent
 import com.example.model.WebCommandType
 import com.example.network.VpnMonitorManager
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class WebVisitUiState(
     val urlInput: String = "",
@@ -64,6 +68,18 @@ data class WebVisitUiState(
     val clickStatusMessage: String? = null,
     val isAuthorizedOwnSite: Boolean = false,
 
+    // Random Interaction Testing Mode (Own Test Page & Demo Environment only, zero ads)
+    val randomTapTargetInput: String = "20",
+    val randomTapTarget: Int = 20,
+    val randomTapDelayInput: String = "2",
+    val randomTapDelaySec: Int = 2,
+    val randomTapCount: Int = 0,
+    val isRandomInteractionRunning: Boolean = false,
+    val isRandomArmedOnLoad: Boolean = false,
+    val isDemoEnvironment: Boolean = false,
+    val randomStatus: RandomInteractionStatus = RandomInteractionStatus.IDLE,
+    val randomStatusMessage: String? = "Starts after verified page load. Performs safe random UI taps with scroll down/up cycles. Own Test Page & Demo Environment only; ads are blocked.",
+
     // Temporary active session state only
     val isRunning: Boolean = false,
     val status: TestSessionStatus = TestSessionStatus.IDLE,
@@ -92,11 +108,15 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
 
     private var queueJob: Job? = null
     private var autoClickJob: Job? = null
+    private var randomJob: Job? = null
     private var commandSeq: Long = 0L
     private var wasVpnActive: Boolean = false
     private var lastSingleTriggerAtMs: Long = 0L
     private var countedVisitToken: Int = -1
     private var countedFailToken: Int = -1
+    private var randomLastSelector: String = ""
+    private var pendingRandomTapDeferred: CompletableDeferred<Triple<String, String?, String?>>? = null
+    private var pendingRandomScrollDeferred: CompletableDeferred<Pair<Boolean, String?>>? = null
 
     init {
         refreshInstalledProviders()
@@ -339,8 +359,15 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     // --- Clicks Automation Controls (Strictly for authorized own sites / test pages, zero ads) ---
 
     fun setAuthorizedOwnSite(authorized: Boolean) {
-        if (!authorized && _uiState.value.isAutoClickRunning) {
-            stopAutoClick("Stopped: Authorization unchecked.")
+        if (!authorized) {
+            if (_uiState.value.isAutoClickRunning) {
+                stopAutoClick("Stopped: Authorization unchecked.")
+            }
+            if ((_uiState.value.isRandomInteractionRunning || _uiState.value.isRandomArmedOnLoad) &&
+                !_uiState.value.isDemoEnvironment
+            ) {
+                stopRandomInteraction("Stopped: Authorization unchecked.", RandomInteractionStatus.RESTRICTED)
+            }
         }
         _uiState.update {
             it.copy(
@@ -705,7 +732,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         if (now - lastSingleTriggerAtMs < 280L) return
 
         val state = _uiState.value
-        if (!state.isAuthorizedOwnSite) {
+        if (!state.isAuthorizedOwnSite && !state.isDemoEnvironment) {
             _uiState.update {
                 it.copy(
                     clickStatus = ClickTestStatus.RESTRICTED,
@@ -837,7 +864,381 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    // --- Random Interaction Testing Mode (Own Test Page & Demo Environment Only, Zero Ads) ---
+
+    fun loadDemoTestEnvironment() {
+        val cur = _uiState.value
+        if (cur.isRunning || cur.isRandomInteractionRunning) return
+
+        queueJob?.cancel()
+        queueJob = null
+        autoClickJob?.cancel()
+        autoClickJob = null
+        cancelRandomJobsAndDeferreds()
+        countedVisitToken = -1
+        countedFailToken = -1
+        randomLastSelector = ""
+
+        _uiState.update {
+            it.copy(
+                isRunning = false,
+                status = TestSessionStatus.VIEWING,
+                activeUrl = DEMO_ENV_URL,
+                previewLoadToken = it.previewLoadToken + 1,
+                isPreviewLoading = false,
+                previewBlockedReason = null,
+                lastLoadWasNetworkError = false,
+                canGoBack = false,
+                scrollDirection = AutoScrollDirection.NONE,
+                isScrollPaused = false,
+                scrollPositionText = "0% • 0/0px",
+                scrollStatus = ScrollIndicatorState.IDLE,
+                isAutoClickRunning = false,
+                isManualClickListening = false,
+                discoveredClickTargets = emptyList(),
+                isDemoEnvironment = true,
+                isRandomInteractionRunning = false,
+                isRandomArmedOnLoad = false,
+                randomStatus = RandomInteractionStatus.IDLE,
+                randomStatusMessage = "Demo Test Environment loaded. Tap 'Start Random Test' to run Random Tap & Scroll Down/Up testing."
+            )
+        }
+    }
+
+    fun updateRandomTapTargetInput(rawInput: String) {
+        val digitsOnly = rawInput.filter { it.isDigit() }.take(4)
+        val parsed = digitsOnly.toIntOrNull()?.coerceIn(1, 5000)
+        _uiState.update { state ->
+            val nextTarget = parsed ?: state.randomTapTarget
+            val reachedNow = state.isRandomInteractionRunning && parsed != null && state.randomTapCount >= nextTarget
+            if (reachedNow) {
+                cancelRandomJobsAndDeferreds()
+            }
+            state.copy(
+                randomTapTargetInput = digitsOnly,
+                randomTapTarget = nextTarget,
+                isRandomInteractionRunning = if (reachedNow) false else state.isRandomInteractionRunning,
+                isRandomArmedOnLoad = if (reachedNow) false else state.isRandomArmedOnLoad,
+                randomStatus = if (reachedNow) RandomInteractionStatus.COMPLETED else state.randomStatus,
+                randomStatusMessage = if (reachedNow) {
+                    "Random Interaction completed (${state.randomTapCount}/$nextTarget taps)."
+                } else {
+                    state.randomStatusMessage
+                }
+            )
+        }
+    }
+
+    fun updateRandomTapDelayInput(rawInput: String) {
+        if (_uiState.value.isRandomInteractionRunning || _uiState.value.isRandomArmedOnLoad) return
+        val digitsOnly = rawInput.filter { it.isDigit() }.take(2)
+        val parsed = digitsOnly.toIntOrNull()?.coerceIn(1, 30)
+        _uiState.update {
+            it.copy(
+                randomTapDelayInput = digitsOnly,
+                randomTapDelaySec = parsed ?: it.randomTapDelaySec
+            )
+        }
+    }
+
+    fun startRandomInteraction() {
+        val state = _uiState.value
+        if (state.isRandomInteractionRunning || state.isRandomArmedOnLoad) return
+
+        val safeTarget = state.randomTapTargetInput.trim().toIntOrNull()?.coerceIn(1, 5000) ?: 20
+        val safeDelay = state.randomTapDelayInput.trim().toIntOrNull()?.coerceIn(1, 30) ?: 2
+
+        if (state.randomTapCount >= safeTarget) {
+            _uiState.update {
+                it.copy(
+                    randomTapTarget = safeTarget,
+                    randomTapTargetInput = safeTarget.toString(),
+                    randomTapDelaySec = safeDelay,
+                    randomTapDelayInput = safeDelay.toString(),
+                    randomStatus = RandomInteractionStatus.COMPLETED,
+                    randomStatusMessage = "Tap Target (${state.randomTapCount}/$safeTarget) already reached. Press Reset or raise Tap Target."
+                )
+            }
+            return
+        }
+
+        if (!state.isDemoEnvironment && !state.isAuthorizedOwnSite) {
+            _uiState.update {
+                it.copy(
+                    randomTapTarget = safeTarget,
+                    randomTapTargetInput = safeTarget.toString(),
+                    randomTapDelaySec = safeDelay,
+                    randomTapDelayInput = safeDelay.toString(),
+                    randomStatus = RandomInteractionStatus.RESTRICTED,
+                    randomStatusMessage = "Random Interaction only works on your own Test Page ('Authorized Own Site') or Demo Environment ('Load Demo Test Environment')."
+                )
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                randomTapTarget = safeTarget,
+                randomTapTargetInput = safeTarget.toString(),
+                randomTapDelaySec = safeDelay,
+                randomTapDelayInput = safeDelay.toString()
+            )
+        }
+
+        val previewReady = (state.isDemoEnvironment && state.activeUrl == DEMO_ENV_URL) ||
+            (state.activeUrl != null && !state.isPreviewLoading && state.previewBlockedReason == null && state.status == TestSessionStatus.VIEWING)
+
+        if (previewReady) {
+            launchRandomInteractionLoop()
+            return
+        }
+
+        if (state.isRunning && state.isPreviewLoading && state.previewBlockedReason == null) {
+            _uiState.update {
+                it.copy(
+                    isRandomArmedOnLoad = true,
+                    randomStatus = RandomInteractionStatus.WAITING_LOAD,
+                    randomStatusMessage = "Waiting for page load to finish before starting Random Interaction..."
+                )
+            }
+            return
+        }
+
+        val check = UrlValidator.validate(state.urlInput)
+        if (check is UrlValidationResult.Invalid) {
+            _uiState.update {
+                it.copy(
+                    randomStatus = RandomInteractionStatus.FAILED,
+                    randomStatusMessage = "Load Demo Test Environment or enter a valid Test Page URL first."
+                )
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isRandomArmedOnLoad = true,
+                randomStatus = RandomInteractionStatus.WAITING_LOAD,
+                randomStatusMessage = "Loading Test Page; Random Interaction will begin once page load completes..."
+            )
+        }
+        startTestInternal(preserveRandomArmed = true)
+    }
+
+    fun stopRandomInteraction(
+        reason: String? = null,
+        finalStatus: RandomInteractionStatus = RandomInteractionStatus.STOPPED
+    ) {
+        cancelRandomJobsAndDeferreds()
+        _uiState.update {
+            it.copy(
+                isRandomInteractionRunning = false,
+                isRandomArmedOnLoad = false,
+                randomStatus = finalStatus,
+                randomStatusMessage = reason ?: "Random Interaction stopped (${it.randomTapCount}/${it.randomTapTarget})."
+            )
+        }
+    }
+
+    fun resetRandomInteractionCounter() {
+        cancelRandomJobsAndDeferreds()
+        randomLastSelector = ""
+        _uiState.update {
+            val safeTarget = it.randomTapTargetInput.toIntOrNull()?.coerceIn(1, 5000) ?: it.randomTapTarget
+            it.copy(
+                randomTapTarget = safeTarget,
+                randomTapTargetInput = safeTarget.toString(),
+                randomTapCount = 0,
+                isRandomInteractionRunning = false,
+                isRandomArmedOnLoad = false,
+                randomStatus = RandomInteractionStatus.IDLE,
+                randomStatusMessage = "Counter reset (0/$safeTarget). Ready to start."
+            )
+        }
+    }
+
+    fun onRandomTapExecuted(status: String, label: String?, selector: String?) {
+        pendingRandomTapDeferred?.complete(Triple(status, label, selector))
+    }
+
+    fun onRandomScrollFinished(moved: Boolean, posText: String?) {
+        pendingRandomScrollDeferred?.complete(Pair(moved, posText))
+    }
+
+    private fun cancelRandomJobsAndDeferreds() {
+        randomJob?.cancel()
+        randomJob = null
+        pendingRandomTapDeferred?.cancel()
+        pendingRandomTapDeferred = null
+        pendingRandomScrollDeferred?.cancel()
+        pendingRandomScrollDeferred = null
+    }
+
+    private fun launchRandomInteractionLoop() {
+        cancelRandomJobsAndDeferreds()
+        randomLastSelector = ""
+        _uiState.update {
+            it.copy(
+                isRandomInteractionRunning = true,
+                isRandomArmedOnLoad = false,
+                scrollDirection = AutoScrollDirection.NONE,
+                isScrollPaused = false,
+                randomStatus = RandomInteractionStatus.TAPPING,
+                randomStatusMessage = "Starting Random Interaction (${it.randomTapCount}/${it.randomTapTarget})..."
+            )
+        }
+
+        randomJob = viewModelScope.launch {
+            var nextScrollDir = "down"
+            var tapsSinceScroll = 0
+
+            while (_uiState.value.isRandomInteractionRunning) {
+                val cur = _uiState.value
+                if (cur.previewBlockedReason != null ||
+                    cur.activeUrl == null ||
+                    cur.status == TestSessionStatus.FAILED ||
+                    cur.status == TestSessionStatus.ERROR ||
+                    cur.status == TestSessionStatus.BLOCKED
+                ) {
+                    stopRandomInteraction("Stopped: Page load failed.", RandomInteractionStatus.FAILED)
+                    break
+                }
+                if (!cur.isDemoEnvironment && !cur.isAuthorizedOwnSite) {
+                    stopRandomInteraction(
+                        "Stopped: Authorized Test Page or Demo Environment required.",
+                        RandomInteractionStatus.RESTRICTED
+                    )
+                    break
+                }
+                if (cur.randomTapCount >= cur.randomTapTarget) {
+                    stopRandomInteraction(
+                        "Random Interaction completed (${cur.randomTapCount}/${cur.randomTapTarget} taps).",
+                        RandomInteractionStatus.COMPLETED
+                    )
+                    break
+                }
+
+                if (tapsSinceScroll >= 2) {
+                    val scrollStatus = if (nextScrollDir == "down") {
+                        RandomInteractionStatus.SCROLLING_DOWN
+                    } else {
+                        RandomInteractionStatus.SCROLLING_UP
+                    }
+                    _uiState.update {
+                        it.copy(
+                            randomStatus = scrollStatus,
+                            scrollStatus = if (nextScrollDir == "down") ScrollIndicatorState.RANDOM_DOWN else ScrollIndicatorState.RANDOM_UP,
+                            randomStatusMessage = "Scrolling $nextScrollDir before re-scanning UI elements (${cur.randomTapCount}/${cur.randomTapTarget})..."
+                        )
+                    }
+                    val scrollDeferred = CompletableDeferred<Pair<Boolean, String?>>()
+                    pendingRandomScrollDeferred = scrollDeferred
+                    _uiState.update {
+                        it.copy(
+                            webCommand = WebCommandEvent(
+                                id = ++commandSeq,
+                                type = WebCommandType.RANDOM_SCROLL_STEP,
+                                selector = nextScrollDir
+                            )
+                        )
+                    }
+                    val scrollRes = withTimeoutOrNull(3500L) { scrollDeferred.await() }
+                    pendingRandomScrollDeferred = null
+                    if (!_uiState.value.isRandomInteractionRunning) break
+                    if (scrollRes?.second != null) {
+                        _uiState.update { it.copy(scrollPositionText = scrollRes.second!!) }
+                    }
+                    nextScrollDir = if (nextScrollDir == "down") "up" else "down"
+                    tapsSinceScroll = 0
+                    delay(350L)
+                    continue
+                }
+
+                val tapDeferred = CompletableDeferred<Triple<String, String?, String?>>()
+                pendingRandomTapDeferred = tapDeferred
+                _uiState.update {
+                    it.copy(
+                        webCommand = WebCommandEvent(
+                            id = ++commandSeq,
+                            type = WebCommandType.EXECUTE_RANDOM_TAP,
+                            selector = randomLastSelector
+                        )
+                    )
+                }
+                val tapRes = withTimeoutOrNull(3000L) { tapDeferred.await() }
+                pendingRandomTapDeferred = null
+                if (!_uiState.value.isRandomInteractionRunning) break
+
+                if (tapRes == null) {
+                    stopRandomInteraction("Stopped: Page preview unavailable.", RandomInteractionStatus.FAILED)
+                    break
+                }
+
+                val (resCode, resLabel, resSelector) = tapRes
+                when (resCode) {
+                    "TAPPED" -> {
+                        if (!resSelector.isNullOrBlank()) {
+                            randomLastSelector = resSelector
+                        }
+                        tapsSinceScroll += 1
+                        val elLabel = resLabel?.takeIf { it.isNotBlank() } ?: "UI element"
+                        var reachedGoal = false
+                        var delaySecNow = 2
+                        _uiState.update { s ->
+                            val nextCount = s.randomTapCount + 1
+                            val target = s.randomTapTarget.coerceAtLeast(1)
+                            delaySecNow = s.randomTapDelaySec.coerceIn(1, 30)
+                            if (nextCount >= target) {
+                                reachedGoal = true
+                                s.copy(
+                                    randomTapCount = nextCount,
+                                    isRandomInteractionRunning = false,
+                                    isRandomArmedOnLoad = false,
+                                    randomStatus = RandomInteractionStatus.COMPLETED,
+                                    randomStatusMessage = "Target reached ($nextCount/$target) after tapping \"$elLabel\"."
+                                )
+                            } else {
+                                s.copy(
+                                    randomTapCount = nextCount,
+                                    randomStatus = RandomInteractionStatus.TAPPING,
+                                    randomStatusMessage = "Tapped \"$elLabel\" ($nextCount/$target) • Next in ${delaySecNow}s"
+                                )
+                            }
+                        }
+                        if (reachedGoal) break
+                        delay(delaySecNow * 1000L)
+                    }
+                    "BLOCKED_AD" -> {
+                        stopRandomInteraction(
+                            "Blocked: Ad elements and ad clicks are strictly prohibited.",
+                            RandomInteractionStatus.RESTRICTED
+                        )
+                        break
+                    }
+                    "NO_TARGET" -> {
+                        stopRandomInteraction(
+                            "No safe non-ad UI elements found to tap on this test page.",
+                            RandomInteractionStatus.RESTRICTED
+                        )
+                        break
+                    }
+                    else -> {
+                        stopRandomInteraction(
+                            resLabel ?: "Random Interaction blocked on this page.",
+                            RandomInteractionStatus.RESTRICTED
+                        )
+                        break
+                    }
+                }
+            }
+        }
+    }
+
     fun startTest() {
+        startTestInternal(preserveRandomArmed = false)
+    }
+
+    private fun startTestInternal(preserveRandomArmed: Boolean) {
         val state = _uiState.value
         if (state.isRunning) return
 
@@ -853,7 +1254,8 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
             _uiState.update {
                 it.copy(
                     vpnStatus = VpnConnectionStatus.DISCONNECTED,
-                    vpnActionMessage = "VPN required: Connect a VPN provider before starting the test."
+                    vpnActionMessage = "VPN required: Connect a VPN provider before starting the test.",
+                    isRandomArmedOnLoad = false
                 )
             }
             return
@@ -864,14 +1266,19 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         val viewSec = state.viewDurationSec
         val pauseSec = state.pauseDurationSec
 
+        cancelRandomJobsAndDeferreds()
         countedVisitToken = -1
         countedFailToken = -1
+        randomLastSelector = ""
 
         _uiState.update {
             it.copy(
                 urlInput = normalizedUrl,
                 urlError = null,
                 vpnActionMessage = null,
+                isDemoEnvironment = false,
+                isRandomInteractionRunning = false,
+                isRandomArmedOnLoad = preserveRandomArmed,
                 isRunning = true,
                 status = TestSessionStatus.LOADING,
                 activeUrl = normalizedUrl,
@@ -1041,6 +1448,36 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 }
             }
 
+            while (_uiState.value.isRandomInteractionRunning || _uiState.value.isRandomArmedOnLoad) {
+                if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
+                    stopTestForVpnLoss()
+                    return
+                }
+                if (_uiState.value.previewBlockedReason != null) {
+                    val hardError = _uiState.value.lastLoadWasNetworkError
+                    autoClickJob?.cancel()
+                    autoClickJob = null
+                    cancelRandomJobsAndDeferreds()
+                    _uiState.update {
+                        it.copy(
+                            isRunning = false,
+                            status = if (hardError) TestSessionStatus.ERROR else TestSessionStatus.FAILED,
+                            isAutoClickRunning = false,
+                            isManualClickListening = false,
+                            isRandomInteractionRunning = false,
+                            isRandomArmedOnLoad = false,
+                            randomStatus = RandomInteractionStatus.FAILED,
+                            randomStatusMessage = "Stopped: Page load failure occurred.",
+                            scrollDirection = AutoScrollDirection.NONE,
+                            isScrollPaused = false,
+                            scrollStatus = ScrollIndicatorState.RESTRICTED
+                        )
+                    }
+                    return
+                }
+                delay(300)
+            }
+
             _uiState.update {
                 it.copy(overallProgress = runIdx.toFloat() / runs.toFloat())
             }
@@ -1068,6 +1505,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
 
         autoClickJob?.cancel()
         autoClickJob = null
+        cancelRandomJobsAndDeferreds()
 
         _uiState.update {
             val allFailed = it.visitCount == 0 && it.failedCount > 0
@@ -1084,6 +1522,9 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 scrollStatus = ScrollIndicatorState.IDLE,
                 isAutoClickRunning = false,
                 isManualClickListening = false,
+                isRandomInteractionRunning = false,
+                isRandomArmedOnLoad = false,
+                isDemoEnvironment = false,
                 discoveredClickTargets = emptyList(),
                 clickStatus = if (it.clickCount >= it.clickTarget && it.clickCount > 0) ClickTestStatus.COMPLETED else ClickTestStatus.IDLE,
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
@@ -1096,6 +1537,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         queueJob = null
         autoClickJob?.cancel()
         autoClickJob = null
+        cancelRandomJobsAndDeferreds()
         countedVisitToken = -1
         countedFailToken = -1
 
@@ -1119,6 +1561,11 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 scrollStatus = ScrollIndicatorState.STOPPED,
                 isAutoClickRunning = false,
                 isManualClickListening = false,
+                isRandomInteractionRunning = false,
+                isRandomArmedOnLoad = false,
+                isDemoEnvironment = false,
+                randomStatus = RandomInteractionStatus.STOPPED,
+                randomStatusMessage = "Stopped: VPN connectivity was lost.",
                 clickCount = 0,
                 discoveredClickTargets = emptyList(),
                 clickStatus = ClickTestStatus.IDLE,
@@ -1136,6 +1583,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         queueJob = null
         autoClickJob?.cancel()
         autoClickJob = null
+        cancelRandomJobsAndDeferreds()
         countedVisitToken = -1
         countedFailToken = -1
 
@@ -1159,6 +1607,12 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 scrollStatus = ScrollIndicatorState.STOPPED,
                 isAutoClickRunning = false,
                 isManualClickListening = false,
+                isRandomInteractionRunning = false,
+                isRandomArmedOnLoad = false,
+                isDemoEnvironment = false,
+                randomTapCount = 0,
+                randomStatus = RandomInteractionStatus.STOPPED,
+                randomStatusMessage = "Session stopped & cleared.",
                 clickCount = 0,
                 discoveredClickTargets = emptyList(),
                 clickStatus = ClickTestStatus.IDLE,
@@ -1176,10 +1630,14 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
 
     fun triggerHome() {
         val state = _uiState.value
-        val target = state.activeUrl ?: when (val res = UrlValidator.validate(state.urlInput)) {
-            is UrlValidationResult.Valid -> res.normalizedUrl
-            is UrlValidationResult.Invalid -> null
-        } ?: return
+        val target = if (state.isDemoEnvironment) {
+            DEMO_ENV_URL
+        } else {
+            state.activeUrl ?: when (val res = UrlValidator.validate(state.urlInput)) {
+                is UrlValidationResult.Valid -> res.normalizedUrl
+                is UrlValidationResult.Invalid -> null
+            } ?: return
+        }
 
         _uiState.update {
             it.copy(
@@ -1192,12 +1650,13 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun triggerReload() {
-        if (_uiState.value.activeUrl == null) return
+        val state = _uiState.value
+        if (state.activeUrl == null) return
         _uiState.update {
             it.copy(
                 previewBlockedReason = null,
                 lastLoadWasNetworkError = false,
-                webCommand = WebCommandEvent(++commandSeq, WebCommandType.RELOAD)
+                webCommand = WebCommandEvent(++commandSeq, WebCommandType.RELOAD, it.activeUrl)
             )
         }
     }
@@ -1217,6 +1676,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun onPreviewPageFinished(canGoBack: Boolean) {
+        var shouldLaunchRandom = false
         _uiState.update { state ->
             val token = state.previewLoadToken
             val shouldCountVisit = state.isRunning &&
@@ -1230,6 +1690,10 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 countedVisitToken = token
             }
 
+            if (state.isRandomArmedOnLoad && !state.isRandomInteractionRunning && state.previewBlockedReason == null) {
+                shouldLaunchRandom = true
+            }
+
             state.copy(
                 isPreviewLoading = false,
                 canGoBack = canGoBack,
@@ -1241,9 +1705,16 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 }
             )
         }
+        if (shouldLaunchRandom) {
+            launchRandomInteractionLoop()
+        }
     }
 
     fun onPreviewBlockedOrError(reason: String, isNetworkError: Boolean = false) {
+        val hadRandom = _uiState.value.isRandomInteractionRunning || _uiState.value.isRandomArmedOnLoad
+        if (hadRandom) {
+            cancelRandomJobsAndDeferreds()
+        }
         _uiState.update { state ->
             val token = state.previewLoadToken
             val shouldCountFail = state.isRunning &&
@@ -1261,7 +1732,11 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 failedCount = if (shouldCountFail) state.failedCount + 1 else state.failedCount,
                 scrollDirection = AutoScrollDirection.NONE,
                 isScrollPaused = false,
-                scrollStatus = ScrollIndicatorState.RESTRICTED
+                scrollStatus = ScrollIndicatorState.RESTRICTED,
+                isRandomInteractionRunning = if (hadRandom) false else state.isRandomInteractionRunning,
+                isRandomArmedOnLoad = if (hadRandom) false else state.isRandomArmedOnLoad,
+                randomStatus = if (hadRandom) RandomInteractionStatus.FAILED else state.randomStatus,
+                randomStatusMessage = if (hadRandom) "Stopped: Page load failed ($reason)" else state.randomStatusMessage
             )
         }
     }
@@ -1270,6 +1745,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         super.onCleared()
         queueJob?.cancel()
         autoClickJob?.cancel()
+        cancelRandomJobsAndDeferreds()
         vpnMonitor.release()
     }
 }
