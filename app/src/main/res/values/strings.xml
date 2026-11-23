@@ -7,9 +7,10 @@
     <string name="url_error_invalid">Enter a valid HTTP or HTTPS web address.</string>
     <string name="btn_start">Start</string>
     <string name="btn_stop">Stop</string>
-    <string name="btn_scroll_down">Scroll Down</string>
-    <string name="btn_scroll_up">Scroll Up</string>
-    <string name="btn_stop_scroll">Stop Scroll</string>
+    <string name="btn_scroll_down">Down</string>
+    <string name="btn_scroll_up">Up</string>
+    <string name="btn_scroll_random">Random</string>
+    <string name="btn_stop_scroll">Stop</string>
     <string name="btn_open_website">Open Website</string>
     <string name="btn_export_html">index.html</string>
     <string name="label_view_duration">Viewing Duration</string>
@@ -20,6 +21,10 @@
     <string name="label_auto_next">Auto Next</string>
     <string name="label_total_runs">Runs</string>
     <string name="label_live_status">Live Status</string>
+    <string name="label_vpn_module">VPN Testing</string>
+    <string name="btn_vpn_connect">Connect VPN</string>
+    <string name="btn_vpn_disconnect">Disconnect</string>
+    <string name="btn_vpn_verify">Verify</string>
     <string name="nav_back">Back</string>
     <string name="nav_home">Home</string>
     <string name="nav_reload">Reload</string>

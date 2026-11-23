@@ -230,7 +230,7 @@
 
     .scroll-controls-row {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
       margin-bottom: 10px;
     }
@@ -290,6 +290,19 @@
     .btn-scroll-up.active {
       background: rgba(168, 85, 247, 0.34);
       border-color: var(--purple);
+    }
+
+    .btn-scroll-random {
+      background: rgba(52, 211, 153, 0.16);
+      border-color: rgba(52, 211, 153, 0.45);
+      color: #d1fae5;
+      min-height: 44px;
+      font-size: 0.78rem;
+    }
+
+    .btn-scroll-random.active {
+      background: rgba(52, 211, 153, 0.32);
+      border-color: var(--emerald);
     }
 
     .btn-scroll-stop {
@@ -526,6 +539,123 @@
 
     .preview-overlay h3 { font-size: 1.02rem; font-weight: 700; }
     .preview-overlay p { font-size: 0.84rem; color: var(--text-secondary); max-width: 340px; }
+
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .vpn-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .vpn-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .vpn-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      background: rgba(251, 191, 36, 0.14);
+      color: var(--amber);
+      white-space: nowrap;
+    }
+
+    .provider-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: 8px 0 12px;
+    }
+
+    .provider-chip {
+      min-height: 36px;
+      padding: 0 11px;
+      border-radius: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(6, 9, 26, 0.52);
+      color: var(--text-secondary);
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .provider-chip.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: rgba(56, 189, 248, 0.6);
+      color: var(--cyan);
+    }
+
+    .vpn-actions-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .btn-vpn-connect {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: rgba(56, 189, 248, 0.45);
+      color: #e0f2fe;
+      min-height: 44px;
+      font-size: 0.78rem;
+    }
+
+    .btn-vpn-disconnect {
+      background: rgba(251, 191, 36, 0.14);
+      border-color: rgba(251, 191, 36, 0.42);
+      color: #fef3c7;
+      min-height: 44px;
+      font-size: 0.78rem;
+    }
+
+    .btn-vpn-verify {
+      background: rgba(52, 211, 153, 0.16);
+      border-color: rgba(52, 211, 153, 0.45);
+      color: #d1fae5;
+      min-height: 44px;
+      font-size: 0.78rem;
+    }
+
+    .vpn-info-box {
+      background: rgba(6, 9, 26, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    .vpn-info-ok {
+      color: var(--emerald);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 600;
+    }
+
+    .vpn-info-warn {
+      color: var(--amber);
+    }
+
+    .vpn-info-err {
+      color: var(--coral);
+    }
   </style>
 </head>
 <body>
@@ -551,86 +681,136 @@
     </header>
 
     <div class="layout-grid">
-      <section class="glass-panel" aria-label="Minimal Testing Controls">
-        <div class="field-group">
-          <div class="url-row">
-            <input
-              id="urlInput"
-              class="url-input"
-              type="url"
-              inputmode="url"
-              autocomplete="off"
-              placeholder="https://example.com"
-            />
-          </div>
-          <div class="chip-row">
-            <button type="button" class="chip-btn active" id="btnHttps">https://</button>
-            <button type="button" class="chip-btn" id="btnHttp">http://</button>
-          </div>
-          <div class="error-text" id="urlError" role="alert"></div>
-        </div>
-
-        <div class="controls-row">
-          <button type="button" class="btn btn-primary" id="startBtn">Start</button>
-          <button type="button" class="btn btn-stop" id="stopBtn" disabled>Stop</button>
-        </div>
-
-        <div class="progress-meta">
-          <span id="liveStatusLabel">Live Status: Idle</span>
-          <span id="progressPercentLabel">0%</span>
-        </div>
-        <div class="progress-track">
-          <div class="progress-fill" id="progressFill"></div>
-        </div>
-
-        <div class="timer-grid">
-          <div class="num-box">
-            <label for="viewSecInput">Viewing (s)</label>
-            <input id="viewSecInput" class="num-input" type="number" min="3" max="300" value="15" />
-          </div>
-          <div class="num-box">
-            <label for="pauseSecInput">Pause (s)</label>
-            <input id="pauseSecInput" class="num-input" type="number" min="0" max="120" value="3" />
-          </div>
-          <div class="num-box">
-            <label for="runsInput">Runs</label>
-            <input id="runsInput" class="num-input" type="number" min="1" max="50" value="3" />
-          </div>
-        </div>
-
-        <div class="scroll-section">
-          <div class="scroll-header">
-            <div>
-              <div class="toggle-label">Auto Scroll</div>
-              <div class="toggle-sub">Scroll Speed &amp; Preview Container</div>
+      <div class="left-col">
+        <section class="glass-panel" aria-label="Minimal Testing Controls">
+          <div class="field-group">
+            <div class="url-row">
+              <input
+                id="urlInput"
+                class="url-input"
+                type="url"
+                inputmode="url"
+                autocomplete="off"
+                placeholder="https://example.com"
+              />
             </div>
-            <span class="scroll-badge" id="scrollStatusBadge">Idle</span>
+            <div class="chip-row">
+              <button type="button" class="chip-btn active" id="btnHttps">https://</button>
+              <button type="button" class="chip-btn" id="btnHttp">http://</button>
+            </div>
+            <div class="error-text" id="urlError" role="alert"></div>
           </div>
 
-          <div class="scroll-controls-row">
-            <button type="button" class="btn btn-scroll-down" id="scrollDownBtn">Scroll Down</button>
-            <button type="button" class="btn btn-scroll-up" id="scrollUpBtn">Scroll Up</button>
-            <button type="button" class="btn btn-scroll-stop" id="stopScrollBtn" disabled>Stop Scroll</button>
+          <div class="controls-row">
+            <button type="button" class="btn btn-primary" id="startBtn">Start</button>
+            <button type="button" class="btn btn-stop" id="stopBtn" disabled>Stop</button>
           </div>
 
-          <div class="chip-row" id="scrollSpeedRow">
-            <button type="button" class="chip-btn" data-speed="slow">Slow</button>
-            <button type="button" class="chip-btn active" data-speed="medium">Medium</button>
-            <button type="button" class="chip-btn" data-speed="fast">Fast</button>
+          <div class="progress-meta">
+            <span id="liveStatusLabel">Live Status: Idle</span>
+            <span id="progressPercentLabel">0%</span>
           </div>
-        </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
 
-        <div class="toggle-row">
-          <div>
-            <div class="toggle-label">Auto Next</div>
-            <div class="toggle-sub">Automatically advance queued runs</div>
+          <div class="timer-grid">
+            <div class="num-box">
+              <label for="viewSecInput">Viewing (s)</label>
+              <input id="viewSecInput" class="num-input" type="number" min="3" max="300" value="15" />
+            </div>
+            <div class="num-box">
+              <label for="pauseSecInput">Pause (s)</label>
+              <input id="pauseSecInput" class="num-input" type="number" min="0" max="120" value="3" />
+            </div>
+            <div class="num-box">
+              <label for="runsInput">Runs</label>
+              <input id="runsInput" class="num-input" type="number" min="1" max="50" value="3" />
+            </div>
           </div>
-          <label class="switch">
-            <input type="checkbox" id="autoNextToggle" checked />
-            <span class="slider"></span>
-          </label>
-        </div>
-      </section>
+
+          <div class="scroll-section">
+            <div class="scroll-header">
+              <div>
+                <div class="toggle-label">Auto Scroll</div>
+                <div class="toggle-sub">Scroll Speed &amp; Preview Container</div>
+              </div>
+              <span class="scroll-badge" id="scrollStatusBadge">Idle</span>
+            </div>
+
+            <div class="scroll-controls-row">
+              <button type="button" class="btn btn-scroll-down" id="scrollDownBtn">Scroll Down</button>
+              <button type="button" class="btn btn-scroll-up" id="scrollUpBtn">Scroll Up</button>
+              <button type="button" class="btn btn-scroll-random" id="scrollRandomBtn">Random Scroll</button>
+              <button type="button" class="btn btn-scroll-stop" id="stopScrollBtn" disabled>Stop Scroll</button>
+            </div>
+
+            <div class="chip-row" id="scrollSpeedRow">
+              <button type="button" class="chip-btn" data-speed="slow">Slow</button>
+              <button type="button" class="chip-btn active" data-speed="medium">Medium</button>
+              <button type="button" class="chip-btn" data-speed="fast">Fast</button>
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Auto Next</div>
+              <div class="toggle-sub">Automatically advance queued runs</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="autoNextToggle" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="glass-panel" aria-label="VPN Testing Module">
+          <div class="vpn-header">
+            <div class="vpn-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              <span>VPN Testing</span>
+            </div>
+            <span class="vpn-badge" id="vpnStatusBadge">Native Android Required</span>
+          </div>
+
+          <div class="toggle-sub">Supported VPN Providers (Country &amp; server selected in provider app)</div>
+          <div class="provider-chips" id="vpnProviderRow">
+            <button type="button" class="provider-chip active" data-provider="Android System VPN">Android System VPN</button>
+            <button type="button" class="provider-chip" data-provider="WireGuard">WireGuard</button>
+            <button type="button" class="provider-chip" data-provider="Proton VPN">Proton VPN</button>
+            <button type="button" class="provider-chip" data-provider="Mullvad VPN">Mullvad VPN</button>
+            <button type="button" class="provider-chip" data-provider="Tailscale">Tailscale</button>
+            <button type="button" class="provider-chip" data-provider="1.1.1.1 / WARP">1.1.1.1 / WARP</button>
+          </div>
+
+          <div class="vpn-actions-row">
+            <button type="button" class="btn btn-vpn-connect" id="vpnConnectBtn">Connect</button>
+            <button type="button" class="btn btn-vpn-disconnect" id="vpnDisconnectBtn">Disconnect</button>
+            <button type="button" class="btn btn-vpn-verify" id="vpnVerifyBtn">Verify</button>
+          </div>
+
+          <div class="vpn-info-box" id="vpnInfoBox">
+            <div class="vpn-info-warn" id="vpnMessage">
+              Browser HTML cannot control or detect OS VPN tunnels. Use the native Android app or toggle your official VPN provider app before testing.
+            </div>
+            <div id="vpnVerifyResult" style="display: none;"></div>
+          </div>
+
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Require Active VPN</div>
+              <div class="toggle-sub" id="requireVpnSub">Native Android auto-stops tests if VPN drops (manual in browser)</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="requireVpnToggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </section>
+      </div>
 
       <section class="glass-panel" aria-label="Website Preview">
         <div class="preview-toolbar">
@@ -687,9 +867,18 @@
 
       const scrollDownBtn = document.getElementById("scrollDownBtn");
       const scrollUpBtn = document.getElementById("scrollUpBtn");
+      const scrollRandomBtn = document.getElementById("scrollRandomBtn");
       const stopScrollBtn = document.getElementById("stopScrollBtn");
       const scrollSpeedRow = document.getElementById("scrollSpeedRow");
       const scrollStatusBadge = document.getElementById("scrollStatusBadge");
+
+      const vpnProviderRow = document.getElementById("vpnProviderRow");
+      const vpnConnectBtn = document.getElementById("vpnConnectBtn");
+      const vpnDisconnectBtn = document.getElementById("vpnDisconnectBtn");
+      const vpnVerifyBtn = document.getElementById("vpnVerifyBtn");
+      const vpnMessage = document.getElementById("vpnMessage");
+      const vpnVerifyResult = document.getElementById("vpnVerifyResult");
+      const requireVpnToggle = document.getElementById("requireVpnToggle");
 
       const startBtn = document.getElementById("startBtn");
       const stopBtn = document.getElementById("stopBtn");
@@ -719,11 +908,14 @@
         totalRuns: 3,
         viewSec: 15,
         pauseSec: 3,
-        scrollDirection: "none", // "none" | "down" | "up"
+        scrollDirection: "none", // "none" | "down" | "up" | "random"
+        randomSubDir: "down",    // "down" | "up"
+        randomSwitchAt: 0,
         scrollSpeed: "medium",
         scrollStatusText: "Idle",
         scrollStatusColor: "#94a3b8",
         autoNext: true,
+        selectedVpnProvider: "Android System VPN",
         phase: "idle", // idle | loading | viewing | cooldown | blocked | completed | stopped
         phaseRemaining: 0,
         activeUrl: "",
@@ -845,12 +1037,28 @@
         return candidates.length > 0 ? candidates[0] : root;
       }
 
+      function nextRandomIntervalMs() {
+        return 1100 + Math.random() * 2100;
+      }
+
+      function updateActiveScrollLabel() {
+        if (session.scrollDirection === "up") {
+          setScrollStatus(`Scrolling Up (${session.scrollSpeed})`, "#a855f7");
+        } else if (session.scrollDirection === "down") {
+          setScrollStatus(`Scrolling Down (${session.scrollSpeed})`, "#38bdf8");
+        } else if (session.scrollDirection === "random") {
+          const dirText = session.randomSubDir === "up" ? "Up" : "Down";
+          setScrollStatus(`Random • ${dirText} (${session.scrollSpeed})`, "#34d399");
+        }
+      }
+
       function stopScrolling(reasonText = "Stopped", color = "#fbbf24") {
         if (session.scrollRafId !== null) {
           cancelAnimationFrame(session.scrollRafId);
           session.scrollRafId = null;
         }
         session.scrollDirection = "none";
+        session.randomSwitchAt = 0;
         session.lastFrameTime = 0;
         session.subPixelCarry = 0;
         setScrollStatus(reasonText, color);
@@ -871,7 +1079,18 @@
         }
 
         const { doc } = access;
-        const target = findScrollableContainer(doc, session.scrollDirection);
+
+        if (session.scrollDirection === "random" && timestamp >= session.randomSwitchAt) {
+          session.randomSubDir = session.randomSubDir === "down" ? "up" : "down";
+          session.randomSwitchAt = timestamp + nextRandomIntervalMs();
+          updateActiveScrollLabel();
+        }
+
+        const effectiveDir = session.scrollDirection === "random"
+          ? session.randomSubDir
+          : session.scrollDirection;
+
+        const target = findScrollableContainer(doc, effectiveDir);
         if (!target) {
           stopScrolling("No Scrollable Container", "#fbbf24");
           return;
@@ -888,8 +1107,29 @@
         const stepPx = Math.floor(session.subPixelCarry);
         if (stepPx >= 1) {
           session.subPixelCarry -= stepPx;
+          const maxScroll = target.scrollHeight - target.clientHeight;
 
-          if (session.scrollDirection === "up") {
+          if (session.scrollDirection === "random") {
+            if (maxScroll <= 1) {
+              stopScrolling("No Scrollable Container", "#fbbf24");
+              return;
+            }
+            if (effectiveDir === "up") {
+              target.scrollTop = Math.max(0, target.scrollTop - stepPx);
+              if (target.scrollTop <= 0) {
+                session.randomSubDir = "down";
+                session.randomSwitchAt = timestamp + nextRandomIntervalMs();
+                updateActiveScrollLabel();
+              }
+            } else {
+              target.scrollTop = Math.min(maxScroll, target.scrollTop + stepPx);
+              if (target.scrollTop >= maxScroll - 1) {
+                session.randomSubDir = "up";
+                session.randomSwitchAt = timestamp + nextRandomIntervalMs();
+                updateActiveScrollLabel();
+              }
+            }
+          } else if (effectiveDir === "up") {
             if (target.scrollTop <= 0) {
               stopScrolling("Reached Top", "#fbbf24");
               return;
@@ -899,8 +1139,7 @@
               stopScrolling("Reached Top", "#fbbf24");
               return;
             }
-          } else if (session.scrollDirection === "down") {
-            const maxScroll = target.scrollHeight - target.clientHeight;
+          } else if (effectiveDir === "down") {
             if (maxScroll <= 0 || target.scrollTop >= maxScroll - 1) {
               stopScrolling("Reached Bottom", "#fbbf24");
               return;
@@ -935,14 +1174,14 @@
         }
 
         session.scrollDirection = direction;
+        if (direction === "random") {
+          session.randomSubDir = Math.random() < 0.7 ? "down" : "up";
+          session.randomSwitchAt = performance.now() + nextRandomIntervalMs();
+        }
         session.lastFrameTime = 0;
         session.subPixelCarry = 0;
 
-        if (direction === "up") {
-          setScrollStatus(`Scrolling Up (${session.scrollSpeed})`, "#a855f7");
-        } else {
-          setScrollStatus(`Scrolling Down (${session.scrollSpeed})`, "#38bdf8");
-        }
+        updateActiveScrollLabel();
         updateUI();
         session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
       }
@@ -986,8 +1225,10 @@
 
         scrollDownBtn.classList.toggle("active", session.scrollDirection === "down");
         scrollUpBtn.classList.toggle("active", session.scrollDirection === "up");
+        scrollRandomBtn.classList.toggle("active", session.scrollDirection === "random");
         scrollDownBtn.disabled = session.scrollDirection === "down";
         scrollUpBtn.disabled = session.scrollDirection === "up";
+        scrollRandomBtn.disabled = session.scrollDirection === "random";
         stopScrollBtn.disabled = session.scrollDirection === "none";
 
         const hasActive = Boolean(session.activeUrl) && session.phase !== "blocked";
@@ -1113,6 +1354,7 @@
 
       scrollDownBtn.addEventListener("click", () => startScrolling("down"));
       scrollUpBtn.addEventListener("click", () => startScrolling("up"));
+      scrollRandomBtn.addEventListener("click", () => startScrolling("random"));
       stopScrollBtn.addEventListener("click", () => stopScrolling("Stopped", "#fbbf24"));
 
       scrollSpeedRow.querySelectorAll("button[data-speed]").forEach((btn) => {
@@ -1121,12 +1363,67 @@
           scrollSpeedRow.querySelectorAll("button[data-speed]").forEach((b) => {
             b.classList.toggle("active", b === btn);
           });
-          if (session.scrollDirection === "up") {
-            setScrollStatus(`Scrolling Up (${session.scrollSpeed})`, "#a855f7");
-          } else if (session.scrollDirection === "down") {
-            setScrollStatus(`Scrolling Down (${session.scrollSpeed})`, "#38bdf8");
-          }
+          updateActiveScrollLabel();
         });
+      });
+
+      vpnProviderRow.querySelectorAll("button[data-provider]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          session.selectedVpnProvider = btn.getAttribute("data-provider") || "Android System VPN";
+          vpnProviderRow.querySelectorAll("button[data-provider]").forEach((b) => {
+            b.classList.toggle("active", b === btn);
+          });
+          vpnMessage.className = "vpn-info-warn";
+          vpnMessage.textContent = `Selected ${session.selectedVpnProvider}. Open its official app or Android VPN Settings to choose country/server (not controllable from browser HTML).`;
+        });
+      });
+
+      vpnConnectBtn.addEventListener("click", () => {
+        vpnMessage.className = "vpn-info-warn";
+        vpnMessage.textContent = `Browser sandboxes cannot open or connect ${session.selectedVpnProvider} directly. Use the WebVisit Tester Android app or connect via your device VPN settings, then tap Verify.`;
+      });
+
+      vpnDisconnectBtn.addEventListener("click", () => {
+        vpnMessage.className = "vpn-info-warn";
+        vpnMessage.textContent = `Disconnect must be performed inside ${session.selectedVpnProvider} or Android System VPN Settings. Browser HTML never fakes VPN tunnel status.`;
+      });
+
+      vpnVerifyBtn.addEventListener("click", async () => {
+        vpnVerifyBtn.disabled = true;
+        vpnVerifyBtn.textContent = "Checking...";
+        vpnVerifyResult.style.display = "block";
+        vpnVerifyResult.className = "vpn-info-warn";
+        vpnVerifyResult.textContent = "Querying current public exit network...";
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        try {
+          const resp = await fetch("https://ipinfo.io/json", {
+            signal: controller.signal,
+            cache: "no-store"
+          });
+          clearTimeout(timeoutId);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          const loc = [data.country, data.region].filter(Boolean).join(", ") || "Unknown";
+          const org = data.org ? ` • Network: ${data.org}` : "";
+          vpnVerifyResult.className = "vpn-info-ok";
+          vpnVerifyResult.textContent = `Exit IP: ${data.ip || "Unknown"} • Region: ${loc}${org}`;
+        } catch (err) {
+          clearTimeout(timeoutId);
+          vpnVerifyResult.className = "vpn-info-err";
+          vpnVerifyResult.textContent = `Verification failed (${err && err.message ? err.message : "Network/CORS blocked"}). Run Verify in the native Android app for direct verification.`;
+        } finally {
+          vpnVerifyBtn.disabled = false;
+          vpnVerifyBtn.textContent = "Verify";
+        }
+      });
+
+      requireVpnToggle.addEventListener("change", () => {
+        if (requireVpnToggle.checked) {
+          vpnMessage.className = "vpn-info-warn";
+          vpnMessage.textContent = "Note: Automatic VPN drop detection (TRANSPORT_VPN) requires the native Android app. Browser HTML cannot detect OS VPN state.";
+        }
       });
 
       autoNextToggle.addEventListener("change", () => {

@@ -22,18 +22,49 @@ enum class ScrollSpeed(val label: String, val pxPerTick: Int) {
 enum class AutoScrollDirection(val label: String) {
     NONE("Stopped"),
     DOWN("Scrolling Down"),
-    UP("Scrolling Up")
+    UP("Scrolling Up"),
+    RANDOM("Random Scroll")
 }
 
 enum class ScrollIndicatorState(val label: String) {
     IDLE("Idle"),
     SCROLLING_DOWN("Scrolling Down"),
     SCROLLING_UP("Scrolling Up"),
+    RANDOM_DOWN("Random • Down"),
+    RANDOM_UP("Random • Up"),
     STOPPED("Stopped"),
     AT_TOP("Reached Top"),
     AT_BOTTOM("Reached Bottom"),
     RESTRICTED("Cross-Origin Restricted")
 }
+
+enum class VpnProvider(
+    val displayName: String,
+    val packageName: String?
+) {
+    ANDROID_SYSTEM("Android System VPN", null),
+    WIREGUARD("WireGuard", "com.wireguard.android"),
+    PROTON_VPN("Proton VPN", "ch.protonvpn.android"),
+    MULLVAD("Mullvad VPN", "net.mullvad.mullvadvpn"),
+    TAILSCALE("Tailscale", "com.tailscale.ipn"),
+    CLOUDFLARE_WARP("1.1.1.1 / WARP", "com.cloudflare.onedotonedotonedotone")
+}
+
+enum class VpnConnectionStatus(val label: String) {
+    DISCONNECTED("Disconnected"),
+    CONNECTED("VPN Active"),
+    VERIFYING("Verifying..."),
+    LOST("VPN Lost")
+}
+
+data class VpnVerificationInfo(
+    val isVerified: Boolean = false,
+    val publicIp: String? = null,
+    val country: String? = null,
+    val region: String? = null,
+    val networkOrg: String? = null,
+    val errorMessage: String? = null
+)
 
 enum class WebCommandType {
     BACK,

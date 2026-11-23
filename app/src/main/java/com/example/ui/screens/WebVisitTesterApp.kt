@@ -19,6 +19,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -52,7 +53,11 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,6 +70,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -81,6 +87,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
@@ -88,6 +97,8 @@ import com.example.model.AutoScrollDirection
 import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
+import com.example.model.VpnConnectionStatus
+import com.example.model.VpnProvider
 import com.example.ui.WebVisitUiState
 import com.example.ui.WebVisitViewModel
 import com.example.ui.components.DurationStepperRow
@@ -119,6 +130,18 @@ fun WebVisitTesterApp(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Refresh installed VPN providers when returning from system VPN Settings or provider app
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshInstalledProviders()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val openWebsiteInBrowser: (String) -> Unit = { targetUrl ->
         val trimmed = targetUrl.trim()
@@ -173,22 +196,35 @@ fun WebVisitTesterApp(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalAlignment = Alignment.Top
                         ) {
-                            MinimalControlPanel(
-                                uiState = uiState,
-                                onUrlChanged = viewModel::onUrlChanged,
-                                onApplyProtocol = viewModel::applyQuickProtocol,
-                                onStartTest = viewModel::startTest,
-                                onStopTest = viewModel::stopTest,
-                                onViewDurationChanged = viewModel::updateViewDuration,
-                                onPauseDurationChanged = viewModel::updatePauseDuration,
-                                onScrollDown = viewModel::startAutoScrollDown,
-                                onScrollUp = viewModel::startAutoScrollUp,
-                                onStopScroll = viewModel::stopAutoScroll,
-                                onScrollSpeedChanged = viewModel::setScrollSpeed,
-                                onAutoNextChanged = viewModel::setAutoNextEnabled,
-                                onTotalRunsChanged = viewModel::updateTotalRuns,
-                                modifier = Modifier.weight(0.95f)
-                            )
+                            Column(
+                                modifier = Modifier.weight(0.95f),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                MinimalControlPanel(
+                                    uiState = uiState,
+                                    onUrlChanged = viewModel::onUrlChanged,
+                                    onApplyProtocol = viewModel::applyQuickProtocol,
+                                    onStartTest = viewModel::startTest,
+                                    onStopTest = viewModel::stopTest,
+                                    onViewDurationChanged = viewModel::updateViewDuration,
+                                    onPauseDurationChanged = viewModel::updatePauseDuration,
+                                    onScrollDown = viewModel::startAutoScrollDown,
+                                    onScrollUp = viewModel::startAutoScrollUp,
+                                    onRandomScroll = viewModel::startRandomScroll,
+                                    onStopScroll = viewModel::stopAutoScroll,
+                                    onScrollSpeedChanged = viewModel::setScrollSpeed,
+                                    onAutoNextChanged = viewModel::setAutoNextEnabled,
+                                    onTotalRunsChanged = viewModel::updateTotalRuns
+                                )
+
+                                VpnTestingPanel(
+                                    uiState = uiState,
+                                    onSelectProvider = viewModel::selectVpnProvider,
+                                    onConnectDisconnect = viewModel::openVpnConnectOrDisconnect,
+                                    onVerifyConnection = viewModel::verifyVpnConnection,
+                                    onRequireVpnChanged = viewModel::setRequireVpnForTest
+                                )
+                            }
 
                             WebPreviewCard(
                                 activeUrl = uiState.activeUrl,
@@ -226,10 +262,19 @@ fun WebVisitTesterApp(
                             onPauseDurationChanged = viewModel::updatePauseDuration,
                             onScrollDown = viewModel::startAutoScrollDown,
                             onScrollUp = viewModel::startAutoScrollUp,
+                            onRandomScroll = viewModel::startRandomScroll,
                             onStopScroll = viewModel::stopAutoScroll,
                             onScrollSpeedChanged = viewModel::setScrollSpeed,
                             onAutoNextChanged = viewModel::setAutoNextEnabled,
                             onTotalRunsChanged = viewModel::updateTotalRuns
+                        )
+
+                        VpnTestingPanel(
+                            uiState = uiState,
+                            onSelectProvider = viewModel::selectVpnProvider,
+                            onConnectDisconnect = viewModel::openVpnConnectOrDisconnect,
+                            onVerifyConnection = viewModel::verifyVpnConnection,
+                            onRequireVpnChanged = viewModel::setRequireVpnForTest
                         )
 
                         WebPreviewCard(
@@ -389,6 +434,7 @@ private fun MinimalControlPanel(
     onPauseDurationChanged: (Int) -> Unit,
     onScrollDown: () -> Unit,
     onScrollUp: () -> Unit,
+    onRandomScroll: () -> Unit,
     onStopScroll: () -> Unit,
     onScrollSpeedChanged: (ScrollSpeed) -> Unit,
     onAutoNextChanged: (Boolean) -> Unit,
@@ -613,7 +659,7 @@ private fun MinimalControlPanel(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Independent Auto Scroll Down / Up / Stop Scroll + Status Indicator
+        // Auto Scroll Down / Up / Random / Stop + Status Indicator
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -628,6 +674,7 @@ private fun MinimalControlPanel(
             val scrollColor = when (uiState.scrollStatus) {
                 ScrollIndicatorState.SCROLLING_DOWN -> ElectricCyan
                 ScrollIndicatorState.SCROLLING_UP -> LuminousPurple
+                ScrollIndicatorState.RANDOM_DOWN, ScrollIndicatorState.RANDOM_UP -> EmeraldSuccess
                 ScrollIndicatorState.RESTRICTED -> CoralDanger
                 ScrollIndicatorState.AT_TOP, ScrollIndicatorState.AT_BOTTOM, ScrollIndicatorState.STOPPED -> AmberWarning
                 ScrollIndicatorState.IDLE -> TextMuted
@@ -651,16 +698,13 @@ private fun MinimalControlPanel(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            val downActive = uiState.scrollDirection == AutoScrollDirection.DOWN
-            val upActive = uiState.scrollDirection == AutoScrollDirection.UP
-
             GlassActionButton(
                 text = stringResource(R.string.btn_scroll_down),
                 icon = Icons.Rounded.ArrowDownward,
                 onClick = onScrollDown,
-                enabled = !downActive,
+                enabled = uiState.scrollDirection != AutoScrollDirection.DOWN,
                 accentColor = ElectricCyan,
                 testTag = "scroll_down_button",
                 modifier = Modifier.weight(1f)
@@ -669,9 +713,26 @@ private fun MinimalControlPanel(
                 text = stringResource(R.string.btn_scroll_up),
                 icon = Icons.Rounded.ArrowUpward,
                 onClick = onScrollUp,
-                enabled = !upActive,
+                enabled = uiState.scrollDirection != AutoScrollDirection.UP,
                 accentColor = LuminousPurple,
                 testTag = "scroll_up_button",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            GlassActionButton(
+                text = stringResource(R.string.btn_scroll_random),
+                icon = Icons.Rounded.Shuffle,
+                onClick = onRandomScroll,
+                enabled = uiState.scrollDirection != AutoScrollDirection.RANDOM,
+                accentColor = EmeraldSuccess,
+                testTag = "scroll_random_button",
                 modifier = Modifier.weight(1f)
             )
             GlassActionButton(
@@ -775,6 +836,220 @@ private fun MinimalControlPanel(
 }
 
 @Composable
+private fun VpnTestingPanel(
+    uiState: WebVisitUiState,
+    onSelectProvider: (VpnProvider) -> Unit,
+    onConnectDisconnect: () -> Unit,
+    onVerifyConnection: () -> Unit,
+    onRequireVpnChanged: (Boolean) -> Unit
+) {
+    val vpnColor = when (uiState.vpnStatus) {
+        VpnConnectionStatus.CONNECTED -> EmeraldSuccess
+        VpnConnectionStatus.VERIFYING -> ElectricCyan
+        VpnConnectionStatus.LOST -> CoralDanger
+        VpnConnectionStatus.DISCONNECTED -> AmberWarning
+    }
+
+    LiquidGlassPanel(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.VpnKey,
+                    contentDescription = null,
+                    tint = ElectricCyan,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = stringResource(R.string.label_vpn_module),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = vpnColor.copy(alpha = 0.14f),
+                border = BorderStroke(1.dp, vpnColor.copy(alpha = 0.45f)),
+                modifier = Modifier.testTag("vpn_status_badge")
+            ) {
+                val ifaceSuffix = uiState.vpnInterfaceName?.let { " • $it" } ?: ""
+                Text(
+                    text = "${uiState.vpnStatus.label}$ifaceSuffix",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = vpnColor,
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            text = "Supported VPN Providers (Country/server chosen inside provider app)",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMuted
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            VpnProvider.entries.forEach { provider ->
+                val selected = uiState.selectedVpnProvider == provider
+                val installed = provider in uiState.installedProviders
+                val shape = RoundedCornerShape(12.dp)
+                Box(
+                    modifier = Modifier
+                        .clip(shape)
+                        .background(
+                            if (selected) ElectricCyan.copy(alpha = 0.2f)
+                            else MidnightDeep.copy(alpha = 0.5f)
+                        )
+                        .border(
+                            1.dp,
+                            if (selected) ElectricCyan.copy(alpha = 0.6f) else GlassStrokeSubtle,
+                            shape
+                        )
+                        .clickable { onSelectProvider(provider) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .testTag("vpn_provider_${provider.name.lowercase()}"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (installed && provider != VpnProvider.ANDROID_SYSTEM) {
+                            "${provider.displayName} ✓"
+                        } else {
+                            provider.displayName
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (selected) ElectricCyan else TextSecondary,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val isConnected = uiState.vpnStatus == VpnConnectionStatus.CONNECTED
+            GlassActionButton(
+                text = if (isConnected) stringResource(R.string.btn_vpn_disconnect) else stringResource(R.string.btn_vpn_connect),
+                icon = Icons.Rounded.Public,
+                onClick = onConnectDisconnect,
+                accentColor = if (isConnected) AmberWarning else ElectricCyan,
+                testTag = "vpn_connect_button",
+                modifier = Modifier.weight(1.1f)
+            )
+            GlassActionButton(
+                text = if (uiState.isVerifyingVpn) "Checking..." else stringResource(R.string.btn_vpn_verify),
+                icon = Icons.Rounded.VerifiedUser,
+                onClick = onVerifyConnection,
+                enabled = !uiState.isVerifyingVpn,
+                accentColor = EmeraldSuccess,
+                testTag = "vpn_verify_button",
+                modifier = Modifier.weight(0.9f)
+            )
+        }
+
+        uiState.vpnVerification?.let { info ->
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MidnightDeep.copy(alpha = 0.6f))
+                    .border(1.dp, GlassStrokeSubtle, RoundedCornerShape(12.dp))
+                    .padding(10.dp)
+            ) {
+                if (info.isVerified) {
+                    val location = listOfNotNull(info.country, info.region).joinToString(", ").ifBlank { "Unknown" }
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            text = "Exit IP: ${info.publicIp ?: "Unknown"} • Region: $location",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = EmeraldSuccess
+                        )
+                        info.networkOrg?.let { org ->
+                            Text(
+                                text = "Network: $org",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = info.errorMessage ?: "Verification unavailable",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = CoralDanger
+                    )
+                }
+            }
+        }
+
+        uiState.vpnActionMessage?.let { msg ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = msg,
+                style = MaterialTheme.typography.labelSmall,
+                color = AmberWarning
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Require Active VPN",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = TextPrimary
+                )
+                Text(
+                    text = "Verify VPN before loading & stop test if VPN disconnects",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = uiState.requireVpnForTest,
+                onCheckedChange = onRequireVpnChanged,
+                enabled = !uiState.isRunning,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MidnightDeep,
+                    checkedTrackColor = EmeraldSuccess,
+                    uncheckedThumbColor = TextMuted,
+                    uncheckedTrackColor = MidnightDeep.copy(alpha = 0.6f)
+                ),
+                modifier = Modifier.testTag("require_vpn_switch")
+            )
+        }
+    }
+}
+
+@Composable
 private fun ProtocolChip(
     label: String,
     selected: Boolean,
@@ -858,7 +1133,7 @@ private fun SingleFileHtmlDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Save or copy the minimal single-file HTML/CSS/JS version of WebVisit Tester (${htmlSource.length} bytes) with zero history or persistent storage.",
+                    text = "Save or copy the minimal single-file HTML/CSS/JS version of WebVisit Tester (${htmlSource.length} bytes) with Random Scroll and VPN Testing interface.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )

@@ -116,7 +116,7 @@ fun WebPreviewCard(
     var lastLoadedToken by remember { mutableIntStateOf(-1) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
-    // Smooth independent Auto Scroll Down / Auto Scroll Up inside webpage container
+    // Smooth independent Scroll Down / Scroll Up / Random Scroll inside webpage container
     LaunchedEffect(
         scrollDirection,
         scrollSpeed,
@@ -134,22 +134,51 @@ fun WebPreviewCard(
             return@LaunchedEffect
         }
 
-        val delta = if (scrollDirection == AutoScrollDirection.DOWN) {
-            scrollSpeed.pxPerTick
-        } else {
-            -scrollSpeed.pxPerTick
-        }
+        var randomGoingDown = true
+        var nextSwitchAtMs = System.currentTimeMillis() + kotlin.random.Random.nextLong(1200L, 3000L)
 
         while (isActive) {
+            val now = System.currentTimeMillis()
+            if (scrollDirection == AutoScrollDirection.RANDOM && now >= nextSwitchAtMs) {
+                randomGoingDown = !randomGoingDown
+                nextSwitchAtMs = now + kotlin.random.Random.nextLong(1100L, 3200L)
+            }
+
+            val goingDown = when (scrollDirection) {
+                AutoScrollDirection.DOWN -> true
+                AutoScrollDirection.UP -> false
+                AutoScrollDirection.RANDOM -> randomGoingDown
+                AutoScrollDirection.NONE -> true
+            }
+            val delta = if (goingDown) scrollSpeed.pxPerTick else -scrollSpeed.pxPerTick
+
             val js = buildPreviewScrollScript(delta)
             wv.evaluateJavascript(js) { rawResult ->
                 val result = rawResult?.trim('"') ?: ""
-                when (result) {
-                    "AT_TOP" -> onScrollStatusChanged(ScrollIndicatorState.AT_TOP)
-                    "AT_BOTTOM" -> onScrollStatusChanged(ScrollIndicatorState.AT_BOTTOM)
-                    "SCROLLING_UP" -> onScrollStatusChanged(ScrollIndicatorState.SCROLLING_UP)
-                    "SCROLLING_DOWN" -> onScrollStatusChanged(ScrollIndicatorState.SCROLLING_DOWN)
-                    "RESTRICTED" -> onScrollStatusChanged(ScrollIndicatorState.RESTRICTED)
+                if (scrollDirection == AutoScrollDirection.RANDOM) {
+                    when (result) {
+                        "AT_TOP" -> {
+                            randomGoingDown = true
+                            nextSwitchAtMs = System.currentTimeMillis() + kotlin.random.Random.nextLong(1100L, 2800L)
+                            onScrollStatusChanged(ScrollIndicatorState.RANDOM_DOWN)
+                        }
+                        "AT_BOTTOM" -> {
+                            randomGoingDown = false
+                            nextSwitchAtMs = System.currentTimeMillis() + kotlin.random.Random.nextLong(1100L, 2800L)
+                            onScrollStatusChanged(ScrollIndicatorState.RANDOM_UP)
+                        }
+                        "SCROLLING_UP" -> onScrollStatusChanged(ScrollIndicatorState.RANDOM_UP)
+                        "SCROLLING_DOWN" -> onScrollStatusChanged(ScrollIndicatorState.RANDOM_DOWN)
+                        "RESTRICTED" -> onScrollStatusChanged(ScrollIndicatorState.RESTRICTED)
+                    }
+                } else {
+                    when (result) {
+                        "AT_TOP" -> onScrollStatusChanged(ScrollIndicatorState.AT_TOP)
+                        "AT_BOTTOM" -> onScrollStatusChanged(ScrollIndicatorState.AT_BOTTOM)
+                        "SCROLLING_UP" -> onScrollStatusChanged(ScrollIndicatorState.SCROLLING_UP)
+                        "SCROLLING_DOWN" -> onScrollStatusChanged(ScrollIndicatorState.SCROLLING_DOWN)
+                        "RESTRICTED" -> onScrollStatusChanged(ScrollIndicatorState.RESTRICTED)
+                    }
                 }
             }
             delay(20)

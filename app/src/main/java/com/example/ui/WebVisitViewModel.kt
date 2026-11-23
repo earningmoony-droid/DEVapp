@@ -1,6 +1,7 @@
 package com.example.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.AutoScrollDirection
 import com.example.model.ScrollIndicatorState
@@ -8,8 +9,12 @@ import com.example.model.ScrollSpeed
 import com.example.model.TestSessionStatus
 import com.example.model.UrlValidationResult
 import com.example.model.UrlValidator
+import com.example.model.VpnConnectionStatus
+import com.example.model.VpnProvider
+import com.example.model.VpnVerificationInfo
 import com.example.model.WebCommandEvent
 import com.example.model.WebCommandType
+import com.example.network.VpnMonitorManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +34,17 @@ data class WebVisitUiState(
     val scrollStatus: ScrollIndicatorState = ScrollIndicatorState.IDLE,
     val autoNextEnabled: Boolean = true,
 
-    // Temporary active session state only (never persisted)
+    // VPN Testing Module (temporary in-memory state only)
+    val selectedVpnProvider: VpnProvider = VpnProvider.ANDROID_SYSTEM,
+    val installedProviders: Set<VpnProvider> = setOf(VpnProvider.ANDROID_SYSTEM),
+    val vpnStatus: VpnConnectionStatus = VpnConnectionStatus.DISCONNECTED,
+    val vpnInterfaceName: String? = null,
+    val requireVpnForTest: Boolean = false,
+    val vpnVerification: VpnVerificationInfo? = null,
+    val vpnActionMessage: String? = null,
+    val isVerifyingVpn: Boolean = false,
+
+    // Temporary active session state only
     val isRunning: Boolean = false,
     val status: TestSessionStatus = TestSessionStatus.IDLE,
     val activeUrl: String? = null,
@@ -45,13 +60,101 @@ data class WebVisitUiState(
     val isHtmlSheetVisible: Boolean = false
 )
 
-class WebVisitViewModel : ViewModel() {
+class WebVisitViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val vpnMonitor = VpnMonitorManager(application.applicationContext)
 
     private val _uiState = MutableStateFlow(WebVisitUiState())
     val uiState: StateFlow<WebVisitUiState> = _uiState.asStateFlow()
 
     private var queueJob: Job? = null
     private var commandSeq: Long = 0L
+    private var wasVpnActive: Boolean = false
+
+    init {
+        refreshInstalledProviders()
+
+        viewModelScope.launch {
+            vpnMonitor.transportState.collect { transport ->
+                val prevActive = wasVpnActive
+                wasVpnActive = transport.isVpnActive
+
+                val currentState = _uiState.value
+                val droppedDuringTest = prevActive && !transport.isVpnActive &&
+                    currentState.isRunning && currentState.requireVpnForTest
+
+                if (droppedDuringTest) {
+                    stopTestForVpnLoss()
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            vpnStatus = if (transport.isVpnActive) {
+                                VpnConnectionStatus.CONNECTED
+                            } else if (it.vpnStatus == VpnConnectionStatus.LOST) {
+                                VpnConnectionStatus.LOST
+                            } else {
+                                VpnConnectionStatus.DISCONNECTED
+                            },
+                            vpnInterfaceName = transport.interfaceName
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun refreshInstalledProviders() {
+        val installed = VpnProvider.entries.filter { vpnMonitor.isProviderInstalled(it) }.toSet()
+        _uiState.update { it.copy(installedProviders = installed) }
+    }
+
+    fun selectVpnProvider(provider: VpnProvider) {
+        _uiState.update {
+            it.copy(selectedVpnProvider = provider, vpnActionMessage = null)
+        }
+    }
+
+    fun setRequireVpnForTest(required: Boolean) {
+        if (_uiState.value.isRunning) return
+        _uiState.update { it.copy(requireVpnForTest = required, vpnActionMessage = null) }
+    }
+
+    fun openVpnConnectOrDisconnect() {
+        val provider = _uiState.value.selectedVpnProvider
+        vpnMonitor.openOfficialVpnControl(provider)
+            .onSuccess { msg ->
+                _uiState.update { it.copy(vpnActionMessage = msg) }
+            }
+            .onFailure { err ->
+                _uiState.update {
+                    it.copy(vpnActionMessage = err.localizedMessage ?: "Unable to open VPN settings.")
+                }
+            }
+    }
+
+    fun verifyVpnConnection() {
+        if (_uiState.value.isVerifyingVpn) return
+        _uiState.update {
+            it.copy(
+                isVerifyingVpn = true,
+                vpnStatus = VpnConnectionStatus.VERIFYING,
+                vpnActionMessage = null
+            )
+        }
+        viewModelScope.launch {
+            val info = vpnMonitor.verifyConnection()
+            val active = vpnMonitor.transportState.value.isVpnActive
+            _uiState.update {
+                it.copy(
+                    isVerifyingVpn = false,
+                    vpnStatus = if (active) VpnConnectionStatus.CONNECTED else VpnConnectionStatus.DISCONNECTED,
+                    vpnInterfaceName = vpnMonitor.transportState.value.interfaceName,
+                    vpnVerification = info,
+                    vpnActionMessage = info.errorMessage
+                )
+            }
+        }
+    }
 
     fun setHtmlSheetVisible(visible: Boolean) {
         _uiState.update { it.copy(isHtmlSheetVisible = visible) }
@@ -107,6 +210,15 @@ class WebVisitViewModel : ViewModel() {
         }
     }
 
+    fun startRandomScroll() {
+        _uiState.update {
+            it.copy(
+                scrollDirection = AutoScrollDirection.RANDOM,
+                scrollStatus = if (it.activeUrl != null) ScrollIndicatorState.RANDOM_DOWN else ScrollIndicatorState.IDLE
+            )
+        }
+    }
+
     fun stopAutoScroll() {
         _uiState.update {
             it.copy(
@@ -139,6 +251,18 @@ class WebVisitViewModel : ViewModel() {
             return
         }
 
+        vpnMonitor.refreshState()
+        val vpnActive = vpnMonitor.transportState.value.isVpnActive
+        if (state.requireVpnForTest && !vpnActive) {
+            _uiState.update {
+                it.copy(
+                    vpnStatus = VpnConnectionStatus.DISCONNECTED,
+                    vpnActionMessage = "VPN required: Connect a VPN provider before starting the test."
+                )
+            }
+            return
+        }
+
         val normalizedUrl = (validation as UrlValidationResult.Valid).normalizedUrl
         val runs = if (state.autoNextEnabled) state.totalRuns else 1
         val viewSec = state.viewDurationSec
@@ -148,6 +272,7 @@ class WebVisitViewModel : ViewModel() {
             it.copy(
                 urlInput = normalizedUrl,
                 urlError = null,
+                vpnActionMessage = null,
                 isRunning = true,
                 status = TestSessionStatus.LOADING,
                 activeUrl = normalizedUrl,
@@ -161,6 +286,7 @@ class WebVisitViewModel : ViewModel() {
                 scrollStatus = when (it.scrollDirection) {
                     AutoScrollDirection.DOWN -> ScrollIndicatorState.SCROLLING_DOWN
                     AutoScrollDirection.UP -> ScrollIndicatorState.SCROLLING_UP
+                    AutoScrollDirection.RANDOM -> ScrollIndicatorState.RANDOM_DOWN
                     AutoScrollDirection.NONE -> ScrollIndicatorState.IDLE
                 }
             )
@@ -179,6 +305,11 @@ class WebVisitViewModel : ViewModel() {
         pauseDurationSec: Int
     ) {
         for (runIdx in 1..runs) {
+            if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
+                stopTestForVpnLoss()
+                return
+            }
+
             _uiState.update {
                 it.copy(
                     status = TestSessionStatus.LOADING,
@@ -197,6 +328,10 @@ class WebVisitViewModel : ViewModel() {
                 _uiState.value.previewBlockedReason == null &&
                 loadGraceMs < 4000
             ) {
+                if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
+                    stopTestForVpnLoss()
+                    return
+                }
                 delay(150)
                 loadGraceMs += 150
             }
@@ -222,6 +357,10 @@ class WebVisitViewModel : ViewModel() {
             }
 
             for (secLeft in viewDurationSec downTo 1) {
+                if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
+                    stopTestForVpnLoss()
+                    return
+                }
                 _uiState.update {
                     val fractionDoneInRun =
                         (viewDurationSec - secLeft).toFloat() / viewDurationSec.toFloat()
@@ -261,6 +400,10 @@ class WebVisitViewModel : ViewModel() {
                     )
                 }
                 for (pauseLeft in pauseDurationSec downTo 1) {
+                    if (_uiState.value.requireVpnForTest && !vpnMonitor.transportState.value.isVpnActive) {
+                        stopTestForVpnLoss()
+                        return
+                    }
                     _uiState.update { it.copy(phaseRemainingSec = pauseLeft) }
                     delay(1000)
                 }
@@ -277,6 +420,31 @@ class WebVisitViewModel : ViewModel() {
                 canGoBack = false,
                 scrollDirection = AutoScrollDirection.NONE,
                 scrollStatus = ScrollIndicatorState.IDLE,
+                webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
+            )
+        }
+    }
+
+    private fun stopTestForVpnLoss() {
+        queueJob?.cancel()
+        queueJob = null
+
+        _uiState.update {
+            it.copy(
+                isRunning = false,
+                status = TestSessionStatus.STOPPED,
+                activeUrl = null,
+                currentRunNumber = 0,
+                phaseRemainingSec = 0,
+                overallProgress = 0f,
+                isPreviewLoading = false,
+                previewBlockedReason = null,
+                canGoBack = false,
+                scrollDirection = AutoScrollDirection.NONE,
+                scrollStatus = ScrollIndicatorState.STOPPED,
+                vpnStatus = VpnConnectionStatus.LOST,
+                vpnInterfaceName = null,
+                vpnActionMessage = "Test stopped: VPN connectivity was lost.",
                 webCommand = WebCommandEvent(++commandSeq, WebCommandType.CLEAR_SESSION)
             )
         }
@@ -378,5 +546,6 @@ class WebVisitViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         queueJob?.cancel()
+        vpnMonitor.release()
     }
 }
