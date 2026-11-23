@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.AutoScrollDirection
+import com.example.model.ClickInteractionMode
 import com.example.model.ClickTargetItem
 import com.example.model.ClickTestStatus
 import com.example.model.ScrollIndicatorState
@@ -34,6 +35,8 @@ data class WebVisitUiState(
     val scrollDirection: AutoScrollDirection = AutoScrollDirection.NONE,
     val scrollSpeed: ScrollSpeed = ScrollSpeed.MEDIUM,
     val scrollStatus: ScrollIndicatorState = ScrollIndicatorState.IDLE,
+    val isScrollPaused: Boolean = false,
+    val scrollPositionText: String = "0% • 0/0px",
     val autoNextEnabled: Boolean = true,
 
     // VPN Testing Module (temporary in-memory state only)
@@ -46,7 +49,8 @@ data class WebVisitUiState(
     val vpnActionMessage: String? = null,
     val isVerifyingVpn: Boolean = false,
 
-    // Clicks Automation (temporary in-memory state only, no history/logs)
+    // Clicks & Tap Automation (temporary in-memory state only, no history/logs)
+    val clickMode: ClickInteractionMode = ClickInteractionMode.CLICK,
     val clickIntervalSec: Int = 2,
     val clickSelector: String = "",
     val discoveredClickTargets: List<ClickTargetItem> = emptyList(),
@@ -84,6 +88,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     private var autoClickJob: Job? = null
     private var commandSeq: Long = 0L
     private var wasVpnActive: Boolean = false
+    private var lastSingleTriggerAtMs: Long = 0L
 
     init {
         refreshInstalledProviders()
@@ -208,28 +213,70 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
 
     fun startAutoScrollDown() {
         _uiState.update {
+            if (it.activeUrl == null) {
+                return@update it.copy(
+                    scrollDirection = AutoScrollDirection.NONE,
+                    isScrollPaused = false,
+                    scrollStatus = ScrollIndicatorState.IDLE
+                )
+            }
             it.copy(
                 scrollDirection = AutoScrollDirection.DOWN,
-                scrollStatus = if (it.activeUrl != null) ScrollIndicatorState.SCROLLING_DOWN else ScrollIndicatorState.IDLE
+                isScrollPaused = false,
+                scrollStatus = ScrollIndicatorState.SCROLLING_DOWN
             )
         }
     }
 
     fun startAutoScrollUp() {
         _uiState.update {
+            if (it.activeUrl == null) {
+                return@update it.copy(
+                    scrollDirection = AutoScrollDirection.NONE,
+                    isScrollPaused = false,
+                    scrollStatus = ScrollIndicatorState.IDLE
+                )
+            }
             it.copy(
                 scrollDirection = AutoScrollDirection.UP,
-                scrollStatus = if (it.activeUrl != null) ScrollIndicatorState.SCROLLING_UP else ScrollIndicatorState.IDLE
+                isScrollPaused = false,
+                scrollStatus = ScrollIndicatorState.SCROLLING_UP
             )
         }
     }
 
     fun startRandomScroll() {
         _uiState.update {
+            if (it.activeUrl == null) {
+                return@update it.copy(
+                    scrollDirection = AutoScrollDirection.NONE,
+                    isScrollPaused = false,
+                    scrollStatus = ScrollIndicatorState.IDLE
+                )
+            }
             it.copy(
                 scrollDirection = AutoScrollDirection.RANDOM,
-                scrollStatus = if (it.activeUrl != null) ScrollIndicatorState.RANDOM_DOWN else ScrollIndicatorState.IDLE
+                isScrollPaused = false,
+                scrollStatus = ScrollIndicatorState.RANDOM_DOWN
             )
+        }
+    }
+
+    fun togglePauseAutoScroll() {
+        _uiState.update { state ->
+            if (state.scrollDirection == AutoScrollDirection.NONE) return@update state
+            val nextPaused = !state.isScrollPaused
+            val nextStatus = if (nextPaused) {
+                ScrollIndicatorState.PAUSED
+            } else {
+                when (state.scrollDirection) {
+                    AutoScrollDirection.DOWN -> ScrollIndicatorState.SCROLLING_DOWN
+                    AutoScrollDirection.UP -> ScrollIndicatorState.SCROLLING_UP
+                    AutoScrollDirection.RANDOM -> ScrollIndicatorState.RANDOM_DOWN
+                    AutoScrollDirection.NONE -> ScrollIndicatorState.IDLE
+                }
+            }
+            state.copy(isScrollPaused = nextPaused, scrollStatus = nextStatus)
         }
     }
 
@@ -237,17 +284,43 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         _uiState.update {
             it.copy(
                 scrollDirection = AutoScrollDirection.NONE,
+                isScrollPaused = false,
                 scrollStatus = ScrollIndicatorState.STOPPED
             )
         }
     }
 
-    fun updateScrollStatus(status: ScrollIndicatorState) {
-        _uiState.update { it.copy(scrollStatus = status) }
+    fun onScrollFeedback(status: ScrollIndicatorState, positionText: String?) {
+        val isTerminal = status == ScrollIndicatorState.AT_TOP ||
+            status == ScrollIndicatorState.AT_BOTTOM ||
+            status == ScrollIndicatorState.NOT_SCROLLABLE ||
+            status == ScrollIndicatorState.STUCK ||
+            status == ScrollIndicatorState.RESTRICTED
+
+        _uiState.update { state ->
+            val updatedPos = positionText ?: state.scrollPositionText
+            if (state.isScrollPaused && !isTerminal) {
+                return@update state.copy(scrollPositionText = updatedPos)
+            }
+            if (state.scrollDirection == AutoScrollDirection.NONE && !isTerminal) {
+                return@update state.copy(scrollPositionText = updatedPos)
+            }
+            state.copy(
+                scrollStatus = status,
+                scrollPositionText = updatedPos,
+                scrollDirection = if (isTerminal) AutoScrollDirection.NONE else state.scrollDirection,
+                isScrollPaused = if (isTerminal) false else state.isScrollPaused
+            )
+        }
     }
 
     fun setScrollSpeed(speed: ScrollSpeed) {
         _uiState.update { it.copy(scrollSpeed = speed) }
+    }
+
+    fun setClickInteractionMode(mode: ClickInteractionMode) {
+        if (_uiState.value.isAutoClickRunning) return
+        _uiState.update { it.copy(clickMode = mode, clickStatusMessage = null) }
     }
 
     fun setAutoNextEnabled(enabled: Boolean) {
@@ -349,6 +422,9 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun triggerSingleClickTest() {
+        val now = System.currentTimeMillis()
+        if (now - lastSingleTriggerAtMs < 320L) return
+
         val state = _uiState.value
         if (!state.isAuthorizedOwnSite) {
             _uiState.update {
@@ -388,10 +464,16 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
             return
         }
 
+        lastSingleTriggerAtMs = now
         _uiState.update {
             it.copy(
                 clickStatusMessage = null,
-                webCommand = WebCommandEvent(++commandSeq, WebCommandType.EXECUTE_SINGLE_CLICK, selector = selector)
+                webCommand = WebCommandEvent(
+                    id = ++commandSeq,
+                    type = WebCommandType.EXECUTE_SINGLE_CLICK,
+                    selector = selector,
+                    interactionMode = state.clickMode
+                )
             )
         }
     }
@@ -438,11 +520,12 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         }
 
         val intervalMs = state.clickIntervalSec.coerceIn(1, 60) * 1000L
+        val modeLabel = if (state.clickMode == ClickInteractionMode.TAP) "Auto Tap" else "Auto Click"
         _uiState.update {
             it.copy(
                 isAutoClickRunning = true,
                 clickStatus = ClickTestStatus.RUNNING,
-                clickStatusMessage = "Auto Click active every ${state.clickIntervalSec}s"
+                clickStatusMessage = "$modeLabel active every ${state.clickIntervalSec}s"
             )
         }
 
@@ -450,11 +533,12 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         autoClickJob = viewModelScope.launch {
             while (_uiState.value.isAutoClickRunning) {
                 val cur = _uiState.value
+                val activeLabel = if (cur.clickMode == ClickInteractionMode.TAP) "Auto Tap" else "Auto Click"
                 if (!cur.isAuthorizedOwnSite ||
                     cur.activeUrl == null ||
                     cur.previewBlockedReason != null
                 ) {
-                    stopAutoClick("Auto Click stopped: Preview not active.")
+                    stopAutoClick("$activeLabel stopped: Preview not active.")
                     break
                 }
                 if (cur.status != TestSessionStatus.PAUSING_BETWEEN && !cur.isPreviewLoading) {
@@ -463,7 +547,8 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                             webCommand = WebCommandEvent(
                                 id = ++commandSeq,
                                 type = WebCommandType.EXECUTE_SINGLE_CLICK,
-                                selector = cur.clickSelector.trim()
+                                selector = cur.clickSelector.trim(),
+                                interactionMode = cur.clickMode
                             )
                         )
                     }
@@ -473,26 +558,28 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun stopAutoClick(reason: String? = "Auto Click stopped.") {
+    fun stopAutoClick(reason: String? = null) {
         autoClickJob?.cancel()
         autoClickJob = null
         _uiState.update {
+            val defaultMsg = if (it.clickMode == ClickInteractionMode.TAP) "Auto Tap stopped." else "Auto Click stopped."
             it.copy(
                 isAutoClickRunning = false,
                 clickStatus = ClickTestStatus.STOPPED,
-                clickStatusMessage = reason
+                clickStatusMessage = reason ?: defaultMsg
             )
         }
     }
 
     fun onSingleClickExecuted(resultCode: String, detail: String?) {
         when (resultCode) {
+            "SKIPPED" -> Unit
             "CLICKED" -> {
                 _uiState.update {
                     it.copy(
                         clickCount = it.clickCount + 1,
                         clickStatus = if (it.isAutoClickRunning) ClickTestStatus.RUNNING else ClickTestStatus.IDLE,
-                        clickStatusMessage = detail ?: "Tested button/link click (${it.clickCount + 1})."
+                        clickStatusMessage = detail ?: "Tested interaction (${it.clickCount + 1})."
                     )
                 }
             }
@@ -634,6 +721,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                         status = TestSessionStatus.BLOCKED,
                         isPreviewLoading = false,
                         scrollDirection = AutoScrollDirection.NONE,
+                        isScrollPaused = false,
                         scrollStatus = ScrollIndicatorState.RESTRICTED
                     )
                 }
@@ -669,6 +757,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                             isRunning = false,
                             status = TestSessionStatus.BLOCKED,
                             scrollDirection = AutoScrollDirection.NONE,
+                            isScrollPaused = false,
                             scrollStatus = ScrollIndicatorState.RESTRICTED
                         )
                     }
@@ -713,6 +802,8 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 overallProgress = 1f,
                 canGoBack = false,
                 scrollDirection = AutoScrollDirection.NONE,
+                isScrollPaused = false,
+                scrollPositionText = "0% • 0/0px",
                 scrollStatus = ScrollIndicatorState.IDLE,
                 isAutoClickRunning = false,
                 clickCount = 0,
@@ -742,6 +833,8 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 previewBlockedReason = null,
                 canGoBack = false,
                 scrollDirection = AutoScrollDirection.NONE,
+                isScrollPaused = false,
+                scrollPositionText = "0% • 0/0px",
                 scrollStatus = ScrollIndicatorState.STOPPED,
                 isAutoClickRunning = false,
                 clickCount = 0,
@@ -774,6 +867,8 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 previewBlockedReason = null,
                 canGoBack = false,
                 scrollDirection = AutoScrollDirection.NONE,
+                isScrollPaused = false,
+                scrollPositionText = "0% • 0/0px",
                 scrollStatus = ScrollIndicatorState.STOPPED,
                 isAutoClickRunning = false,
                 clickCount = 0,
@@ -851,6 +946,7 @@ class WebVisitViewModel(application: Application) : AndroidViewModel(application
                 isPreviewLoading = false,
                 previewBlockedReason = reason,
                 scrollDirection = AutoScrollDirection.NONE,
+                isScrollPaused = false,
                 scrollStatus = ScrollIndicatorState.RESTRICTED
             )
         }

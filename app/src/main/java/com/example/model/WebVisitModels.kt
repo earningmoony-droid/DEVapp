@@ -32,10 +32,18 @@ enum class ScrollIndicatorState(val label: String) {
     SCROLLING_UP("Scrolling Up"),
     RANDOM_DOWN("Random • Down"),
     RANDOM_UP("Random • Up"),
+    PAUSED("Paused"),
     STOPPED("Stopped"),
     AT_TOP("Reached Top"),
     AT_BOTTOM("Reached Bottom"),
+    NOT_SCROLLABLE("Page Not Scrollable"),
+    STUCK("Scroll Stuck"),
     RESTRICTED("Cross-Origin Restricted")
+}
+
+enum class ClickInteractionMode(val label: String) {
+    CLICK("Click Mode"),
+    TAP("Tap Mode")
 }
 
 enum class VpnProvider(
@@ -74,7 +82,7 @@ data class ClickTargetItem(
 
 enum class ClickTestStatus(val label: String) {
     IDLE("Idle"),
-    RUNNING("Auto Clicking"),
+    RUNNING("Auto Active"),
     STOPPED("Stopped"),
     BLOCKED_AD("Ad Blocked"),
     RESTRICTED("Restricted"),
@@ -94,7 +102,8 @@ data class WebCommandEvent(
     val id: Long,
     val type: WebCommandType,
     val targetUrl: String? = null,
-    val selector: String? = null
+    val selector: String? = null,
+    val interactionMode: ClickInteractionMode = ClickInteractionMode.CLICK
 )
 
 sealed interface UrlValidationResult {

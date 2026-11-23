@@ -52,6 +52,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Search
@@ -96,6 +97,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.model.AutoScrollDirection
+import com.example.model.ClickInteractionMode
 import com.example.model.ClickTargetItem
 import com.example.model.ClickTestStatus
 import com.example.model.ScrollIndicatorState
@@ -215,6 +217,7 @@ fun WebVisitTesterApp(
                                     onScrollDown = viewModel::startAutoScrollDown,
                                     onScrollUp = viewModel::startAutoScrollUp,
                                     onRandomScroll = viewModel::startRandomScroll,
+                                    onTogglePauseScroll = viewModel::togglePauseAutoScroll,
                                     onStopScroll = viewModel::stopAutoScroll,
                                     onScrollSpeedChanged = viewModel::setScrollSpeed,
                                     onAutoNextChanged = viewModel::setAutoNextEnabled,
@@ -224,6 +227,7 @@ fun WebVisitTesterApp(
                                 ClicksAutomationPanel(
                                     uiState = uiState,
                                     onAuthorizedChanged = viewModel::setAuthorizedOwnSite,
+                                    onClickModeChanged = viewModel::setClickInteractionMode,
                                     onSelectorChanged = viewModel::onClickSelectorChanged,
                                     onSelectTarget = viewModel::selectDiscoveredTarget,
                                     onScanTargets = viewModel::scanClickTargets,
@@ -251,6 +255,7 @@ fun WebVisitTesterApp(
                                 blockedReason = uiState.previewBlockedReason,
                                 phaseRemainingSec = uiState.phaseRemainingSec,
                                 scrollDirection = uiState.scrollDirection,
+                                isScrollPaused = uiState.isScrollPaused,
                                 scrollSpeed = uiState.scrollSpeed,
                                 canGoBack = uiState.canGoBack,
                                 pendingCommand = uiState.webCommand,
@@ -261,7 +266,7 @@ fun WebVisitTesterApp(
                                 onPageStarted = viewModel::onPreviewPageStarted,
                                 onPageFinished = viewModel::onPreviewPageFinished,
                                 onCanGoBackChanged = viewModel::updateCanGoBack,
-                                onScrollStatusChanged = viewModel::updateScrollStatus,
+                                onScrollFeedback = viewModel::onScrollFeedback,
                                 onBlockedOrError = viewModel::onPreviewBlockedOrError,
                                 onOpenExternal = openWebsiteInBrowser,
                                 onTargetsScanned = viewModel::onClickTargetsScanned,
@@ -281,6 +286,7 @@ fun WebVisitTesterApp(
                             onScrollDown = viewModel::startAutoScrollDown,
                             onScrollUp = viewModel::startAutoScrollUp,
                             onRandomScroll = viewModel::startRandomScroll,
+                            onTogglePauseScroll = viewModel::togglePauseAutoScroll,
                             onStopScroll = viewModel::stopAutoScroll,
                             onScrollSpeedChanged = viewModel::setScrollSpeed,
                             onAutoNextChanged = viewModel::setAutoNextEnabled,
@@ -290,6 +296,7 @@ fun WebVisitTesterApp(
                         ClicksAutomationPanel(
                             uiState = uiState,
                             onAuthorizedChanged = viewModel::setAuthorizedOwnSite,
+                            onClickModeChanged = viewModel::setClickInteractionMode,
                             onSelectorChanged = viewModel::onClickSelectorChanged,
                             onSelectTarget = viewModel::selectDiscoveredTarget,
                             onScanTargets = viewModel::scanClickTargets,
@@ -316,6 +323,7 @@ fun WebVisitTesterApp(
                             blockedReason = uiState.previewBlockedReason,
                             phaseRemainingSec = uiState.phaseRemainingSec,
                             scrollDirection = uiState.scrollDirection,
+                            isScrollPaused = uiState.isScrollPaused,
                             scrollSpeed = uiState.scrollSpeed,
                             canGoBack = uiState.canGoBack,
                             pendingCommand = uiState.webCommand,
@@ -326,7 +334,7 @@ fun WebVisitTesterApp(
                             onPageStarted = viewModel::onPreviewPageStarted,
                             onPageFinished = viewModel::onPreviewPageFinished,
                             onCanGoBackChanged = viewModel::updateCanGoBack,
-                            onScrollStatusChanged = viewModel::updateScrollStatus,
+                            onScrollFeedback = viewModel::onScrollFeedback,
                             onBlockedOrError = viewModel::onPreviewBlockedOrError,
                             onOpenExternal = openWebsiteInBrowser,
                             onTargetsScanned = viewModel::onClickTargetsScanned,
@@ -467,6 +475,7 @@ private fun MinimalControlPanel(
     onScrollDown: () -> Unit,
     onScrollUp: () -> Unit,
     onRandomScroll: () -> Unit,
+    onTogglePauseScroll: () -> Unit,
     onStopScroll: () -> Unit,
     onScrollSpeedChanged: (ScrollSpeed) -> Unit,
     onAutoNextChanged: (Boolean) -> Unit,
@@ -691,7 +700,7 @@ private fun MinimalControlPanel(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Auto Scroll Down / Up / Random / Stop + Status Indicator
+        // Auto Scroll Down / Up / Random / Pause / Stop + Position & Status Indicator
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -707,8 +716,8 @@ private fun MinimalControlPanel(
                 ScrollIndicatorState.SCROLLING_DOWN -> ElectricCyan
                 ScrollIndicatorState.SCROLLING_UP -> LuminousPurple
                 ScrollIndicatorState.RANDOM_DOWN, ScrollIndicatorState.RANDOM_UP -> EmeraldSuccess
-                ScrollIndicatorState.RESTRICTED -> CoralDanger
-                ScrollIndicatorState.AT_TOP, ScrollIndicatorState.AT_BOTTOM, ScrollIndicatorState.STOPPED -> AmberWarning
+                ScrollIndicatorState.RESTRICTED, ScrollIndicatorState.NOT_SCROLLABLE, ScrollIndicatorState.STUCK -> CoralDanger
+                ScrollIndicatorState.PAUSED, ScrollIndicatorState.AT_TOP, ScrollIndicatorState.AT_BOTTOM, ScrollIndicatorState.STOPPED -> AmberWarning
                 ScrollIndicatorState.IDLE -> TextMuted
             }
             Surface(
@@ -726,6 +735,31 @@ private fun MinimalControlPanel(
             }
         }
 
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MidnightDeep.copy(alpha = 0.56f))
+                .border(1.dp, GlassStrokeSubtle, RoundedCornerShape(12.dp))
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Scroll Position",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted
+            )
+            Text(
+                text = uiState.scrollPositionText,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = ElectricCyan,
+                modifier = Modifier.testTag("scroll_position_text")
+            )
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(
@@ -736,7 +770,7 @@ private fun MinimalControlPanel(
                 text = stringResource(R.string.btn_scroll_down),
                 icon = Icons.Rounded.ArrowDownward,
                 onClick = onScrollDown,
-                enabled = uiState.scrollDirection != AutoScrollDirection.DOWN,
+                enabled = uiState.scrollDirection != AutoScrollDirection.DOWN || uiState.isScrollPaused,
                 accentColor = ElectricCyan,
                 testTag = "scroll_down_button",
                 modifier = Modifier.weight(1f)
@@ -745,7 +779,7 @@ private fun MinimalControlPanel(
                 text = stringResource(R.string.btn_scroll_up),
                 icon = Icons.Rounded.ArrowUpward,
                 onClick = onScrollUp,
-                enabled = uiState.scrollDirection != AutoScrollDirection.UP,
+                enabled = uiState.scrollDirection != AutoScrollDirection.UP || uiState.isScrollPaused,
                 accentColor = LuminousPurple,
                 testTag = "scroll_up_button",
                 modifier = Modifier.weight(1f)
@@ -762,21 +796,33 @@ private fun MinimalControlPanel(
                 text = stringResource(R.string.btn_scroll_random),
                 icon = Icons.Rounded.Shuffle,
                 onClick = onRandomScroll,
-                enabled = uiState.scrollDirection != AutoScrollDirection.RANDOM,
+                enabled = uiState.scrollDirection != AutoScrollDirection.RANDOM || uiState.isScrollPaused,
                 accentColor = EmeraldSuccess,
                 testTag = "scroll_random_button",
                 modifier = Modifier.weight(1f)
             )
             GlassActionButton(
-                text = stringResource(R.string.btn_stop_scroll),
-                icon = Icons.Rounded.Stop,
-                onClick = onStopScroll,
+                text = if (uiState.isScrollPaused) stringResource(R.string.btn_resume_scroll) else stringResource(R.string.btn_pause_scroll),
+                icon = if (uiState.isScrollPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                onClick = onTogglePauseScroll,
                 enabled = uiState.scrollDirection != AutoScrollDirection.NONE,
-                accentColor = CoralDanger,
-                testTag = "stop_scroll_button",
+                accentColor = AmberWarning,
+                testTag = "pause_scroll_button",
                 modifier = Modifier.weight(1f)
             )
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        GlassActionButton(
+            text = stringResource(R.string.btn_stop_scroll),
+            icon = Icons.Rounded.Stop,
+            onClick = onStopScroll,
+            enabled = uiState.scrollDirection != AutoScrollDirection.NONE,
+            accentColor = CoralDanger,
+            testTag = "stop_scroll_button",
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -1085,6 +1131,7 @@ private fun VpnTestingPanel(
 private fun ClicksAutomationPanel(
     uiState: WebVisitUiState,
     onAuthorizedChanged: (Boolean) -> Unit,
+    onClickModeChanged: (ClickInteractionMode) -> Unit,
     onSelectorChanged: (String) -> Unit,
     onSelectTarget: (ClickTargetItem) -> Unit,
     onScanTargets: () -> Unit,
@@ -1099,6 +1146,7 @@ private fun ClicksAutomationPanel(
         ClickTestStatus.STOPPED, ClickTestStatus.NO_TARGET -> AmberWarning
         ClickTestStatus.IDLE -> ElectricCyan
     }
+    val isTapMode = uiState.clickMode == ClickInteractionMode.TAP
 
     LiquidGlassPanel(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -1129,8 +1177,9 @@ private fun ClicksAutomationPanel(
                 border = BorderStroke(1.dp, clickBadgeColor.copy(alpha = 0.45f)),
                 modifier = Modifier.testTag("click_counter_badge")
             ) {
+                val countLabel = if (isTapMode) "Taps" else "Clicks"
                 Text(
-                    text = "Clicks: ${uiState.clickCount} • ${uiState.clickStatus.label}",
+                    text = "$countLabel: ${uiState.clickCount} • ${uiState.clickStatus.label}",
                     style = MaterialTheme.typography.labelSmall,
                     color = clickBadgeColor,
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
@@ -1169,6 +1218,43 @@ private fun ClicksAutomationPanel(
                 ),
                 modifier = Modifier.testTag("authorized_site_switch")
             )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ClickInteractionMode.entries.forEach { mode ->
+                val selected = uiState.clickMode == mode
+                val shape = RoundedCornerShape(10.dp)
+                val accent = if (mode == ClickInteractionMode.TAP) LuminousPurple else ElectricCyan
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(shape)
+                        .background(
+                            if (selected) accent.copy(alpha = 0.22f)
+                            else MidnightDeep.copy(alpha = 0.45f)
+                        )
+                        .border(
+                            1.dp,
+                            if (selected) accent.copy(alpha = 0.65f) else GlassStrokeSubtle,
+                            shape
+                        )
+                        .clickable(enabled = !uiState.isAutoClickRunning) { onClickModeChanged(mode) }
+                        .padding(vertical = 8.dp)
+                        .testTag("interaction_mode_${mode.name.lowercase()}"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = mode.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (selected) TextPrimary else TextMuted
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -1216,7 +1302,7 @@ private fun ClicksAutomationPanel(
                 modifier = Modifier.weight(1f)
             )
             GlassActionButton(
-                text = stringResource(R.string.btn_single_click),
+                text = if (isTapMode) stringResource(R.string.btn_single_tap) else stringResource(R.string.btn_single_click),
                 icon = Icons.Rounded.TouchApp,
                 onClick = onSingleClickTest,
                 enabled = !uiState.isAutoClickRunning,
@@ -1286,7 +1372,7 @@ private fun ClicksAutomationPanel(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             GlassActionButton(
-                text = stringResource(R.string.btn_start_click),
+                text = if (isTapMode) stringResource(R.string.btn_start_tap) else stringResource(R.string.btn_start_click),
                 icon = Icons.Rounded.PlayArrow,
                 onClick = onStartAutoClick,
                 enabled = !uiState.isAutoClickRunning,
@@ -1295,7 +1381,7 @@ private fun ClicksAutomationPanel(
                 modifier = Modifier.weight(1f)
             )
             GlassActionButton(
-                text = stringResource(R.string.btn_stop_click),
+                text = if (isTapMode) stringResource(R.string.btn_stop_tap) else stringResource(R.string.btn_stop_click),
                 icon = Icons.Rounded.Stop,
                 onClick = onStopAutoClick,
                 enabled = uiState.isAutoClickRunning,
@@ -1405,7 +1491,7 @@ private fun SingleFileHtmlDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Save or copy the minimal single-file HTML/CSS/JS version of WebVisit Tester (${htmlSource.length} bytes) with Random Scroll and VPN Testing interface.",
+                    text = "Save or copy the standalone single-file HTML/CSS/JS version of WebVisit Tester (${htmlSource.length} bytes) with Auto Scroll, Clicks & Tap Automation, and VPN Testing.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )

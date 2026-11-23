@@ -42,6 +42,11 @@
       background-attachment: fixed;
       line-height: 1.45;
       overflow-x: hidden;
+      touch-action: manipulation;
+    }
+
+    button, a, input, label, .slider {
+      touch-action: manipulation;
     }
 
     .ambient-orb {
@@ -197,7 +202,7 @@
 
     .chip-btn {
       flex: 1;
-      min-height: 36px;
+      min-height: 40px;
       border-radius: 10px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       background: rgba(6, 9, 26, 0.48);
@@ -205,12 +210,19 @@
       font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
+      user-select: none;
     }
 
     .chip-btn.active {
       background: rgba(56, 189, 248, 0.18);
       border-color: rgba(56, 189, 248, 0.55);
       color: var(--cyan);
+    }
+
+    .chip-btn.active-purple {
+      background: rgba(168, 85, 247, 0.22);
+      border-color: rgba(168, 85, 247, 0.62);
+      color: #f3e8ff;
     }
 
     .chip-btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -232,7 +244,7 @@
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .btn {
@@ -249,6 +261,7 @@
       gap: 6px;
       padding: 0 10px;
       text-decoration: none;
+      user-select: none;
       transition: transform 0.15s ease, opacity 0.18s ease;
     }
 
@@ -270,7 +283,7 @@
       background: rgba(56, 189, 248, 0.16);
       border-color: rgba(56, 189, 248, 0.45);
       color: #e0f2fe;
-      min-height: 44px;
+      min-height: 46px;
       font-size: 0.78rem;
     }
 
@@ -283,7 +296,7 @@
       background: rgba(168, 85, 247, 0.16);
       border-color: rgba(168, 85, 247, 0.45);
       color: #f3e8ff;
-      min-height: 44px;
+      min-height: 46px;
       font-size: 0.78rem;
     }
 
@@ -296,7 +309,7 @@
       background: rgba(52, 211, 153, 0.16);
       border-color: rgba(52, 211, 153, 0.45);
       color: #d1fae5;
-      min-height: 44px;
+      min-height: 46px;
       font-size: 0.78rem;
     }
 
@@ -305,12 +318,47 @@
       border-color: var(--emerald);
     }
 
+    .btn-scroll-pause {
+      background: rgba(251, 191, 36, 0.16);
+      border-color: rgba(251, 191, 36, 0.45);
+      color: #fef3c7;
+      min-height: 46px;
+      font-size: 0.78rem;
+    }
+
+    .btn-scroll-pause.active {
+      background: rgba(251, 191, 36, 0.32);
+      border-color: var(--amber);
+    }
+
     .btn-scroll-stop {
+      width: 100%;
       background: rgba(251, 113, 133, 0.16);
       border-color: rgba(251, 113, 133, 0.45);
       color: #fecdd3;
       min-height: 44px;
       font-size: 0.78rem;
+      margin-bottom: 10px;
+    }
+
+    .scroll-pos-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: rgba(6, 9, 26, 0.56);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 7px 10px;
+      margin-bottom: 10px;
+      font-size: 0.74rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--text-secondary);
+    }
+
+    .scroll-pos-value {
+      color: var(--cyan);
+      font-weight: 700;
     }
 
     .progress-meta {
@@ -478,8 +526,8 @@
     }
 
     .icon-btn {
-      min-width: 40px;
-      height: 40px;
+      min-width: 44px;
+      height: 44px;
       border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.14);
       background: rgba(6, 9, 26, 0.55);
@@ -488,12 +536,13 @@
       font-weight: 600;
       padding: 0 10px;
       cursor: pointer;
+      user-select: none;
     }
 
     .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .btn-ghost {
-      min-height: 40px;
+      min-height: 44px;
       padding: 0 12px;
       border-radius: 12px;
       background: rgba(56, 189, 248, 0.14);
@@ -504,6 +553,7 @@
       text-decoration: none;
       display: inline-flex;
       align-items: center;
+      user-select: none;
     }
 
     .preview-stage {
@@ -522,6 +572,7 @@
       border: none;
       background: #ffffff;
       display: none;
+      touch-action: pan-x pan-y pinch-zoom;
     }
 
     .preview-overlay {
@@ -582,7 +633,7 @@
     }
 
     .provider-chip {
-      min-height: 36px;
+      min-height: 40px;
       padding: 0 11px;
       border-radius: 11px;
       border: 1px solid rgba(255, 255, 255, 0.14);
@@ -591,6 +642,7 @@
       font-size: 0.76rem;
       font-weight: 600;
       cursor: pointer;
+      user-select: none;
     }
 
     .provider-chip.active {
@@ -680,7 +732,7 @@
       background: rgba(56, 189, 248, 0.16);
       border-color: rgba(56, 189, 248, 0.45);
       color: #e0f2fe;
-      min-height: 44px;
+      min-height: 46px;
       font-size: 0.78rem;
     }
 
@@ -688,7 +740,7 @@
       background: rgba(168, 85, 247, 0.16);
       border-color: rgba(168, 85, 247, 0.45);
       color: #f3e8ff;
-      min-height: 44px;
+      min-height: 46px;
       font-size: 0.78rem;
     }
 
@@ -696,7 +748,7 @@
       background: rgba(52, 211, 153, 0.16);
       border-color: rgba(52, 211, 153, 0.45);
       color: #d1fae5;
-      min-height: 44px;
+      min-height: 46px;
       font-size: 0.8rem;
     }
 
@@ -704,7 +756,7 @@
       background: rgba(251, 113, 133, 0.16);
       border-color: rgba(251, 113, 133, 0.45);
       color: #fecdd3;
-      min-height: 44px;
+      min-height: 46px;
       font-size: 0.8rem;
     }
 
@@ -718,7 +770,7 @@
 
     .target-chip {
       flex-shrink: 0;
-      min-height: 34px;
+      min-height: 38px;
       padding: 0 10px;
       border-radius: 10px;
       border: 1px solid rgba(255, 255, 255, 0.14);
@@ -727,6 +779,7 @@
       font-size: 0.74rem;
       font-weight: 600;
       cursor: pointer;
+      user-select: none;
     }
 
     .target-chip.active {
@@ -828,12 +881,18 @@
               <span class="scroll-badge" id="scrollStatusBadge">Idle</span>
             </div>
 
+            <div class="scroll-pos-bar">
+              <span>Scroll Position</span>
+              <span class="scroll-pos-value" id="scrollPosLabel">0% • 0/0px</span>
+            </div>
+
             <div class="scroll-controls-row">
               <button type="button" class="btn btn-scroll-down" id="scrollDownBtn">Scroll Down</button>
               <button type="button" class="btn btn-scroll-up" id="scrollUpBtn">Scroll Up</button>
               <button type="button" class="btn btn-scroll-random" id="scrollRandomBtn">Random Scroll</button>
-              <button type="button" class="btn btn-scroll-stop" id="stopScrollBtn" disabled>Stop Scroll</button>
+              <button type="button" class="btn btn-scroll-pause" id="pauseScrollBtn" disabled>Pause</button>
             </div>
+            <button type="button" class="btn btn-scroll-stop" id="stopScrollBtn" disabled>Stop Scroll</button>
 
             <div class="chip-row" id="scrollSpeedRow">
               <button type="button" class="chip-btn" data-speed="slow">Slow</button>
@@ -862,7 +921,7 @@
                 <path d="M12 11v9"></path>
                 <path d="M5 13a7 7 0 0 0 14 0"></path>
               </svg>
-              <span>Clicks Automation</span>
+              <span>Clicks &amp; Tap Automation</span>
             </div>
             <span class="click-badge" id="clickCounterBadge">Clicks: 0 • Idle</span>
           </div>
@@ -876,6 +935,11 @@
               <input type="checkbox" id="authorizedSiteToggle" />
               <span class="slider"></span>
             </label>
+          </div>
+
+          <div class="chip-row" id="clickModeRow" style="margin-bottom: 10px;">
+            <button type="button" class="chip-btn active" id="modeClickBtn" data-mode="click">Click Mode</button>
+            <button type="button" class="chip-btn" id="modeTapBtn" data-mode="tap">Tap Mode</button>
           </div>
 
           <div class="field-group" style="margin-bottom: 8px;">
@@ -892,7 +956,7 @@
 
           <div class="click-actions-row">
             <button type="button" class="btn btn-click-scan" id="scanTargetsBtn">Scan Targets</button>
-            <button type="button" class="btn btn-click-once" id="singleClickBtn">1x Test</button>
+            <button type="button" class="btn btn-click-once" id="singleClickBtn">1x Click Test</button>
           </div>
 
           <div class="target-chips-row" id="clickTargetChips" style="display: none;"></div>
@@ -1005,6 +1069,9 @@
 
   <script>
     (() => {
+      if (window.__webVisitTesterInitialized) return;
+      window.__webVisitTesterInitialized = true;
+
       // Strictly temporary in-memory session state only. No localStorage, IndexedDB, or history logs.
       const urlInput = document.getElementById("urlInput");
       const urlError = document.getElementById("urlError");
@@ -1018,9 +1085,11 @@
       const scrollDownBtn = document.getElementById("scrollDownBtn");
       const scrollUpBtn = document.getElementById("scrollUpBtn");
       const scrollRandomBtn = document.getElementById("scrollRandomBtn");
+      const pauseScrollBtn = document.getElementById("pauseScrollBtn");
       const stopScrollBtn = document.getElementById("stopScrollBtn");
       const scrollSpeedRow = document.getElementById("scrollSpeedRow");
       const scrollStatusBadge = document.getElementById("scrollStatusBadge");
+      const scrollPosLabel = document.getElementById("scrollPosLabel");
 
       const vpnProviderRow = document.getElementById("vpnProviderRow");
       const vpnConnectBtn = document.getElementById("vpnConnectBtn");
@@ -1032,6 +1101,8 @@
 
       const clickCounterBadge = document.getElementById("clickCounterBadge");
       const authorizedSiteToggle = document.getElementById("authorizedSiteToggle");
+      const modeClickBtn = document.getElementById("modeClickBtn");
+      const modeTapBtn = document.getElementById("modeTapBtn");
       const clickSelectorInput = document.getElementById("clickSelectorInput");
       const scanTargetsBtn = document.getElementById("scanTargetsBtn");
       const singleClickBtn = document.getElementById("singleClickBtn");
@@ -1060,36 +1131,49 @@
       const overlayOpenBtn = document.getElementById("overlayOpenBtn");
       const headerOpenBtn = document.getElementById("headerOpenBtn");
 
-      // Speeds in pixels per second for smooth requestAnimationFrame scrolling
-      const SPEED_PX_PER_SEC = { slow: 65, medium: 160, fast: 320 };
+      // Speeds in CSS pixels per second for smooth requestAnimationFrame scrolling
+      const SPEED_PX_PER_SEC = { slow: 65, medium: 165, fast: 340 };
+      const MIN_ACTION_COOLDOWN_MS = 300;
+      const AD_SELECTOR_REGEX = /(adsbygoogle|doubleclick|googlesyndication|adservice|adsystem|adserver|adnxs|taboola|outbrain|mgid|sponsored|advertisement|ad-slot|ad_slot|ad-banner|ad_banner|google_ads|data-ad)/i;
 
-      let session = {
+      // Track same-origin iframe documents once so listeners are never duplicated across loads
+      const guardedDocs = new WeakSet();
+
+      const session = {
         running: false,
         currentRun: 0,
         totalRuns: 3,
         viewSec: 15,
         pauseSec: 3,
         scrollDirection: "none", // "none" | "down" | "up" | "random"
+        scrollPaused: false,
         randomSubDir: "down",    // "down" | "up"
         randomSwitchAt: 0,
         scrollSpeed: "medium",
         scrollStatusText: "Idle",
         scrollStatusColor: "#94a3b8",
+        scrollPosText: "0% • 0/0px",
+        scrollRafId: null,
+        lastFrameTime: 0,
+        subPixelCarry: 0,
+        scrollStuckFrames: 0,
+        scrollExpectedDelta: 0,
         autoNext: true,
         selectedVpnProvider: "Android System VPN",
+        interactionMode: "click", // "click" | "tap"
         autoClickRunning: false,
         autoClickTimerId: null,
+        actionLock: false,
+        lastInteractionAt: 0,
         clickCount: 0,
         clickStatusLabel: "Idle",
         discoveredTargets: [],
         phase: "idle", // idle | loading | viewing | cooldown | blocked | completed | stopped
         phaseRemaining: 0,
         activeUrl: "",
+        loadSeq: 0,
         timerId: null,
-        loadTimeoutId: null,
-        scrollRafId: null,
-        lastFrameTime: 0,
-        subPixelCarry: 0
+        loadTimeoutId: null
       };
 
       function validateUrl(raw) {
@@ -1150,268 +1234,46 @@
         scrollStatusBadge.style.borderColor = color;
       }
 
-      // Safely check same-origin iframe document access without bypassing security restrictions
+      function setScrollPosition(pos, max) {
+        const safeMax = Math.max(0, Math.round(max));
+        const safePos = Math.max(0, Math.min(safeMax, Math.round(pos)));
+        const pct = safeMax > 0 ? Math.round((safePos / safeMax) * 100) : 0;
+        session.scrollPosText = `${pct}% • ${safePos}/${safeMax}px`;
+        scrollPosLabel.textContent = session.scrollPosText;
+      }
+
+      // Safely check same-origin iframe document access without bypassing cross-origin security
       function getAccessibleIframeDocument() {
         try {
           if (!previewFrame || previewFrame.style.display === "none") return null;
           const win = previewFrame.contentWindow;
           const doc = previewFrame.contentDocument || (win ? win.document : null);
-          if (!doc) return null;
-          // Accessing location.href throws SecurityError on cross-origin iframes
+          if (!doc || !win) return null;
           const href = doc.location && doc.location.href;
           if (!href || href === "about:blank") return null;
+          if (!doc.documentElement && !doc.body) return null;
           return { doc, win };
         } catch {
           return null;
         }
       }
 
-      // Detect the actual scrollable container inside the previewed page
-      function findScrollableContainer(doc, direction) {
-        const win = doc.defaultView || previewFrame.contentWindow;
-        const root = doc.scrollingElement || doc.documentElement || doc.body;
-        const candidates = [];
-
-        if (root && root.scrollHeight > root.clientHeight + 2) {
-          candidates.push(root);
+      function isElementVisible(el, win) {
+        if (!el || !win) return false;
+        const style = win.getComputedStyle(el);
+        if (!style || style.display === "none" || style.visibility === "hidden" || parseFloat(style.opacity) === 0) {
+          return false;
         }
-
-        const elements = doc.querySelectorAll("*");
-        const limit = Math.min(elements.length, 600);
-        for (let i = 0; i < limit; i++) {
-          const el = elements[i];
-          if (el === root) continue;
-          const style = win ? win.getComputedStyle(el) : null;
-          if (!style) continue;
-          const oy = style.overflowY;
-          if ((oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight + 4) {
-            candidates.push(el);
-          }
-        }
-
-        if (direction === "up") {
-          for (let i = 0; i < candidates.length; i++) {
-            if (candidates[i].scrollTop > 0) return candidates[i];
-          }
-        } else {
-          for (let i = 0; i < candidates.length; i++) {
-            const c = candidates[i];
-            if (c.scrollTop + c.clientHeight < c.scrollHeight - 1) return c;
-          }
-        }
-
-        return candidates.length > 0 ? candidates[0] : root;
+        const rect = el.getBoundingClientRect();
+        return rect.width >= 2 && rect.height >= 2;
       }
 
-      function nextRandomIntervalMs() {
-        return 1100 + Math.random() * 2100;
+      function isElementInteractable(el, win) {
+        if (!isElementVisible(el, win)) return false;
+        if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
+        const style = win.getComputedStyle(el);
+        return style && style.pointerEvents !== "none";
       }
-
-      function updateActiveScrollLabel() {
-        if (session.scrollDirection === "up") {
-          setScrollStatus(`Scrolling Up (${session.scrollSpeed})`, "#a855f7");
-        } else if (session.scrollDirection === "down") {
-          setScrollStatus(`Scrolling Down (${session.scrollSpeed})`, "#38bdf8");
-        } else if (session.scrollDirection === "random") {
-          const dirText = session.randomSubDir === "up" ? "Up" : "Down";
-          setScrollStatus(`Random • ${dirText} (${session.scrollSpeed})`, "#34d399");
-        }
-      }
-
-      function stopScrolling(reasonText = "Stopped", color = "#fbbf24") {
-        if (session.scrollRafId !== null) {
-          cancelAnimationFrame(session.scrollRafId);
-          session.scrollRafId = null;
-        }
-        session.scrollDirection = "none";
-        session.randomSwitchAt = 0;
-        session.lastFrameTime = 0;
-        session.subPixelCarry = 0;
-        setScrollStatus(reasonText, color);
-        updateUI();
-      }
-
-      function runScrollAnimationFrame(timestamp) {
-        if (session.scrollDirection === "none") {
-          session.scrollRafId = null;
-          return;
-        }
-
-        const access = getAccessibleIframeDocument();
-        if (!access) {
-          // Cross-origin or unavailable iframe: stop cleanly and do NOT scroll the outer app page
-          stopScrolling("Cross-Origin Restricted", "#fb7185");
-          return;
-        }
-
-        const { doc } = access;
-
-        if (session.scrollDirection === "random" && timestamp >= session.randomSwitchAt) {
-          session.randomSubDir = session.randomSubDir === "down" ? "up" : "down";
-          session.randomSwitchAt = timestamp + nextRandomIntervalMs();
-          updateActiveScrollLabel();
-        }
-
-        const effectiveDir = session.scrollDirection === "random"
-          ? session.randomSubDir
-          : session.scrollDirection;
-
-        const target = findScrollableContainer(doc, effectiveDir);
-        if (!target) {
-          stopScrolling("No Scrollable Container", "#fbbf24");
-          return;
-        }
-
-        if (!session.lastFrameTime) {
-          session.lastFrameTime = timestamp;
-        }
-        const dtSec = Math.min(0.05, Math.max(0, (timestamp - session.lastFrameTime) / 1000));
-        session.lastFrameTime = timestamp;
-
-        const speed = SPEED_PX_PER_SEC[session.scrollSpeed] || 160;
-        session.subPixelCarry += speed * dtSec;
-        const stepPx = Math.floor(session.subPixelCarry);
-        if (stepPx >= 1) {
-          session.subPixelCarry -= stepPx;
-          const maxScroll = target.scrollHeight - target.clientHeight;
-
-          if (session.scrollDirection === "random") {
-            if (maxScroll <= 1) {
-              stopScrolling("No Scrollable Container", "#fbbf24");
-              return;
-            }
-            if (effectiveDir === "up") {
-              target.scrollTop = Math.max(0, target.scrollTop - stepPx);
-              if (target.scrollTop <= 0) {
-                session.randomSubDir = "down";
-                session.randomSwitchAt = timestamp + nextRandomIntervalMs();
-                updateActiveScrollLabel();
-              }
-            } else {
-              target.scrollTop = Math.min(maxScroll, target.scrollTop + stepPx);
-              if (target.scrollTop >= maxScroll - 1) {
-                session.randomSubDir = "up";
-                session.randomSwitchAt = timestamp + nextRandomIntervalMs();
-                updateActiveScrollLabel();
-              }
-            }
-          } else if (effectiveDir === "up") {
-            if (target.scrollTop <= 0) {
-              stopScrolling("Reached Top", "#fbbf24");
-              return;
-            }
-            target.scrollTop = Math.max(0, target.scrollTop - stepPx);
-            if (target.scrollTop <= 0) {
-              stopScrolling("Reached Top", "#fbbf24");
-              return;
-            }
-          } else if (effectiveDir === "down") {
-            if (maxScroll <= 0 || target.scrollTop >= maxScroll - 1) {
-              stopScrolling("Reached Bottom", "#fbbf24");
-              return;
-            }
-            target.scrollTop = Math.min(maxScroll, target.scrollTop + stepPx);
-            if (target.scrollTop >= maxScroll - 1) {
-              stopScrolling("Reached Bottom", "#fbbf24");
-              return;
-            }
-          }
-        }
-
-        session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
-      }
-
-      function startScrolling(direction) {
-        if (session.scrollRafId !== null) {
-          cancelAnimationFrame(session.scrollRafId);
-          session.scrollRafId = null;
-        }
-
-        const access = getAccessibleIframeDocument();
-        if (!access) {
-          session.scrollDirection = "none";
-          if (previewFrame.style.display === "block") {
-            setScrollStatus("Cross-Origin Restricted", "#fb7185");
-          } else {
-            setScrollStatus("Load Preview First", "#fbbf24");
-          }
-          updateUI();
-          return;
-        }
-
-        session.scrollDirection = direction;
-        if (direction === "random") {
-          session.randomSubDir = Math.random() < 0.7 ? "down" : "up";
-          session.randomSwitchAt = performance.now() + nextRandomIntervalMs();
-        }
-        session.lastFrameTime = 0;
-        session.subPixelCarry = 0;
-
-        updateActiveScrollLabel();
-        updateUI();
-        session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
-      }
-
-      function updateUI() {
-        const labels = {
-          idle: ["Idle", "#38bdf8"],
-          loading: ["Loading", "#38bdf8"],
-          viewing: ["Viewing", "#34d399"],
-          cooldown: ["Pausing", "#fbbf24"],
-          blocked: ["Restricted", "#fb7185"],
-          completed: ["Completed", "#34d399"],
-          stopped: ["Stopped", "#fbbf24"]
-        };
-        const [label, color] = labels[session.phase] || ["Idle", "#38bdf8"];
-        statusText.textContent = session.running ? `${label} • ${formatTimer(session.phaseRemaining)}` : label;
-        statusDot.style.background = color;
-        statusDot.style.boxShadow = `0 0 10px ${color}`;
-
-        liveStatusLabel.textContent = session.running
-          ? `${label} • Run ${session.currentRun}/${session.totalRuns}`
-          : `Live Status: ${label}`;
-
-        const pct = session.phase === "completed"
-          ? 100
-          : (session.running && session.totalRuns > 0
-            ? Math.round(((session.currentRun - 1) / session.totalRuns) * 100)
-            : 0);
-        progressPercentLabel.textContent = `${pct}%`;
-        progressFill.style.width = `${pct}%`;
-
-        urlInput.disabled = session.running;
-        btnHttps.disabled = session.running;
-        btnHttp.disabled = session.running;
-        viewSecInput.disabled = session.running;
-        pauseSecInput.disabled = session.running;
-        runsInput.disabled = session.running || !session.autoNext;
-        autoNextToggle.disabled = session.running;
-        startBtn.disabled = session.running;
-        stopBtn.disabled = !session.running;
-
-        scrollDownBtn.classList.toggle("active", session.scrollDirection === "down");
-        scrollUpBtn.classList.toggle("active", session.scrollDirection === "up");
-        scrollRandomBtn.classList.toggle("active", session.scrollDirection === "random");
-        scrollDownBtn.disabled = session.scrollDirection === "down";
-        scrollUpBtn.disabled = session.scrollDirection === "up";
-        scrollRandomBtn.disabled = session.scrollDirection === "random";
-        stopScrollBtn.disabled = session.scrollDirection === "none";
-
-        const hasActive = Boolean(session.activeUrl) && session.phase !== "blocked";
-        backBtn.disabled = !hasActive;
-        homeBtn.disabled = !session.activeUrl;
-        reloadBtn.disabled = !hasActive;
-
-        clickCounterBadge.textContent = `Clicks: ${session.clickCount} • ${session.clickStatusLabel}`;
-        clickSelectorInput.disabled = session.autoClickRunning;
-        clickIntervalInput.disabled = session.autoClickRunning;
-        scanTargetsBtn.disabled = session.autoClickRunning;
-        singleClickBtn.disabled = session.autoClickRunning;
-        startClickBtn.disabled = session.autoClickRunning;
-        stopClickBtn.disabled = !session.autoClickRunning;
-      }
-
-      const AD_SELECTOR_REGEX = /(adsbygoogle|doubleclick|googlesyndication|adservice|adsystem|adserver|adnxs|taboola|outbrain|mgid|sponsored|advertisement|ad-slot|ad_slot|ad-banner|ad_banner|google_ads|data-ad)/i;
 
       function isProhibitedAdElement(el) {
         if (!el) return true;
@@ -1435,20 +1297,458 @@
         return false;
       }
 
-      function buildCssSelector(el) {
+      // Attach a single debounced touch/click guard inside same-origin preview so mobile taps never double-fire
+      function attachSameOriginPreviewHandlers(access) {
+        if (!access || !access.doc || guardedDocs.has(access.doc)) return;
+        const { doc, win } = access;
+        guardedDocs.add(doc);
+
+        try {
+          if (!doc.getElementById("__webvisit_touch_css") && doc.head) {
+            const st = doc.createElement("style");
+            st.id = "__webvisit_touch_css";
+            st.textContent = "a, button, [role='button'], input, select, textarea { touch-action: manipulation; }";
+            doc.head.appendChild(st);
+          }
+        } catch {
+          // Ignore CSP style insertion blocks cleanly
+        }
+
+        let lastDirectEl = null;
+        let lastDirectAt = 0;
+        let scrollReportTick = 0;
+
+        doc.addEventListener("click", (ev) => {
+          if (!ev.isTrusted || !authorizedSiteToggle.checked) return;
+          const rawTarget = ev.target && ev.target.closest
+            ? ev.target.closest('button, a[href], [role="button"], input[type="button"], input[type="submit"]')
+            : null;
+          if (!rawTarget) return;
+
+          const now = performance.now();
+          if (rawTarget === lastDirectEl && now - lastDirectAt < 280) {
+            ev.preventDefault();
+            ev.stopImmediatePropagation();
+            return;
+          }
+          lastDirectEl = rawTarget;
+          lastDirectAt = now;
+
+          if (isProhibitedAdElement(rawTarget)) {
+            setClickFeedback("Ad Blocked", "#fb7185", "Ad click blocked by policy guard.", "vpn-info-err");
+            return;
+          }
+
+          session.clickCount += 1;
+          const label = (rawTarget.innerText || rawTarget.value || rawTarget.getAttribute("aria-label") || rawTarget.tagName)
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 24);
+          const runningLabel = session.interactionMode === "tap" ? "Auto Tapping" : "Auto Clicking";
+          setClickFeedback(
+            session.autoClickRunning ? runningLabel : "Idle",
+            session.autoClickRunning ? "#34d399" : "#38bdf8",
+            `Direct preview tap on "${label || rawTarget.tagName.toLowerCase()}" (${session.clickCount}).`,
+            "vpn-info-ok"
+          );
+        }, true);
+
+        doc.addEventListener("scroll", () => {
+          const now = performance.now();
+          if (now - scrollReportTick < 60) return;
+          scrollReportTick = now;
+          const target = detectScrollTarget(doc, win, session.scrollDirection === "up" ? "up" : "down");
+          if (target) {
+            setScrollPosition(target.getTop(), target.maxScroll);
+          }
+        }, { passive: true, capture: true });
+      }
+
+      // Accurately detect the scrollable container (window/root or inner overflow-y container)
+      function detectScrollTarget(doc, win, direction) {
+        const candidates = [];
+        const rootEl = doc.scrollingElement || doc.documentElement || doc.body;
+        const docHeight = Math.max(
+          rootEl ? rootEl.scrollHeight : 0,
+          doc.documentElement ? doc.documentElement.scrollHeight : 0,
+          doc.body ? doc.body.scrollHeight : 0
+        );
+        const viewportH = win.innerHeight || (rootEl ? rootEl.clientHeight : 0);
+        const winMax = Math.max(0, docHeight - viewportH);
+
+        if (winMax > 2) {
+          candidates.push({
+            isWindow: true,
+            el: rootEl || doc.documentElement || doc.body,
+            maxScroll: winMax,
+            getTop: () => Math.max(0, win.scrollY || win.pageYOffset || (rootEl ? rootEl.scrollTop : 0)),
+            setTop: (nextTop) => {
+              const targetEl = doc.scrollingElement || doc.documentElement || doc.body;
+              const prevBeh = targetEl && targetEl.style ? targetEl.style.scrollBehavior : "";
+              if (targetEl && targetEl.style && prevBeh !== "auto") {
+                targetEl.style.scrollBehavior = "auto";
+              }
+              try {
+                win.scrollTo({ top: nextTop, left: win.scrollX || 0, behavior: "auto" });
+              } catch {
+                win.scrollTo(win.scrollX || 0, nextTop);
+              }
+              if (targetEl && Math.abs((win.scrollY || targetEl.scrollTop) - nextTop) > 2 && targetEl.scrollTop !== nextTop) {
+                targetEl.scrollTop = nextTop;
+              }
+              if (targetEl && targetEl.style) {
+                targetEl.style.scrollBehavior = prevBeh;
+              }
+            }
+          });
+        }
+
+        const elements = doc.querySelectorAll("*");
+        const limit = Math.min(elements.length, 700);
+        for (let i = 0; i < limit; i += 1) {
+          const el = elements[i];
+          if (el === rootEl || el === doc.documentElement || el === doc.body) continue;
+          const style = win.getComputedStyle(el);
+          if (!style) continue;
+          if (style.display === "none" || style.visibility === "hidden") continue;
+          const oy = style.overflowY;
+          if ((oy === "auto" || oy === "scroll" || oy === "overlay") && el.scrollHeight > el.clientHeight + 4) {
+            const rect = el.getBoundingClientRect();
+            if (rect.width < 20 || rect.height < 20) continue;
+            const elMax = el.scrollHeight - el.clientHeight;
+            candidates.push({
+              isWindow: false,
+              el,
+              maxScroll: elMax,
+              getTop: () => el.scrollTop,
+              setTop: (nextTop) => {
+                const prevBeh = el.style.scrollBehavior;
+                if (prevBeh !== "auto") el.style.scrollBehavior = "auto";
+                if (typeof el.scrollTo === "function") {
+                  try {
+                    el.scrollTo({ top: nextTop, left: el.scrollLeft, behavior: "auto" });
+                  } catch {
+                    el.scrollTop = nextTop;
+                  }
+                } else {
+                  el.scrollTop = nextTop;
+                }
+                el.style.scrollBehavior = prevBeh;
+              }
+            });
+          }
+        }
+
+        if (candidates.length === 0) return null;
+
+        if (direction === "up") {
+          for (let i = 0; i < candidates.length; i += 1) {
+            if (candidates[i].getTop() > 1) return candidates[i];
+          }
+        } else {
+          for (let i = 0; i < candidates.length; i += 1) {
+            const c = candidates[i];
+            if (c.getTop() < c.maxScroll - 1) return c;
+          }
+        }
+        return candidates[0];
+      }
+
+      function nextRandomIntervalMs() {
+        return 1100 + Math.random() * 2100;
+      }
+
+      function updateActiveScrollLabel() {
+        if (session.scrollDirection === "none") return;
+        if (session.scrollPaused) {
+          setScrollStatus("Paused", "#fbbf24");
+          return;
+        }
+        if (session.scrollDirection === "up") {
+          setScrollStatus(`Scrolling Up (${session.scrollSpeed})`, "#a855f7");
+        } else if (session.scrollDirection === "down") {
+          setScrollStatus(`Scrolling Down (${session.scrollSpeed})`, "#38bdf8");
+        } else if (session.scrollDirection === "random") {
+          const dirText = session.randomSubDir === "up" ? "Up" : "Down";
+          setScrollStatus(`Random • ${dirText} (${session.scrollSpeed})`, "#34d399");
+        }
+      }
+
+      function cancelScrollRaf() {
+        if (session.scrollRafId !== null) {
+          cancelAnimationFrame(session.scrollRafId);
+          session.scrollRafId = null;
+        }
+      }
+
+      function stopScrolling(reasonText = "Stopped", color = "#fbbf24") {
+        cancelScrollRaf();
+        session.scrollDirection = "none";
+        session.scrollPaused = false;
+        session.randomSwitchAt = 0;
+        session.lastFrameTime = 0;
+        session.subPixelCarry = 0;
+        session.scrollStuckFrames = 0;
+        session.scrollExpectedDelta = 0;
+        setScrollStatus(reasonText, color);
+        updateUI();
+      }
+
+      function togglePauseScrolling() {
+        if (session.scrollDirection === "none") return;
+        if (!session.scrollPaused) {
+          session.scrollPaused = true;
+          cancelScrollRaf();
+          setScrollStatus("Paused", "#fbbf24");
+          updateUI();
+        } else {
+          const access = getAccessibleIframeDocument();
+          if (!access) {
+            stopScrolling("Cross-Origin Restricted", "#fb7185");
+            return;
+          }
+          session.scrollPaused = false;
+          session.lastFrameTime = 0;
+          session.subPixelCarry = 0;
+          session.scrollStuckFrames = 0;
+          session.scrollExpectedDelta = 0;
+          if (session.scrollDirection === "random") {
+            session.randomSwitchAt = performance.now() + nextRandomIntervalMs();
+          }
+          updateActiveScrollLabel();
+          updateUI();
+          session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
+        }
+      }
+
+      function runScrollAnimationFrame(timestamp) {
+        if (session.scrollDirection === "none" || session.scrollPaused) {
+          session.scrollRafId = null;
+          return;
+        }
+
+        const access = getAccessibleIframeDocument();
+        if (!access) {
+          stopScrolling("Cross-Origin Restricted", "#fb7185");
+          return;
+        }
+
+        const { doc, win } = access;
+
+        if (session.scrollDirection === "random" && timestamp >= session.randomSwitchAt) {
+          session.randomSubDir = session.randomSubDir === "down" ? "up" : "down";
+          session.randomSwitchAt = timestamp + nextRandomIntervalMs();
+          session.scrollStuckFrames = 0;
+          session.scrollExpectedDelta = 0;
+          updateActiveScrollLabel();
+        }
+
+        const effectiveDir = session.scrollDirection === "random"
+          ? session.randomSubDir
+          : session.scrollDirection;
+
+        const target = detectScrollTarget(doc, win, effectiveDir);
+        if (!target || target.maxScroll <= 2) {
+          setScrollPosition(0, 0);
+          stopScrolling("Page Not Scrollable", "#fb7185");
+          return;
+        }
+
+        if (!session.lastFrameTime) {
+          session.lastFrameTime = timestamp;
+        }
+        const dtSec = Math.min(0.05, Math.max(0, (timestamp - session.lastFrameTime) / 1000));
+        session.lastFrameTime = timestamp;
+
+        const speed = SPEED_PX_PER_SEC[session.scrollSpeed] || 165;
+        session.subPixelCarry += speed * dtSec;
+        const stepPx = Math.floor(session.subPixelCarry);
+
+        if (stepPx >= 1) {
+          session.subPixelCarry -= stepPx;
+          const beforeTop = target.getTop();
+          const maxScroll = target.maxScroll;
+
+          if (effectiveDir === "up") {
+            if (beforeTop <= 1) {
+              setScrollPosition(0, maxScroll);
+              if (session.scrollDirection === "random") {
+                session.randomSubDir = "down";
+                session.randomSwitchAt = timestamp + nextRandomIntervalMs();
+                session.scrollStuckFrames = 0;
+                session.scrollExpectedDelta = 0;
+                updateActiveScrollLabel();
+              } else {
+                stopScrolling("Reached Top", "#fbbf24");
+                return;
+              }
+            } else {
+              const desiredTop = Math.max(0, beforeTop - stepPx);
+              target.setTop(desiredTop);
+              const afterTop = target.getTop();
+              setScrollPosition(afterTop, maxScroll);
+
+              const expectedMove = Math.abs(beforeTop - desiredTop);
+              const actualMove = Math.abs(afterTop - beforeTop);
+              if (expectedMove >= 1 && actualMove < 0.25) {
+                session.scrollStuckFrames += 1;
+                session.scrollExpectedDelta += expectedMove;
+                if (session.scrollStuckFrames >= 10 && session.scrollExpectedDelta >= 12) {
+                  stopScrolling("Scroll Stuck", "#fb7185");
+                  return;
+                }
+              } else {
+                session.scrollStuckFrames = 0;
+                session.scrollExpectedDelta = 0;
+              }
+
+              if (afterTop <= 1) {
+                if (session.scrollDirection === "random") {
+                  session.randomSubDir = "down";
+                  session.randomSwitchAt = timestamp + nextRandomIntervalMs();
+                  updateActiveScrollLabel();
+                } else {
+                  stopScrolling("Reached Top", "#fbbf24");
+                  return;
+                }
+              }
+            }
+          } else {
+            if (beforeTop >= maxScroll - 1) {
+              setScrollPosition(maxScroll, maxScroll);
+              if (session.scrollDirection === "random") {
+                session.randomSubDir = "up";
+                session.randomSwitchAt = timestamp + nextRandomIntervalMs();
+                session.scrollStuckFrames = 0;
+                session.scrollExpectedDelta = 0;
+                updateActiveScrollLabel();
+              } else {
+                stopScrolling("Reached Bottom", "#fbbf24");
+                return;
+              }
+            } else {
+              const desiredTop = Math.min(maxScroll, beforeTop + stepPx);
+              target.setTop(desiredTop);
+              const afterTop = target.getTop();
+              setScrollPosition(afterTop, maxScroll);
+
+              const expectedMove = Math.abs(desiredTop - beforeTop);
+              const actualMove = Math.abs(afterTop - beforeTop);
+              if (expectedMove >= 1 && actualMove < 0.25) {
+                session.scrollStuckFrames += 1;
+                session.scrollExpectedDelta += expectedMove;
+                if (session.scrollStuckFrames >= 10 && session.scrollExpectedDelta >= 12) {
+                  stopScrolling("Scroll Stuck", "#fb7185");
+                  return;
+                }
+              } else {
+                session.scrollStuckFrames = 0;
+                session.scrollExpectedDelta = 0;
+              }
+
+              if (afterTop >= maxScroll - 1) {
+                if (session.scrollDirection === "random") {
+                  session.randomSubDir = "up";
+                  session.randomSwitchAt = timestamp + nextRandomIntervalMs();
+                  updateActiveScrollLabel();
+                } else {
+                  stopScrolling("Reached Bottom", "#fbbf24");
+                  return;
+                }
+              }
+            }
+          }
+        }
+
+        session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
+      }
+
+      function startScrolling(direction) {
+        cancelScrollRaf();
+
+        const access = getAccessibleIframeDocument();
+        if (!access) {
+          session.scrollDirection = "none";
+          session.scrollPaused = false;
+          if (previewFrame.style.display === "block") {
+            setScrollStatus("Cross-Origin Restricted", "#fb7185");
+          } else {
+            setScrollStatus("Load Preview First", "#fbbf24");
+          }
+          updateUI();
+          return;
+        }
+
+        attachSameOriginPreviewHandlers(access);
+
+        const initialCheckDir = direction === "up" ? "up" : "down";
+        const target = detectScrollTarget(access.doc, access.win, initialCheckDir);
+        if (!target || target.maxScroll <= 2) {
+          setScrollPosition(0, 0);
+          session.scrollDirection = "none";
+          session.scrollPaused = false;
+          setScrollStatus("Page Not Scrollable", "#fb7185");
+          updateUI();
+          return;
+        }
+
+        const currentTop = target.getTop();
+        setScrollPosition(currentTop, target.maxScroll);
+
+        if (direction === "up" && currentTop <= 1) {
+          session.scrollDirection = "none";
+          session.scrollPaused = false;
+          setScrollStatus("Already At Top", "#fbbf24");
+          updateUI();
+          return;
+        }
+
+        if (direction === "down" && currentTop >= target.maxScroll - 1) {
+          session.scrollDirection = "none";
+          session.scrollPaused = false;
+          setScrollStatus("Already At Bottom", "#fbbf24");
+          updateUI();
+          return;
+        }
+
+        session.scrollDirection = direction;
+        session.scrollPaused = false;
+        session.lastFrameTime = 0;
+        session.subPixelCarry = 0;
+        session.scrollStuckFrames = 0;
+        session.scrollExpectedDelta = 0;
+
+        if (direction === "random") {
+          session.randomSubDir = currentTop >= target.maxScroll - 4 ? "up" : (currentTop <= 4 ? "down" : (Math.random() < 0.7 ? "down" : "up"));
+          session.randomSwitchAt = performance.now() + nextRandomIntervalMs();
+        }
+
+        updateActiveScrollLabel();
+        updateUI();
+        session.scrollRafId = requestAnimationFrame(runScrollAnimationFrame);
+      }
+
+      function buildCssSelector(el, doc) {
+        const escapeId = (id) => (window.CSS && CSS.escape ? CSS.escape(id) : id.replace(/([^\w-])/g, "\\$1"));
         if (el.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(el.id)) {
-          return `#${el.id}`;
+          const candidate = `#${escapeId(el.id)}`;
+          try {
+            if (doc.querySelector(candidate) === el) return candidate;
+          } catch {}
         }
         const testId = el.getAttribute && el.getAttribute("data-testid");
         if (testId) {
-          return `${el.tagName.toLowerCase()}[data-testid="${testId.replace(/"/g, '\\"')}"]`;
+          const candidate = `${el.tagName.toLowerCase()}[data-testid="${testId.replace(/"/g, '\\"')}"]`;
+          try {
+            if (doc.querySelector(candidate) === el) return candidate;
+          } catch {}
         }
         const parts = [];
         let cur = el;
         while (cur && cur.nodeType === 1 && cur.tagName.toLowerCase() !== "html") {
           const tag = cur.tagName.toLowerCase();
           if (cur.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(cur.id)) {
-            parts.unshift(`#${cur.id}`);
+            parts.unshift(`#${escapeId(cur.id)}`);
             break;
           }
           let sib = cur;
@@ -1459,9 +1759,12 @@
           }
           parts.unshift(`${tag}:nth-of-type(${idx})`);
           cur = cur.parentElement;
-          if (parts.length >= 4) break;
         }
-        return parts.join(" > ");
+        const full = parts.join(" > ");
+        try {
+          if (full && doc.querySelector(full) === el) return full;
+        } catch {}
+        return full;
       }
 
       function setClickFeedback(label, color, msg, className) {
@@ -1501,29 +1804,129 @@
           session.autoClickTimerId = null;
         }
         session.autoClickRunning = false;
-        setClickFeedback(statusLabel, color, reason, statusLabel === "Ad Blocked" || statusLabel === "Restricted" ? "vpn-info-err" : "vpn-info-warn");
+        setClickFeedback(
+          statusLabel,
+          color,
+          reason,
+          statusLabel === "Ad Blocked" || statusLabel === "Restricted" ? "vpn-info-err" : "vpn-info-warn"
+        );
+      }
+
+      function dispatchSingleActivation(el, win, doc, mode) {
+        if (el.scrollIntoView) {
+          el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
+        }
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+
+        if (mode === "tap") {
+          let touchHandled = false;
+          if (typeof win.Touch === "function" && typeof win.TouchEvent === "function") {
+            try {
+              const touchObj = new win.Touch({
+                identifier: Date.now() % 100000,
+                target: el,
+                clientX: cx,
+                clientY: cy,
+                screenX: cx,
+                screenY: cy,
+                pageX: cx + (win.scrollX || 0),
+                pageY: cy + (win.scrollY || 0),
+                radiusX: 4,
+                radiusY: 4,
+                force: 1
+              });
+              el.dispatchEvent(new win.TouchEvent("touchstart", {
+                bubbles: true,
+                cancelable: true,
+                view: win,
+                touches: [touchObj],
+                targetTouches: [touchObj],
+                changedTouches: [touchObj]
+              }));
+              const touchEndEvent = new win.TouchEvent("touchend", {
+                bubbles: true,
+                cancelable: true,
+                view: win,
+                touches: [],
+                targetTouches: [],
+                changedTouches: [touchObj]
+              });
+              touchHandled = !el.dispatchEvent(touchEndEvent);
+            } catch {
+              // Some desktop engines block Touch constructor; PointerEvent touch dispatch continues cleanly below
+            }
+          }
+
+          if (typeof win.PointerEvent === "function") {
+            el.dispatchEvent(new win.PointerEvent("pointerdown", {
+              bubbles: true, cancelable: true, view: win, pointerType: "touch", isPrimary: true, clientX: cx, clientY: cy
+            }));
+            const pUpCanceled = !el.dispatchEvent(new win.PointerEvent("pointerup", {
+              bubbles: true, cancelable: true, view: win, pointerType: "touch", isPrimary: true, clientX: cx, clientY: cy
+            }));
+            touchHandled = touchHandled || pUpCanceled;
+          }
+
+          if (!touchHandled) {
+            if (typeof el.focus === "function") {
+              try { el.focus({ preventScroll: true }); } catch {}
+            }
+            el.click();
+          }
+        } else {
+          if (typeof win.PointerEvent === "function") {
+            el.dispatchEvent(new win.PointerEvent("pointerdown", {
+              bubbles: true, cancelable: true, view: win, pointerType: "mouse", isPrimary: true, clientX: cx, clientY: cy
+            }));
+          }
+          el.dispatchEvent(new win.MouseEvent("mousedown", {
+            bubbles: true, cancelable: true, view: win, clientX: cx, clientY: cy, button: 0
+          }));
+          if (typeof win.PointerEvent === "function") {
+            el.dispatchEvent(new win.PointerEvent("pointerup", {
+              bubbles: true, cancelable: true, view: win, pointerType: "mouse", isPrimary: true, clientX: cx, clientY: cy
+            }));
+          }
+          el.dispatchEvent(new win.MouseEvent("mouseup", {
+            bubbles: true, cancelable: true, view: win, clientX: cx, clientY: cy, button: 0
+          }));
+          if (typeof el.focus === "function") {
+            try { el.focus({ preventScroll: true }); } catch {}
+          }
+          el.click();
+        }
       }
 
       function executeSafeClickOnce() {
-        if (!authorizedSiteToggle.checked) {
-          stopAutoClick("Confirm this is your own website or authorized test page first.", "#fb7185", "Restricted");
+        const now = performance.now();
+        if (session.actionLock || now - session.lastInteractionAt < MIN_ACTION_COOLDOWN_MS) {
           return false;
         }
-        const selector = (clickSelectorInput.value || "").trim();
-        if (!selector) {
-          stopAutoClick("Enter a CSS selector or scan targets first.", "#fbbf24", "No Target");
-          return false;
-        }
-        if (AD_SELECTOR_REGEX.test(selector)) {
-          stopAutoClick("Blocked: Clicking ads or CTR manipulation is strictly prohibited.", "#fb7185", "Ad Blocked");
-          return false;
-        }
-        const access = getAccessibleIframeDocument();
-        if (!access) {
-          stopAutoClick("Preview unavailable or cross-origin restricted (use native Android app for external sites).", "#fb7185", "Restricted");
-          return false;
-        }
+        session.actionLock = true;
         try {
+          if (!authorizedSiteToggle.checked) {
+            stopAutoClick("Confirm this is your own website or authorized test page first.", "#fb7185", "Restricted");
+            return false;
+          }
+          const selector = (clickSelectorInput.value || "").trim();
+          if (!selector) {
+            stopAutoClick("Enter a CSS selector or scan targets first.", "#fbbf24", "No Target");
+            return false;
+          }
+          if (AD_SELECTOR_REGEX.test(selector)) {
+            stopAutoClick("Blocked: Clicking ads or CTR manipulation is strictly prohibited.", "#fb7185", "Ad Blocked");
+            return false;
+          }
+          const access = getAccessibleIframeDocument();
+          if (!access) {
+            stopAutoClick("Cross-origin iframe restricted in browser HTML. Use the native Android app for external sites.", "#fb7185", "Restricted");
+            return false;
+          }
+
+          attachSameOriginPreviewHandlers(access);
+
           const el = access.doc.querySelector(selector);
           if (!el) {
             stopAutoClick("Selected button/link was not found on the current preview.", "#fbbf24", "No Target");
@@ -1533,26 +1936,116 @@
             stopAutoClick("Blocked: Ad or sponsored elements cannot be clicked.", "#fb7185", "Ad Blocked");
             return false;
           }
-          if (el.scrollIntoView) {
-            el.scrollIntoView({ block: "center", behavior: "smooth" });
+          if (!isElementInteractable(el, access.win)) {
+            stopAutoClick("Target element is hidden, disabled, or non-interactive.", "#fbbf24", "No Target");
+            return false;
           }
+
+          const mode = session.interactionMode;
           const prevOutline = el.style.outline;
-          el.style.outline = "2px solid #38BDF8";
-          setTimeout(() => { try { el.style.outline = prevOutline; } catch (_) {} }, 350);
-          el.click();
+          el.style.outline = mode === "tap" ? "2px solid #A855F7" : "2px solid #38BDF8";
+          setTimeout(() => { try { el.style.outline = prevOutline; } catch {} }, 320);
+
+          dispatchSingleActivation(el, access.win, access.doc, mode);
+          session.lastInteractionAt = performance.now();
           session.clickCount += 1;
+
           const label = (el.innerText || el.value || el.getAttribute("aria-label") || el.tagName).replace(/\s+/g, " ").trim().slice(0, 24);
-          const nextLabel = session.autoClickRunning ? "Auto Clicking" : "Idle";
+          const actionWord = mode === "tap" ? "tap" : "click";
+          const nextLabel = session.autoClickRunning ? (mode === "tap" ? "Auto Tapping" : "Auto Clicking") : "Idle";
           const nextColor = session.autoClickRunning ? "#34d399" : "#38bdf8";
-          setClickFeedback(nextLabel, nextColor, `Tested click on "${label || el.tagName.toLowerCase()}" (${session.clickCount}).`, "vpn-info-ok");
+          setClickFeedback(
+            nextLabel,
+            nextColor,
+            `Tested ${actionWord} on "${label || el.tagName.toLowerCase()}" (${session.clickCount}).`,
+            "vpn-info-ok"
+          );
           return true;
         } catch (err) {
-          stopAutoClick(`Click blocked (${err && err.message ? err.message : "Restricted"}).`, "#fb7185", "Restricted");
+          stopAutoClick(`Interaction blocked (${err && err.message ? err.message : "Restricted"}).`, "#fb7185", "Restricted");
           return false;
+        } finally {
+          session.actionLock = false;
         }
       }
 
+      function updateUI() {
+        const labels = {
+          idle: ["Idle", "#38bdf8"],
+          loading: ["Loading", "#38bdf8"],
+          viewing: ["Viewing", "#34d399"],
+          cooldown: ["Pausing", "#fbbf24"],
+          blocked: ["Restricted", "#fb7185"],
+          completed: ["Completed", "#34d399"],
+          stopped: ["Stopped", "#fbbf24"]
+        };
+        const [label, color] = labels[session.phase] || ["Idle", "#38bdf8"];
+        statusText.textContent = session.running ? `${label} • ${formatTimer(session.phaseRemaining)}` : label;
+        statusDot.style.background = color;
+        statusDot.style.boxShadow = `0 0 10px ${color}`;
+
+        liveStatusLabel.textContent = session.running
+          ? `${label} • Run ${session.currentRun}/${session.totalRuns}`
+          : `Live Status: ${label}`;
+
+        const pct = session.phase === "completed"
+          ? 100
+          : (session.running && session.totalRuns > 0
+            ? Math.round(((session.currentRun - 1) / session.totalRuns) * 100)
+            : 0);
+        progressPercentLabel.textContent = `${pct}%`;
+        progressFill.style.width = `${pct}%`;
+
+        urlInput.disabled = session.running;
+        btnHttps.disabled = session.running;
+        btnHttp.disabled = session.running;
+        viewSecInput.disabled = session.running;
+        pauseSecInput.disabled = session.running;
+        runsInput.disabled = session.running || !session.autoNext;
+        autoNextToggle.disabled = session.running;
+        startBtn.disabled = session.running;
+        stopBtn.disabled = !session.running;
+
+        scrollDownBtn.classList.toggle("active", session.scrollDirection === "down" && !session.scrollPaused);
+        scrollUpBtn.classList.toggle("active", session.scrollDirection === "up" && !session.scrollPaused);
+        scrollRandomBtn.classList.toggle("active", session.scrollDirection === "random" && !session.scrollPaused);
+        pauseScrollBtn.classList.toggle("active", session.scrollPaused);
+
+        scrollDownBtn.disabled = session.scrollDirection === "down" && !session.scrollPaused;
+        scrollUpBtn.disabled = session.scrollDirection === "up" && !session.scrollPaused;
+        scrollRandomBtn.disabled = session.scrollDirection === "random" && !session.scrollPaused;
+        pauseScrollBtn.disabled = session.scrollDirection === "none";
+        pauseScrollBtn.textContent = session.scrollPaused ? "Resume" : "Pause";
+        stopScrollBtn.disabled = session.scrollDirection === "none";
+        scrollPosLabel.textContent = session.scrollPosText;
+
+        const hasActive = Boolean(session.activeUrl) && session.phase !== "blocked";
+        backBtn.disabled = !hasActive;
+        homeBtn.disabled = !session.activeUrl;
+        reloadBtn.disabled = !hasActive;
+
+        const isTap = session.interactionMode === "tap";
+        modeClickBtn.classList.toggle("active", !isTap);
+        modeTapBtn.classList.toggle("active-purple", isTap);
+        modeClickBtn.disabled = session.autoClickRunning;
+        modeTapBtn.disabled = session.autoClickRunning;
+
+        singleClickBtn.textContent = isTap ? "1x Tap Test" : "1x Click Test";
+        startClickBtn.textContent = isTap ? "Start Tap" : "Start Click";
+        stopClickBtn.textContent = isTap ? "Stop Tap" : "Stop Click";
+
+        const countWord = isTap ? "Taps" : "Clicks";
+        clickCounterBadge.textContent = `${countWord}: ${session.clickCount} • ${session.clickStatusLabel}`;
+        clickSelectorInput.disabled = session.autoClickRunning;
+        clickIntervalInput.disabled = session.autoClickRunning;
+        scanTargetsBtn.disabled = session.autoClickRunning;
+        singleClickBtn.disabled = session.autoClickRunning;
+        startClickBtn.disabled = session.autoClickRunning;
+        stopClickBtn.disabled = !session.autoClickRunning;
+      }
+
       function clearTemporarySession(nextPhase) {
+        session.loadSeq += 1;
         if (session.timerId) clearInterval(session.timerId);
         if (session.loadTimeoutId) clearTimeout(session.loadTimeoutId);
         if (session.autoClickTimerId) clearInterval(session.autoClickTimerId);
@@ -1560,6 +2053,7 @@
         session.loadTimeoutId = null;
         session.autoClickTimerId = null;
         session.autoClickRunning = false;
+        session.actionLock = false;
         session.clickCount = 0;
         session.discoveredTargets = [];
         session.clickStatusLabel = "Idle";
@@ -1573,13 +2067,57 @@
         session.phaseRemaining = 0;
         session.activeUrl = "";
         session.phase = nextPhase;
+        setScrollPosition(0, 0);
         stopScrolling(nextPhase === "idle" ? "Idle" : "Stopped", nextPhase === "idle" ? "#94a3b8" : "#fbbf24");
         previewFrame.src = "about:blank";
         syncExternalLinks(urlInput.value);
         updateUI();
       }
 
+      function onPreviewLoadedForSeq(seq) {
+        if (!session.running || seq !== session.loadSeq || previewFrame.src === "about:blank") return;
+        clearTimeout(session.loadTimeoutId);
+        session.loadTimeoutId = null;
+        session.phase = "viewing";
+        showIframe();
+
+        const access = getAccessibleIframeDocument();
+        if (access) {
+          attachSameOriginPreviewHandlers(access);
+          const t = detectScrollTarget(access.doc, access.win, "down");
+          if (t) {
+            setScrollPosition(t.getTop(), t.maxScroll);
+          } else {
+            setScrollPosition(0, 0);
+          }
+        }
+        if (session.scrollDirection !== "none" && !session.scrollPaused) {
+          startScrolling(session.scrollDirection);
+        }
+        updateUI();
+      }
+
+      previewFrame.addEventListener("load", () => {
+        onPreviewLoadedForSeq(session.loadSeq);
+      });
+
+      previewFrame.addEventListener("error", () => {
+        if (!session.running) return;
+        clearTemporarySession("blocked");
+        setScrollStatus("Cross-Origin Restricted", "#fb7185");
+        showOverlay("Embedded Preview Restricted", "This site restricts embedded loading. Open it directly in your browser without bypassing site security.", true);
+      });
+
       function beginRun(runNumber) {
+        session.loadSeq += 1;
+        const seq = session.loadSeq;
+        if (session.loadTimeoutId) {
+          clearTimeout(session.loadTimeoutId);
+          session.loadTimeoutId = null;
+        }
+        cancelScrollRaf();
+        setScrollPosition(0, 0);
+
         session.currentRun = runNumber;
         session.phase = "loading";
         session.phaseRemaining = session.viewSec;
@@ -1589,37 +2127,13 @@
 
         previewFrame.src = "about:blank";
         setTimeout(() => {
-          if (!session.running) return;
+          if (!session.running || seq !== session.loadSeq) return;
           previewFrame.src = session.activeUrl;
         }, 50);
 
-        let loaded = false;
-        previewFrame.onload = () => {
-          if (!session.running || previewFrame.src === "about:blank") return;
-          loaded = true;
-          clearTimeout(session.loadTimeoutId);
-          session.phase = "viewing";
-          showIframe();
-          if (session.scrollDirection !== "none") {
-            startScrolling(session.scrollDirection);
-          }
-          updateUI();
-        };
-
-        previewFrame.onerror = () => {
-          clearTemporarySession("blocked");
-          setScrollStatus("Cross-Origin Restricted", "#fb7185");
-          showOverlay("Embedded Preview Restricted", "This site restricts embedded loading. Open it directly in your browser without bypassing site security.", true);
-        };
-
         session.loadTimeoutId = setTimeout(() => {
-          if (!loaded && session.running) {
-            session.phase = "viewing";
-            showIframe();
-            if (session.scrollDirection !== "none") {
-              startScrolling(session.scrollDirection);
-            }
-            updateUI();
+          if (session.running && seq === session.loadSeq && session.phase === "loading") {
+            onPreviewLoadedForSeq(seq);
           }
         }, 4000);
       }
@@ -1681,6 +2195,7 @@
       scrollDownBtn.addEventListener("click", () => startScrolling("down"));
       scrollUpBtn.addEventListener("click", () => startScrolling("up"));
       scrollRandomBtn.addEventListener("click", () => startScrolling("random"));
+      pauseScrollBtn.addEventListener("click", togglePauseScrolling);
       stopScrollBtn.addEventListener("click", () => stopScrolling("Stopped", "#fbbf24"));
 
       scrollSpeedRow.querySelectorAll("button[data-speed]").forEach((btn) => {
@@ -1758,6 +2273,14 @@
         }
       });
 
+      [modeClickBtn, modeTapBtn].forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (session.autoClickRunning) return;
+          session.interactionMode = btn.getAttribute("data-mode") === "tap" ? "tap" : "click";
+          updateUI();
+        });
+      });
+
       scanTargetsBtn.addEventListener("click", () => {
         const access = getAccessibleIframeDocument();
         if (!access) {
@@ -1771,16 +2294,16 @@
           );
           return;
         }
+        attachSameOriginPreviewHandlers(access);
         try {
           const nodes = access.doc.querySelectorAll('button, a[href], [role="button"], input[type="button"], input[type="submit"]');
           const found = [];
           const seen = new Set();
           for (let i = 0; i < nodes.length && found.length < 18; i += 1) {
             const el = nodes[i];
-            const rect = el.getBoundingClientRect();
-            if (rect.width < 2 || rect.height < 2) continue;
+            if (!isElementInteractable(el, access.win)) continue;
             if (isProhibitedAdElement(el)) continue;
-            const sel = buildCssSelector(el);
+            const sel = buildCssSelector(el, access.doc);
             if (!sel || seen.has(sel)) continue;
             seen.add(sel);
             let txt = (el.innerText || el.value || el.getAttribute("aria-label") || el.tagName).replace(/\s+/g, " ").trim();
@@ -1794,9 +2317,9 @@
           }
           renderTargetChips();
           if (found.length === 0) {
-            setClickFeedback("No Target", "#fbbf24", "No safe buttons or links found in this view.", "vpn-info-warn");
+            setClickFeedback("No Target", "#fbbf24", "No visible safe buttons or links found in this view.", "vpn-info-warn");
           } else {
-            setClickFeedback("Idle", "#38bdf8", `Found ${found.length} safe button/link target(s).`, "vpn-info-ok");
+            setClickFeedback("Idle", "#38bdf8", `Found ${found.length} interactive button/link target(s).`, "vpn-info-ok");
           }
         } catch (err) {
           setClickFeedback("Restricted", "#fb7185", `Target scan blocked (${err && err.message ? err.message : "Restricted"}).`, "vpn-info-err");
@@ -1826,12 +2349,29 @@
           return;
         }
         if (!getAccessibleIframeDocument()) {
-          setClickFeedback("Restricted", "#fb7185", "Load a same-origin preview first (or use native Android WebView for external sites).", "vpn-info-err");
+          setClickFeedback(
+            "Restricted",
+            "#fb7185",
+            previewFrame.style.display === "block"
+              ? "Cross-origin iframe restricted in browser HTML. Use the native Android app for external sites."
+              : "Load a same-origin preview first.",
+            "vpn-info-err"
+          );
           return;
         }
 
+        if (session.autoClickTimerId) {
+          clearInterval(session.autoClickTimerId);
+          session.autoClickTimerId = null;
+        }
         session.autoClickRunning = true;
-        setClickFeedback("Auto Clicking", "#34d399", `Auto Click active every ${intervalSec}s`, "vpn-info-ok");
+        const modeWord = session.interactionMode === "tap" ? "Auto Tap" : "Auto Click";
+        setClickFeedback(
+          session.interactionMode === "tap" ? "Auto Tapping" : "Auto Clicking",
+          "#34d399",
+          `${modeWord} active every ${intervalSec}s`,
+          "vpn-info-ok"
+        );
         executeSafeClickOnce();
         if (session.autoClickRunning) {
           session.autoClickTimerId = setInterval(() => {
@@ -1842,7 +2382,8 @@
       });
 
       stopClickBtn.addEventListener("click", () => {
-        stopAutoClick("Auto Click stopped.", "#fbbf24", "Stopped");
+        const modeWord = session.interactionMode === "tap" ? "Auto Tap" : "Auto Click";
+        stopAutoClick(`${modeWord} stopped.`, "#fbbf24", "Stopped");
       });
 
       autoNextToggle.addEventListener("change", () => {
@@ -1851,6 +2392,7 @@
       });
 
       startBtn.addEventListener("click", () => {
+        if (session.running) return;
         const check = validateUrl(urlInput.value);
         if (!check.valid) {
           urlError.textContent = check.error;
@@ -1858,6 +2400,11 @@
         }
         urlError.textContent = "";
         urlInput.value = check.url;
+
+        if (session.timerId) {
+          clearInterval(session.timerId);
+          session.timerId = null;
+        }
 
         session.viewSec = clampInt(viewSecInput.value, 3, 300, 15);
         session.pauseSec = clampInt(pauseSecInput.value, 0, 120, 3);
@@ -1888,7 +2435,13 @@
       });
 
       reloadBtn.addEventListener("click", () => {
-        if (session.activeUrl) previewFrame.src = previewFrame.src;
+        if (!session.activeUrl) return;
+        const access = getAccessibleIframeDocument();
+        if (access && access.win) {
+          access.win.location.reload();
+        } else {
+          previewFrame.src = previewFrame.src;
+        }
       });
 
       window.addEventListener("beforeunload", () => {

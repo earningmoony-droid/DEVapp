@@ -3,6 +3,7 @@ package com.example.ui.components
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.http.SslError
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
@@ -66,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.R
 import com.example.model.AutoScrollDirection
+import com.example.model.ClickInteractionMode
 import com.example.model.ClickTargetItem
 import com.example.model.ScrollIndicatorState
 import com.example.model.ScrollSpeed
@@ -86,8 +88,11 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
 @Composable
 fun WebPreviewCard(
     activeUrl: String?,
@@ -98,6 +103,7 @@ fun WebPreviewCard(
     blockedReason: String?,
     phaseRemainingSec: Int,
     scrollDirection: AutoScrollDirection,
+    isScrollPaused: Boolean,
     scrollSpeed: ScrollSpeed,
     canGoBack: Boolean,
     pendingCommand: WebCommandEvent?,
@@ -108,7 +114,7 @@ fun WebPreviewCard(
     onPageStarted: () -> Unit,
     onPageFinished: (Boolean) -> Unit,
     onCanGoBackChanged: (Boolean) -> Unit,
-    onScrollStatusChanged: (ScrollIndicatorState) -> Unit,
+    onScrollFeedback: (ScrollIndicatorState, String?) -> Unit,
     onBlockedOrError: (String) -> Unit,
     onOpenExternal: (String) -> Unit,
     onTargetsScanned: (List<ClickTargetItem>, String?) -> Unit,
@@ -119,9 +125,10 @@ fun WebPreviewCard(
     var lastLoadedToken by remember { mutableIntStateOf(-1) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
-    // Smooth independent Scroll Down / Scroll Up / Random Scroll inside webpage container
+    // Smooth independent Scroll Down / Scroll Up / Random Scroll with Pause, Position & Stuck detection
     LaunchedEffect(
         scrollDirection,
+        isScrollPaused,
         scrollSpeed,
         activeUrl,
         blockedReason,
@@ -130,6 +137,7 @@ fun WebPreviewCard(
     ) {
         val wv = webViewRef ?: return@LaunchedEffect
         if (scrollDirection == AutoScrollDirection.NONE ||
+            isScrollPaused ||
             activeUrl == null ||
             blockedReason != null ||
             status == TestSessionStatus.PAUSING_BETWEEN
@@ -139,12 +147,16 @@ fun WebPreviewCard(
 
         var randomGoingDown = true
         var nextSwitchAtMs = System.currentTimeMillis() + kotlin.random.Random.nextLong(1200L, 3000L)
+        var stuckFrames = 0
+        var stuckExpectedAccum = 0.0
 
         while (isActive) {
             val now = System.currentTimeMillis()
             if (scrollDirection == AutoScrollDirection.RANDOM && now >= nextSwitchAtMs) {
                 randomGoingDown = !randomGoingDown
                 nextSwitchAtMs = now + kotlin.random.Random.nextLong(1100L, 3200L)
+                stuckFrames = 0
+                stuckExpectedAccum = 0.0
             }
 
             val goingDown = when (scrollDirection) {
@@ -155,36 +167,76 @@ fun WebPreviewCard(
             }
             val delta = if (goingDown) scrollSpeed.pxPerTick else -scrollSpeed.pxPerTick
 
-            val js = buildPreviewScrollScript(delta)
-            wv.evaluateJavascript(js) { rawResult ->
-                val result = rawResult?.trim('"') ?: ""
-                if (scrollDirection == AutoScrollDirection.RANDOM) {
-                    when (result) {
-                        "AT_TOP" -> {
-                            randomGoingDown = true
-                            nextSwitchAtMs = System.currentTimeMillis() + kotlin.random.Random.nextLong(1100L, 2800L)
-                            onScrollStatusChanged(ScrollIndicatorState.RANDOM_DOWN)
-                        }
-                        "AT_BOTTOM" -> {
-                            randomGoingDown = false
-                            nextSwitchAtMs = System.currentTimeMillis() + kotlin.random.Random.nextLong(1100L, 2800L)
-                            onScrollStatusChanged(ScrollIndicatorState.RANDOM_UP)
-                        }
-                        "SCROLLING_UP" -> onScrollStatusChanged(ScrollIndicatorState.RANDOM_UP)
-                        "SCROLLING_DOWN" -> onScrollStatusChanged(ScrollIndicatorState.RANDOM_DOWN)
-                        "RESTRICTED" -> onScrollStatusChanged(ScrollIndicatorState.RESTRICTED)
-                    }
-                } else {
-                    when (result) {
-                        "AT_TOP" -> onScrollStatusChanged(ScrollIndicatorState.AT_TOP)
-                        "AT_BOTTOM" -> onScrollStatusChanged(ScrollIndicatorState.AT_BOTTOM)
-                        "SCROLLING_UP" -> onScrollStatusChanged(ScrollIndicatorState.SCROLLING_UP)
-                        "SCROLLING_DOWN" -> onScrollStatusChanged(ScrollIndicatorState.SCROLLING_DOWN)
-                        "RESTRICTED" -> onScrollStatusChanged(ScrollIndicatorState.RESTRICTED)
+            val rawResult = withTimeoutOrNull(450L) {
+                suspendCancellableCoroutine<String?> { cont ->
+                    wv.evaluateJavascript(buildPreviewScrollScript(delta)) { value ->
+                        if (cont.isActive) cont.resume(value)
                     }
                 }
             }
-            delay(20)
+
+            val decoded = decodeJsString(rawResult)
+            val parsedObj = runCatching { org.json.JSONObject(decoded) }.getOrNull()
+            val resultState = parsedObj?.optString("state").orEmpty()
+            val posText = parsedObj?.optString("pos")?.takeIf { it.isNotBlank() }
+            val expectedMove = parsedObj?.optDouble("expectedMove", 0.0) ?: 0.0
+            val actualMove = parsedObj?.optDouble("actualMove", 0.0) ?: 0.0
+
+            if (resultState == "NOT_SCROLLABLE") {
+                onScrollFeedback(ScrollIndicatorState.NOT_SCROLLABLE, posText ?: "0% • 0/0px")
+                break
+            }
+            if (resultState == "RESTRICTED") {
+                onScrollFeedback(ScrollIndicatorState.RESTRICTED, posText)
+                break
+            }
+
+            if (expectedMove >= 1.0 && actualMove < 0.25 && resultState != "AT_TOP" && resultState != "AT_BOTTOM") {
+                stuckFrames += 1
+                stuckExpectedAccum += expectedMove
+                if (stuckFrames >= 10 && stuckExpectedAccum >= 12.0) {
+                    onScrollFeedback(ScrollIndicatorState.STUCK, posText)
+                    break
+                }
+            } else {
+                stuckFrames = 0
+                stuckExpectedAccum = 0.0
+            }
+
+            if (scrollDirection == AutoScrollDirection.RANDOM) {
+                when (resultState) {
+                    "AT_TOP" -> {
+                        randomGoingDown = true
+                        nextSwitchAtMs = System.currentTimeMillis() + kotlin.random.Random.nextLong(1100L, 2800L)
+                        stuckFrames = 0
+                        stuckExpectedAccum = 0.0
+                        onScrollFeedback(ScrollIndicatorState.RANDOM_DOWN, posText)
+                    }
+                    "AT_BOTTOM" -> {
+                        randomGoingDown = false
+                        nextSwitchAtMs = System.currentTimeMillis() + kotlin.random.Random.nextLong(1100L, 2800L)
+                        stuckFrames = 0
+                        stuckExpectedAccum = 0.0
+                        onScrollFeedback(ScrollIndicatorState.RANDOM_UP, posText)
+                    }
+                    "SCROLLING_UP" -> onScrollFeedback(ScrollIndicatorState.RANDOM_UP, posText)
+                    "SCROLLING_DOWN" -> onScrollFeedback(ScrollIndicatorState.RANDOM_DOWN, posText)
+                }
+            } else {
+                when (resultState) {
+                    "AT_TOP" -> {
+                        onScrollFeedback(ScrollIndicatorState.AT_TOP, posText)
+                        break
+                    }
+                    "AT_BOTTOM" -> {
+                        onScrollFeedback(ScrollIndicatorState.AT_BOTTOM, posText)
+                        break
+                    }
+                    "SCROLLING_UP" -> onScrollFeedback(ScrollIndicatorState.SCROLLING_UP, posText)
+                    "SCROLLING_DOWN" -> onScrollFeedback(ScrollIndicatorState.SCROLLING_DOWN, posText)
+                }
+            }
+            delay(18)
         }
     }
 
@@ -231,7 +283,7 @@ fun WebPreviewCard(
                 if (wv == null || selector.isBlank()) {
                     onClickExecuted("NO_TARGET", "Preview or target selector unavailable.")
                 } else {
-                    wv.evaluateJavascript(buildSafeClickScript(selector)) { raw ->
+                    wv.evaluateJavascript(buildSafeClickScript(selector, cmd.interactionMode)) { raw ->
                         val decoded = decodeJsString(raw)
                         val parts = decoded.split("::", limit = 2)
                         val code = parts.firstOrNull().orEmpty().ifBlank { "RESTRICTED" }
@@ -343,6 +395,22 @@ fun WebPreviewCard(
                                 ViewGroup.LayoutParams.MATCH_PARENT
                             )
                             setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                            isFocusable = true
+                            isFocusableInTouchMode = true
+                            isClickable = true
+                            setOnTouchListener { v, event ->
+                                when (event.actionMasked) {
+                                    MotionEvent.ACTION_DOWN,
+                                    MotionEvent.ACTION_MOVE -> {
+                                        v.parent?.requestDisallowInterceptTouchEvent(true)
+                                    }
+                                    MotionEvent.ACTION_UP,
+                                    MotionEvent.ACTION_CANCEL -> {
+                                        v.parent?.requestDisallowInterceptTouchEvent(false)
+                                    }
+                                }
+                                false
+                            }
                             settings.apply {
                                 javaScriptEnabled = true
                                 domStorageEnabled = false
@@ -611,50 +679,139 @@ private fun buildPreviewScrollScript(delta: Int): String {
         (function() {
           try {
             var delta = $delta;
-            function findScrollable(doc) {
+            function findScrollable(doc, goingUp) {
               if (!doc) return null;
+              var win = doc.defaultView || window;
               var root = doc.scrollingElement || doc.documentElement || doc.body;
+              var docHeight = Math.max(
+                root ? root.scrollHeight : 0,
+                doc.documentElement ? doc.documentElement.scrollHeight : 0,
+                doc.body ? doc.body.scrollHeight : 0
+              );
+              var viewportH = win.innerHeight || (root ? root.clientHeight : 0);
+              var winMax = Math.max(0, docHeight - viewportH);
               var candidates = [];
-              if (root && root.scrollHeight > root.clientHeight + 2) {
-                candidates.push(root);
+
+              if (winMax > 2) {
+                candidates.push({
+                  maxScroll: winMax,
+                  getTop: function() {
+                    return Math.max(0, win.scrollY || win.pageYOffset || (root ? root.scrollTop : 0));
+                  },
+                  setTop: function(nextTop) {
+                    var targetEl = doc.scrollingElement || doc.documentElement || doc.body;
+                    var prevBeh = targetEl && targetEl.style ? targetEl.style.scrollBehavior : '';
+                    if (targetEl && targetEl.style && prevBeh !== 'auto') {
+                      targetEl.style.scrollBehavior = 'auto';
+                    }
+                    try {
+                      win.scrollTo({ top: nextTop, left: win.scrollX || 0, behavior: 'auto' });
+                    } catch (e1) {
+                      win.scrollTo(win.scrollX || 0, nextTop);
+                    }
+                    if (targetEl && Math.abs((win.scrollY || targetEl.scrollTop) - nextTop) > 2 && targetEl.scrollTop !== nextTop) {
+                      targetEl.scrollTop = nextTop;
+                    }
+                    if (targetEl && targetEl.style) {
+                      targetEl.style.scrollBehavior = prevBeh;
+                    }
+                  }
+                });
               }
+
               var all = doc.querySelectorAll('*');
-              for (var i = 0; i < all.length && i < 600; i++) {
+              for (var i = 0; i < all.length && i < 700; i++) {
                 var el = all[i];
-                if (el === root) continue;
-                var style = (doc.defaultView || window).getComputedStyle(el);
+                if (el === root || el === doc.documentElement || el === doc.body) continue;
+                var style = win.getComputedStyle(el);
                 if (!style) continue;
+                if (style.display === 'none' || style.visibility === 'hidden') continue;
                 var oy = style.overflowY;
-                if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 4) {
-                  candidates.push(el);
+                if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && el.scrollHeight > el.clientHeight + 4) {
+                  var rect = el.getBoundingClientRect();
+                  if (rect.width < 20 || rect.height < 20) continue;
+                  (function(node, maxVal) {
+                    candidates.push({
+                      maxScroll: maxVal,
+                      getTop: function() { return node.scrollTop; },
+                      setTop: function(nextTop) {
+                        var prevBeh = node.style.scrollBehavior;
+                        if (prevBeh !== 'auto') node.style.scrollBehavior = 'auto';
+                        if (node.scrollTo) {
+                          try {
+                            node.scrollTo({ top: nextTop, left: node.scrollLeft, behavior: 'auto' });
+                          } catch (e2) {
+                            node.scrollTop = nextTop;
+                          }
+                        } else {
+                          node.scrollTop = nextTop;
+                        }
+                        node.style.scrollBehavior = prevBeh;
+                      }
+                    });
+                  })(el, el.scrollHeight - el.clientHeight);
                 }
               }
-              if (delta < 0) {
+
+              if (candidates.length === 0) return null;
+              if (goingUp) {
                 for (var j = 0; j < candidates.length; j++) {
-                  if (candidates[j].scrollTop > 0) return candidates[j];
+                  if (candidates[j].getTop() > 1) return candidates[j];
                 }
               } else {
                 for (var k = 0; k < candidates.length; k++) {
-                  var c = candidates[k];
-                  if (c.scrollTop + c.clientHeight < c.scrollHeight - 1) return c;
+                  if (candidates[k].getTop() < candidates[k].maxScroll - 1) return candidates[k];
                 }
               }
-              return candidates.length > 0 ? candidates[0] : root;
+              return candidates[0];
             }
-            var target = findScrollable(document);
-            if (!target) return 'NO_TARGET';
-            if (delta < 0) {
-              if (target.scrollTop <= 0) return 'AT_TOP';
-              target.scrollTop = Math.max(0, target.scrollTop + delta);
-              return target.scrollTop <= 0 ? 'AT_TOP' : 'SCROLLING_UP';
+
+            var goingUp = delta < 0;
+            var target = findScrollable(document, goingUp);
+            if (!target || target.maxScroll <= 2) {
+              return JSON.stringify({ state: 'NOT_SCROLLABLE', pos: '0% • 0/0px', expectedMove: 0, actualMove: 0 });
+            }
+
+            var maxScroll = target.maxScroll;
+            var beforeTop = target.getTop();
+            function formatPos(posVal) {
+              var safePos = Math.max(0, Math.min(maxScroll, Math.round(posVal)));
+              var safeMax = Math.max(0, Math.round(maxScroll));
+              var pct = safeMax > 0 ? Math.round((safePos / safeMax) * 100) : 0;
+              return pct + '% • ' + safePos + '/' + safeMax + 'px';
+            }
+
+            if (goingUp) {
+              if (beforeTop <= 1) {
+                return JSON.stringify({ state: 'AT_TOP', pos: formatPos(0), expectedMove: 0, actualMove: 0 });
+              }
+              var desiredUp = Math.max(0, beforeTop + delta);
+              target.setTop(desiredUp);
+              var afterUp = target.getTop();
+              var nextStateUp = afterUp <= 1 ? 'AT_TOP' : 'SCROLLING_UP';
+              return JSON.stringify({
+                state: nextStateUp,
+                pos: formatPos(afterUp),
+                expectedMove: Math.abs(beforeTop - desiredUp),
+                actualMove: Math.abs(afterUp - beforeTop)
+              });
             } else {
-              var maxScroll = target.scrollHeight - target.clientHeight;
-              if (maxScroll <= 0 || target.scrollTop >= maxScroll - 1) return 'AT_BOTTOM';
-              target.scrollTop = Math.min(maxScroll, target.scrollTop + delta);
-              return target.scrollTop >= maxScroll - 1 ? 'AT_BOTTOM' : 'SCROLLING_DOWN';
+              if (beforeTop >= maxScroll - 1) {
+                return JSON.stringify({ state: 'AT_BOTTOM', pos: formatPos(maxScroll), expectedMove: 0, actualMove: 0 });
+              }
+              var desiredDown = Math.min(maxScroll, beforeTop + delta);
+              target.setTop(desiredDown);
+              var afterDown = target.getTop();
+              var nextStateDown = afterDown >= maxScroll - 1 ? 'AT_BOTTOM' : 'SCROLLING_DOWN';
+              return JSON.stringify({
+                state: nextStateDown,
+                pos: formatPos(afterDown),
+                expectedMove: Math.abs(desiredDown - beforeTop),
+                actualMove: Math.abs(afterDown - beforeTop)
+              });
             }
           } catch (e) {
-            return 'RESTRICTED';
+            return JSON.stringify({ state: 'RESTRICTED', pos: '0% • 0/0px', expectedMove: 0, actualMove: 0 });
           }
         })();
     """.trimIndent()
@@ -663,7 +820,7 @@ private fun buildPreviewScrollScript(delta: Int): String {
 private const val AD_GUARD_JS = """
   function isProhibitedAdElement(el) {
     if (!el) return true;
-    var adPattern = /(adsbygoogle|doubleclick|googlesyndication|adservice|adsystem|adserver|adnxs|taboola|outbrain|mgid|sponsored|advertisement|ad-slot|ad_slot|ad-banner|ad_banner|google_ads)/i;
+    var adPattern = /(adsbygoogle|doubleclick|googlesyndication|adservice|adsystem|adserver|adnxs|taboola|outbrain|mgid|sponsored|advertisement|ad-slot|ad_slot|ad-banner|ad_banner|google_ads|data-ad)/i;
     var cur = el;
     var depth = 0;
     while (cur && depth < 6) {
@@ -683,6 +840,16 @@ private const val AD_GUARD_JS = """
     }
     return false;
   }
+  function isInteractable(el) {
+    if (!el) return false;
+    if (el.disabled || (el.getAttribute && el.getAttribute('aria-disabled') === 'true')) return false;
+    var style = window.getComputedStyle(el);
+    if (!style || style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0 || style.pointerEvents === 'none') {
+      return false;
+    }
+    var rect = el.getBoundingClientRect();
+    return rect.width >= 2 && rect.height >= 2;
+  }
 """
 
 private fun buildScanClickablesScript(): String {
@@ -690,20 +857,25 @@ private fun buildScanClickablesScript(): String {
         (function() {
           try {
             $AD_GUARD_JS
+            function escapeCssId(id) {
+              return (window.CSS && CSS.escape) ? CSS.escape(id) : id.replace(/([^\w-])/g, '\\$1');
+            }
             function buildSelector(el) {
               if (el.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(el.id)) {
-                return '#' + el.id;
+                var idSel = '#' + escapeCssId(el.id);
+                try { if (document.querySelector(idSel) === el) return idSel; } catch (e0) {}
               }
               var testId = el.getAttribute('data-testid');
               if (testId) {
-                return el.tagName.toLowerCase() + '[data-testid="' + testId.replace(/"/g, '\\"') + '"]';
+                var tidSel = el.tagName.toLowerCase() + '[data-testid="' + testId.replace(/"/g, '\\"') + '"]';
+                try { if (document.querySelector(tidSel) === el) return tidSel; } catch (e1) {}
               }
               var parts = [];
               var cur = el;
               while (cur && cur.nodeType === 1 && cur.tagName.toLowerCase() !== 'html') {
                 var tag = cur.tagName.toLowerCase();
                 if (cur.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(cur.id)) {
-                  parts.unshift('#' + cur.id);
+                  parts.unshift('#' + escapeCssId(cur.id));
                   break;
                 }
                 var sib = cur;
@@ -714,17 +886,17 @@ private fun buildScanClickablesScript(): String {
                 }
                 parts.unshift(tag + ':nth-of-type(' + idx + ')');
                 cur = cur.parentElement;
-                if (parts.length >= 4) break;
               }
-              return parts.join(' > ');
+              var full = parts.join(' > ');
+              try { if (full && document.querySelector(full) === el) return full; } catch (e2) {}
+              return full;
             }
             var nodes = document.querySelectorAll('button, a[href], [role="button"], input[type="button"], input[type="submit"]');
             var results = [];
             var seen = {};
             for (var i = 0; i < nodes.length && results.length < 18; i++) {
               var el = nodes[i];
-              var rect = el.getBoundingClientRect();
-              if (rect.width < 2 || rect.height < 2) continue;
+              if (!isInteractable(el)) continue;
               if (isProhibitedAdElement(el)) continue;
               var sel = buildSelector(el);
               if (!sel || seen[sel]) continue;
@@ -746,12 +918,17 @@ private fun buildScanClickablesScript(): String {
     """.trimIndent()
 }
 
-private fun buildSafeClickScript(rawSelector: String): String {
+private fun buildSafeClickScript(rawSelector: String, mode: ClickInteractionMode): String {
     val quotedSelector = org.json.JSONObject.quote(rawSelector)
+    val isTap = mode == ClickInteractionMode.TAP
     return """
         (function() {
           try {
             $AD_GUARD_JS
+            var now = Date.now();
+            if (window.__wvLastActAt && now - window.__wvLastActAt < 280) {
+              return 'SKIPPED::Debounced accidental double interaction.';
+            }
             var sel = $quotedSelector;
             if (/(adsbygoogle|doubleclick|googlesyndication|adservice|adsystem|adserver|adnxs|taboola|outbrain|mgid|sponsored|advertisement|ad-slot|ad_slot|ad-banner|ad_banner|google_ads|data-ad)/i.test(sel)) {
               return 'BLOCKED_AD::Blocked ad-related selector.';
@@ -761,17 +938,88 @@ private fun buildSafeClickScript(rawSelector: String): String {
             if (isProhibitedAdElement(el)) {
               return 'BLOCKED_AD::Blocked ad or sponsored element.';
             }
-            if (el.scrollIntoView) {
-              el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            if (!isInteractable(el)) {
+              return 'NO_TARGET::Target element is hidden, disabled, or non-interactive.';
             }
+            window.__wvLastActAt = now;
+            if (el.scrollIntoView) {
+              el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+            }
+            var rect = el.getBoundingClientRect();
+            var cx = rect.left + rect.width / 2;
+            var cy = rect.top + rect.height / 2;
+            var isTap = $isTap;
+
             var prevOutline = el.style.outline;
-            el.style.outline = '2px solid #38BDF8';
-            setTimeout(function() { try { el.style.outline = prevOutline; } catch (_) {} }, 350);
-            el.click();
+            el.style.outline = isTap ? '2px solid #A855F7' : '2px solid #38BDF8';
+            setTimeout(function() { try { el.style.outline = prevOutline; } catch (_) {} }, 320);
+
+            if (isTap) {
+              var touchHandled = false;
+              if (typeof Touch === 'function' && typeof TouchEvent === 'function') {
+                try {
+                  var touchObj = new Touch({
+                    identifier: now % 100000,
+                    target: el,
+                    clientX: cx,
+                    clientY: cy,
+                    screenX: cx,
+                    screenY: cy,
+                    pageX: cx + (window.scrollX || 0),
+                    pageY: cy + (window.scrollY || 0),
+                    radiusX: 4,
+                    radiusY: 4,
+                    force: 1
+                  });
+                  el.dispatchEvent(new TouchEvent('touchstart', {
+                    bubbles: true, cancelable: true, view: window,
+                    touches: [touchObj], targetTouches: [touchObj], changedTouches: [touchObj]
+                  }));
+                  var te = new TouchEvent('touchend', {
+                    bubbles: true, cancelable: true, view: window,
+                    touches: [], targetTouches: [], changedTouches: [touchObj]
+                  });
+                  touchHandled = !el.dispatchEvent(te);
+                } catch (eTouch) {}
+              }
+              if (typeof PointerEvent === 'function') {
+                el.dispatchEvent(new PointerEvent('pointerdown', {
+                  bubbles: true, cancelable: true, view: window, pointerType: 'touch', isPrimary: true, clientX: cx, clientY: cy
+                }));
+                var puCanceled = !el.dispatchEvent(new PointerEvent('pointerup', {
+                  bubbles: true, cancelable: true, view: window, pointerType: 'touch', isPrimary: true, clientX: cx, clientY: cy
+                }));
+                touchHandled = touchHandled || puCanceled;
+              }
+              if (!touchHandled) {
+                if (el.focus) { try { el.focus({ preventScroll: true }); } catch (_) {} }
+                el.click();
+              }
+            } else {
+              if (typeof PointerEvent === 'function') {
+                el.dispatchEvent(new PointerEvent('pointerdown', {
+                  bubbles: true, cancelable: true, view: window, pointerType: 'mouse', isPrimary: true, clientX: cx, clientY: cy
+                }));
+              }
+              el.dispatchEvent(new MouseEvent('mousedown', {
+                bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0
+              }));
+              if (typeof PointerEvent === 'function') {
+                el.dispatchEvent(new PointerEvent('pointerup', {
+                  bubbles: true, cancelable: true, view: window, pointerType: 'mouse', isPrimary: true, clientX: cx, clientY: cy
+                }));
+              }
+              el.dispatchEvent(new MouseEvent('mouseup', {
+                bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0
+              }));
+              if (el.focus) { try { el.focus({ preventScroll: true }); } catch (_) {} }
+              el.click();
+            }
+
             var label = (el.innerText || el.value || el.getAttribute('aria-label') || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 24);
-            return 'CLICKED::Tested click on "' + (label || el.tagName.toLowerCase()) + '"';
+            return 'CLICKED::Tested ' + (isTap ? 'tap' : 'click') + ' on "' + (label || el.tagName.toLowerCase()) + '"';
           } catch (e) {
-            return 'RESTRICTED::' + (e && e.message ? e.message : 'Unable to execute click');
+            return 'RESTRICTED::' + (e && e.message ? e.message : 'Unable to execute interaction');
           }
         })();
     """.trimIndent()
